@@ -1,0 +1,37 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: MOBEAST chlorophyll concentration calculations
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+## Load the Libraries
+```{r}
+library(tidyverse) 
+library(here)
+library(gt) 
+library(ghibli) 
+```
+
+## Load the Data
+```{r}
+chla <- read_csv(here("data", "chlorophyll_MOBEAST.csv"))
+```
+
+```{r}
+chla %>% 
+  mutate(conc_extractant = fluorometer*dilution_factor,
+         filter_deposit = extraction_vol*conc_extractant/1000,
+         chla_conc = round(filter_deposit/vol_filtered*1000, digits = 3))%>% 
+  write_csv(here("outputs", "chla_conc.csv"))
+```
+
+
+
+
