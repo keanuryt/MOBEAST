@@ -1,0 +1,122 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: ROTUI DOC verification
+output: pdf_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+```
+
+
+## Load data
+```{r}
+meta <- read_delim(here("data", "ROTUI_metadata.csv"))
+DOC <- read_delim(here("data", "raw_data", "DOC", "ROTUI_NPOC_TN_241108.csv"))
+```
+
+
+```{r}
+meta <- meta %>% clean_names() %>% filter(site != "River 1") %>% 
+  mutate(date = ymd(date))  
+```
+
+```{r}
+DOC <- DOC %>% clean_names() 
+```
+
+
+```{r}
+DOC_join <- left_join(meta, DOC, by = "sample_id")
+```
+
+
+## Check data for NPOC (mg/L)
+The values appear mostly consistent.  
+
+
+However, **site B2** (2024-08-09) has higher value compared to other B2 measurements. B2 is located in the middle of the Tautira Bassin, close to the village. It is arguably the closest site to the **Water Treatment Plant (WTP)** outfall. Maybe we just caught a plume of outfall water, _OR_ it's an outlier point.  
+```{r, fig.height= 6, fig.width=10}
+DOC_join %>% drop_na(npoc_mg_l) %>% 
+  ggplot(aes(x= site, y = npoc_mg_l)) +
+  geom_point() + 
+  geom_text_repel(aes(label = site)) +
+  geom_point(data=DOC_join %>% filter(npoc_mg_l > 1.3), 
+           pch=21, 
+           size=4, 
+           colour="red") +
+  facet_wrap(.~date)+
+  theme_bw()+
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle = 60, vjust = 0.5),
+        panel.background = element_rect(fill = "azure1")) 
+```
+
+## Check data for TN (mg/L)
+All the data point seem to be consistent with one another.  
+The Water Treatment Plant (WTP) data point is the highest but I think that's normal.
+
+```{r, fig.height= 6, fig.width=10}
+DOC_join %>% drop_na(tn_mg_l) %>% 
+  ggplot(aes(x= site, y = tn_mg_l)) +
+  geom_point() + 
+  geom_text_repel(aes(label = site)) +
+  geom_point(data=DOC_join %>% filter(tn_mg_l > 2), 
+           pch=21, 
+           size=4, 
+           colour="red") +
+  facet_wrap(.~date)+
+  theme_bw()+
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle = 60, vjust = 0.5),
+        panel.background = element_rect(fill = "azure1")) 
+```
+
+
+## Some Stats
+The NPOC standard deviations remain fairly small.  
+The largest std dev occur for B2 (0.33), R8 (0.20) and S2 (0.14).  
+B2 might be impacted by the treatment plant outfall.  
+S2 is a stream mouth and it may vary more because I may have sampled more river water one time and more lagoon water another time.  
+  
+```{r}
+DOC_join %>%
+  group_by(site) %>% 
+  summarise(avg_npoc_mgl = round(mean(npoc_mg_l, na.rm = T), digits = 3),
+            std_dev_npoc_mgl = round(sd(npoc_mg_l, na.rm = T),digits = 3),
+            avg_tn_mgl = round(mean(tn_mg_l, na.rm = T), digits = 3),
+            std_dev_tn_mgl = round(sd(tn_mg_l, na.rm = T),digits = 3)) %>% 
+  gt() %>% 
+  cols_label(avg_npoc_mgl = "Average NPOC (mg/L)",
+             std_dev_npoc_mgl = "Std.Dev.NPOC (mg/L)",
+             avg_tn_mgl = "Average TN (mg/L)",
+             std_dev_tn_mgl= "Std.Dev.TN (mg/L)")
+  
+```
+
+
+

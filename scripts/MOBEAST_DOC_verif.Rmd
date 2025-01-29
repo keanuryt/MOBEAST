@@ -1,0 +1,132 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: MOBEAST DOC verification
+output: pdf_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE , 
+                      warning = FALSE)
+```
+
+<!-- ## Load Libraries -->
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+```
+
+<!--## Load Data -->
+```{r}
+meta <- read_delim(here("data", "MOBEAST_metadata.csv"))
+DOC <- read_delim(here("data", "raw_data", "DOC", "MOBEAST_NPOC_TN_241010.csv"))
+```
+
+## Codes of the treatment  
+```{r}
+treat_code <- tibble(
+  treatment = c("A", "K", "C", "R"),
+  full_name = c("Algae", "Coral", "Control", "Rubble")
+)
+treat_table <- treat_code %>% gt() %>% 
+  cols_label(treatment = "Treatment Code",
+             full_name = "Treatment Name")
+treat_table
+```
+
+
+<!-- ## Data clean up -->
+```{r}
+meta <- meta %>% clean_names() %>% drop_na() %>%
+  mutate(long_name = str_trim(long_name)) %>% 
+  filter(long_name != "Long Name") %>% 
+  mutate(date = mdy(date), 
+         time = format(strptime(time, format = "%H%M"), "%H:%M"),
+         id_number = str_trim(id_number))  
+```
+
+```{r}
+DOC <- DOC %>% clean_names() 
+```
+
+<!-- ## Joining the data -->
+```{r}
+DOC_join <- left_join(meta, DOC, by = "id_number")
+```
+
+## Check data for NPOC (mg/L)
+
+The following points have a value different than the other data points: 
+
+- 2024-06-02 18:00: **T8** and **T11**. These are the same points as the ones Laurel identified.  
+- 2024-06-03 00:00: **F1, F2, T2, T5, T3** and **T13**. However, that's a lot of points so they might not be outliers.  
+
+```{r}
+DOC_join %>% drop_na(npoc_mg_l) %>% filter(treatment != "Endmember") %>% 
+  ggplot(aes(x= treatment, y = npoc_mg_l, color = as.factor(time))) +
+  geom_point() + 
+  geom_text_repel(aes(label = tank_number)) +
+  geom_point(data=DOC_join %>% filter(npoc_mg_l > 3.5), 
+           pch=21, 
+           size=4, 
+           colour="red") +
+  facet_wrap(.~date)+
+  theme_bw()+
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle = 45, vjust = 0.5),
+        panel.background = element_rect(fill = "azure1"))+
+   scale_color_ghibli_d("SpiritedMedium", direction=-1)
+  
+  
+  
+```
+
+
+## Check data for TN (mg/L)
+
+For TN, **T11** at 2024-06-03 6:00 seems to be a clear outlier. The tanks that were identified as outliers in the NPOC plot above do not appear on the TN plot.  
+```{r}
+DOC_join %>% drop_na(tn_mg_l) %>% filter(treatment != "Endmember") %>% 
+  ggplot(aes(x= treatment, y = tn_mg_l, color = as.factor(time))) +
+  geom_point() + 
+  geom_text_repel(aes(label = tank_number)) +
+  geom_point(data=DOC_join %>% filter(tn_mg_l > 0.9), 
+           pch=21, 
+           size=4, 
+           colour="red") +
+  facet_wrap(.~date)+
+  theme_bw()+
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle = 45, vjust = 0.5),
+        panel.background = element_rect(fill = "azure1"))+
+   scale_color_ghibli_d("SpiritedMedium", direction=-1)
+```
+
+<!--
+## Overall Stats
+```{r}
+DOC_join %>% filter(treatment != "Endmember", treatment != "Rain" ) %>%
+  group_by(date, time, treatment) %>% 
+  summarise(avg = mean(npoc_mg_l, na.rm = T),
+            std_dev = sd(npoc_mg_l, na.rm = T))
+```
+-->
+
+

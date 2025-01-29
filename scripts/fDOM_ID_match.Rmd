@@ -1,0 +1,45 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: MOBEAST chlorophyll concentration calculations
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+```{r}
+library(here)
+library(tidyverse)
+library(janitor)
+```
+
+```{r}
+fdom <- read_csv(here("data", "fDOM_inv.csv"))
+dna <- read_csv(here("data", "DNA_inv.csv"))
+```
+
+```{r}
+fdom<- fdom %>% clean_names() %>% select (-id_number)
+```
+
+```{r}
+dna <- dna %>% clean_names() %>% select(id_number, long_name,tank_number)
+```
+
+
+```{r}
+fdom_new <- left_join(fdom,dna, by= c("long_name","tank_number"))
+```
+
+```{r}
+fdom_new<- fdom_new %>%  relocate(id_number, .before= "long_name")
+```
+
+```{r}
+write_csv(fdom_new, here("data", "fdom_new.csv"))
+```
+
