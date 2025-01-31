@@ -1,0 +1,84 @@
+######################################################################################
+Log File: C:\Users\Craig Nelson\Desktop\Swift\Keanu\MOBEAST\run5\AqualogSampleQLog.txt
+Date: Saturday, December 14, 2024
+Time: 11:28:24 AM
+######################################################################################
+[2024-12-14 11-28-24] 
+Aqualog Sample Q Experimental Parameters:
+[Aqualog Sample Q File] C:\Users\Craig Nelson\Desktop\Swift\AqualogSampleQ.aqu
+[Aqualog Experiment File] C:\Users\Craig Nelson\Desktop\Swift\AqualogSampleQ.xml
+[Output Destination Folder] C:\Users\Craig Nelson\Desktop\Swift\Keanu\MOBEAST\run5\
+
+Output File Names:
+[Blank Group Prefix] Group
+[Blank File Base] Blank
+[Sample Prefix] Sample
+
+Blank & Sample Setup:
+[Blank Group Count] 8
+[Blank Group Start] 1
+[Samples Per Blank] 7
+[Blank Group Start] 1
+[Total Number of Blanks & Samples] 64
+
+Post Prossessing Options:
+
+Export Options:
+ASCII = True
+ABS = True
+BEM = True
+SEM = True
+
+Delay Options:
+Single Cell Kinetics = False
+Delay Before First Blank = 0 Seconds
+Delay Between Each Experiment = 0 Seconds
+
+Starting (Run/Resume) Position:
+[Blank Start Index] 0
+[Sample Start Index] 0
+################################################################################
+[2024-12-14 11-28-24] STARTING Aqualog SampleQ Execution
+[2024-12-14 11-33-45] Experiment 01 of 64 [Blank 000, Sample 0000] [Files: Group001Blank*] Start Done
+[2024-12-14 11-37-43] Experiment 02 of 64 [Blank 000, Sample 0001] [Files: Group001Sample0001*] Start Done
+[2024-12-14 11-46-05] Experiment 03 of 64 [Blank 000, Sample 0002] [Files: Group001Sample0002*] Start Done
+[2024-12-14 11-50-05] Experiment 04 of 64 [Blank 000, Sample 0003] [Files: Group001Sample0003*] Start Done
+[2024-12-14 11-59-45] Experiment 05 of 64 [Blank 000, Sample 0004] [Files: Group001Sample0004*] Start Done
+[2024-12-14 12-03-52] Experiment 06 of 64 [Blank 000, Sample 0005] [Files: Group001Sample0005*] Start Done
+[2024-12-14 12-11-17] Experiment 07 of 64 [Blank 000, Sample 0006] [Files: Group001Sample0006*] Start Done
+[2024-12-14 12-15-24] Experiment 08 of 64 [Blank 000, Sample 0007] [Files: Group001Sample0007*] Start Done
+[2024-12-14 12-23-08] Experiment 09 of 64 [Blank 001, Sample 0000] [Files: Group002Blank*] Start Done
+[2024-12-14 12-27-08] Experiment 10 of 64 [Blank 001, Sample 0001] [Files: Group002Sample0001*] Start Done
+[2024-12-14 12-35-31] Experiment 11 of 64 [Blank 001, Sample 0002] [Files: Group002Sample0002*] Start Done
+[2024-12-14 12-39-38] Experiment 12 of 64 [Blank 001, Sample 0003] [Files: Group002Sample0003*] Start Done
+[2024-12-14 12-48-39] Experiment 13 of 64 [Blank 001, Sample 0004] [Files: Group002Sample0004*] Start Done
+[2024-12-14 12-52-39] Experiment 14 of 64 [Blank 001, Sample 0005] [Files: Group002Sample0005*] Start Done
+[2024-12-14 13-00-07] Experiment 15 of 64 [Blank 001, Sample 0006] [Files: Group002Sample0006*] Start Done
+[2024-12-14 13-04-08] Experiment 16 of 64 [Blank 001, Sample 0007] [Files: Group002Sample0007*] Start Done
+[2024-12-14 13-12-12] Experiment 17 of 64 [Blank 002, Sample 0000] [Files: Group003Blank*] Start Done
+[2024-12-14 13-16-12] Experiment 18 of 64 [Blank 002, Sample 0001] [Files: Group003Sample0001*] Start Done
+[2024-12-14 13-23-54] Experiment 19 of 64 [Blank 002, Sample 0002] [Files: Group003Sample0002*] Start Done
+[2024-12-14 13-28-00] Experiment 20 of 64 [Blank 002, Sample 0003] [Files: Group003Sample0003*] Start Done
+[2024-12-14 13-35-37] Experiment 21 of 64 [Blank 002, Sample 0004] [Files: Group003Sample0004*] Start Done
+[2024-12-14 13-39-43] Experiment 22 of 64 [Blank 002, Sample 0005] [Files: Group003Sample0005*] Start Done
+[2024-12-14 14-31-13] Experiment 23 of 64 [Blank 002, Sample 0006] [Files: Group003Sample0006*] Start Done
+[2024-12-14 14-35-20] Experiment 24 of 64 [Blank 002, Sample 0007] [Files: Group003Sample0007*] Start Done
+[2024-12-14 14-45-54] Experiment 25 of 64 [Blank 003, Sample 0000] [Files: Group004Blank*] Start Done
+[2024-12-14 14-49-55] Experiment 26 of 64 [Blank 003, Sample 0001] [Files: Group004Sample0001*] Start Done
+[2024-12-14 14-57-01] Experiment 27 of 64 [Blank 003, Sample 0002] [Files: Group004Sample0002*] Start Done
+[2024-12-14 15-01-08] Experiment 28 of 64 [Blank 003, Sample 0003] [Files: Group004Sample0003*] Start Done
+[2024-12-14 15-09-20] Experiment 29 of 64 [Blank 003, Sample 0004] [Files: Group004Sample0004*] Start Done
+[2024-12-14 15-13-26] Experiment 30 of 64 [Blank 003, Sample 0005] [Files: Group004Sample0005*] Start Done
+[2024-12-14 15-24-37] Experiment 31 of 64 [Blank 003, Sample 0006] [Files: Group004Sample0006*] Start Done
+[2024-12-14 15-28-38] Experiment 32 of 64 [Blank 003, Sample 0007] [Files: Group004Sample0007*] Start Done
+[2024-12-14 15-35-14] Experiment 33 of 64 [Blank 004, Sample 0000] [Files: Group005Blank*] Start Done
+[2024-12-14 15-39-14] Experiment 34 of 64 [Blank 004, Sample 0001] [Files: Group005Sample0001*] Start Done
+[2024-12-14 15-46-46] Experiment 35 of 64 [Blank 004, Sample 0002] [Files: Group005Sample0002*] Start Done
+[2024-12-14 15-50-52] Experiment 36 of 64 [Blank 004, Sample 0003] [Files: Group005Sample0003*] Start Done
+[2024-12-14 15-58-15] Experiment 37 of 64 [Blank 004, Sample 0004] [Files: Group005Sample0004*] Start Done
+[2024-12-14 16-02-21] Experiment 38 of 64 [Blank 004, Sample 0005] [Files: Group005Sample0005*] Start Done
+[2024-12-14 16-09-10] Experiment 39 of 64 [Blank 004, Sample 0006] [Files: Group005Sample0006*] Start Done
+[2024-12-14 16-13-16] Experiment 40 of 64 [Blank 004, Sample 0007] [Files: Group005Sample0007*] Start Done
+[2024-12-14 16-21-01] Experiment 41 of 64 [Blank 005, Sample 0000] [Files: Group006Blank*] Start Done
+[2024-12-14 16-24-59] Experiment 42 of 64 [Blank 005, Sample 0001] [Files: Group006Sample0001*] Start Done
+[2024-12-14 16-30-03] USER CANCELED Aqualog SampleQ Execution

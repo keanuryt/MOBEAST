@@ -1,0 +1,77 @@
+######################################################################################
+Log File: C:\Users\Craig Nelson\Desktop\Swift\Keanu\MOBEAST\run1\AqualogSampleQLog.txt
+Date: Thursday, November 07, 2024
+Time: 3:12:17 PM
+######################################################################################
+[2024-11-07 15-12-17] 
+Aqualog Sample Q Experimental Parameters:
+[Aqualog Sample Q File] C:\Users\Craig Nelson\Desktop\Swift\AqualogSampleQ.aqu
+[Aqualog Experiment File] C:\Users\Craig Nelson\Desktop\Swift\AqualogSampleQ.xml
+[Output Destination Folder] C:\Users\Craig Nelson\Desktop\Swift\Keanu\MOBEAST\run1\
+
+Output File Names:
+[Blank Group Prefix] Group
+[Blank File Base] Blank
+[Sample Prefix] Sample
+
+Blank & Sample Setup:
+[Blank Group Count] 4
+[Blank Group Start] 1
+[Samples Per Blank] 7
+[Blank Group Start] 1
+[Total Number of Blanks & Samples] 32
+
+Post Prossessing Options:
+
+Export Options:
+ASCII = True
+ABS = True
+BEM = True
+SEM = True
+
+Delay Options:
+Single Cell Kinetics = False
+Delay Before First Blank = 0 Seconds
+Delay Between Each Experiment = 0 Seconds
+
+Starting (Run/Resume) Position:
+[Blank Start Index] 0
+[Sample Start Index] 0
+################################################################################
+[2024-11-07 15-12-17] STARTING Aqualog SampleQ Execution
+[2024-11-07 15-19-08] Experiment 01 of 32 [Blank 000, Sample 0000] [Files: Group001Blank*] Start Done
+[2024-11-07 15-23-09] Experiment 02 of 32 [Blank 000, Sample 0001] [Files: Group001Sample0001*] Start
+[2024-11-07 15-27-16] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 15-32-43] Experiment 03 of 32 [Blank 000, Sample 0002] [Files: Group001Sample0002*] Start Done
+[2024-11-07 15-36-46] Experiment 04 of 32 [Blank 000, Sample 0003] [Files: Group001Sample0003*] Start
+[2024-11-07 15-40-48] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 15-45-33] Experiment 05 of 32 [Blank 000, Sample 0004] [Files: Group001Sample0004*] Start
+[2024-11-07 15-49-34] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 15-49-35] Experiment 06 of 32 [Blank 000, Sample 0005] [Files: Group001Sample0005*] Start Done
+[2024-11-07 15-58-56] Experiment 07 of 32 [Blank 000, Sample 0006] [Files: Group001Sample0006*] Start
+[2024-11-07 16-02-58] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 16-02-58] Experiment 08 of 32 [Blank 000, Sample 0007] [Files: Group001Sample0007*] Start
+[2024-11-07 16-07-00] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 16-11-18] Experiment 09 of 32 [Blank 001, Sample 0000] [Files: Group002Blank*] Start Done
+[2024-11-07 16-15-17] Experiment 10 of 32 [Blank 001, Sample 0001] [Files: Group002Sample0001*] Start
+[2024-11-07 16-19-19] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 16-25-08] Experiment 11 of 32 [Blank 001, Sample 0002] [Files: Group002Sample0002*] Start
+[2024-11-07 16-29-09] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 16-29-10] Experiment 12 of 32 [Blank 001, Sample 0003] [Files: Group002Sample0003*] Start Done
+[2024-11-07 16-38-08] Experiment 13 of 32 [Blank 001, Sample 0004] [Files: Group002Sample0004*] Start
+[2024-11-07 16-42-09] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 16-42-10] Experiment 14 of 32 [Blank 001, Sample 0005] [Files: Group002Sample0005*] Start
+[2024-11-07 16-46-11] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 16-52-12] Experiment 15 of 32 [Blank 001, Sample 0006] [Files: Group002Sample0006*] Start Done
+[2024-11-07 16-56-14] Experiment 16 of 32 [Blank 001, Sample 0007] [Files: Group002Sample0007*] Start
+[2024-11-07 17-00-15] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 17-04-15] Experiment 17 of 32 [Blank 002, Sample 0000] [Files: Group003Blank*] Start Done
+[2024-11-07 17-08-13] Experiment 18 of 32 [Blank 002, Sample 0001] [Files: Group003Sample0001*] Start Done
+[2024-11-07 17-17-55] Experiment 19 of 32 [Blank 002, Sample 0002] [Files: Group003Sample0002*] Start Done
+[2024-11-07 17-21-57] Experiment 20 of 32 [Blank 002, Sample 0003] [Files: Group003Sample0003*] Start
+[2024-11-07 17-25-58] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 17-30-08] Experiment 21 of 32 [Blank 002, Sample 0004] [Files: Group003Sample0004*] Start
+[2024-11-07 17-34-10] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 17-34-11] Experiment 22 of 32 [Blank 002, Sample 0005] [Files: Group003Sample0005*] Start
+[2024-11-07 17-38-13] ##### WARNING: CCD SATURATION OCCURRED ##### Done
+[2024-11-07 17-40-35] USER CANCELED Aqualog SampleQ Execution

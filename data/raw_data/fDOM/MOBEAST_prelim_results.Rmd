@@ -1,0 +1,431 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: MOBEAST Preliminary Results
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE , 
+                      warning = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(GGally)
+```
+
+## Load function
+```{r}
+source(here("functions", "function_ANOVA_nunu.R"))
+```
+
+
+## Load Data
+```{r}
+meta <- read_delim(here("data", "MOBEAST_metadata.csv"))
+DOC <- read_delim(here("data", "raw_data", "DOC", "MOBEAST_NPOC_TN_241010.csv"))
+fDOM <- read.csv(here("data", "fDOM", "fDOM_clean.csv"))
+```
+
+## Data manipulation 
+### Codes of the treatment  
+```{r}
+treat_code <- tibble(
+  treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
+  full_name = c("Algae", "Coral", "Control", "Rubble", "Inflow", "Endmember", "Rain")
+)
+```
+
+### Data clean up 
+```{r}
+meta <- meta %>% clean_names() %>% drop_na() %>%
+  mutate(long_name = str_trim(long_name),
+         treatment = as.factor(treatment)) %>% 
+  filter(long_name != "Long Name") %>% 
+  mutate(date = mdy(date), 
+         time = format(strptime(time, format = "%H%M"), "%H:%M"),
+         id_number = str_trim(id_number))  
+```
+
+```{r}
+DOC <- DOC %>% clean_names() 
+```
+
+```{r}
+fDOM <- fDOM %>% clean_names() %>% 
+  rename(id_number = unique_id) %>% 
+  select(id_number,coble_a, coble_c, coble_m, bix, hix, m_to_c, fi, lignin)
+```
+
+### Joining the data 
+```{r}
+DOC_join <- left_join(meta, DOC, by = "id_number")
+```
+
+```{r}
+DOC<- left_join(DOC_join, treat_code, by= "treatment")
+```
+
+```{r}
+DOC <- DOC %>% select(-treatment) %>% rename(treatment = full_name) %>%
+  relocate(treatment,.after = tank_number) %>% 
+  mutate(treatment = factor(treatment, levels = c("Inflow", "Control", "Coral", "Algae", "Rubble", "Endmember", "Rain")))
+```
+
+```{r}
+fDOM <- left_join(meta, fDOM, by="id_number")
+
+```
+
+```{r}
+fDOM <- left_join(fDOM, treat_code, by = "treatment")
+```
+
+```{r}
+fDOM <- fDOM %>% select(-treatment) %>% 
+  mutate(treatment = full_name) %>% 
+  relocate(treatment, .after = tank_number) %>% 
+  mutate(treatment = factor(treatment, levels= c("Inflow", "Control", "Coral", "Algae", "Rubble", "Endmember", "Rain"))) %>% select(-full_name)
+```
+
+## Data visualization
+```{r}
+
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        legend.position = "none",
+        panel.background = element_rect(fill = "azure1"))
+```
+
+### DOC Visualization
+#### Run ANOVA on data and graph plots
+```{r}
+# apply an ANOVA and Tukey's test that I coded for
+anova_nunu(DOC, indep_var = treatment, dep_var = npoc_u_m)
+
+#make a boxplot of the DOC by treatments
+DOC_uM <- DOC %>% 
+ggplot(aes(treatment, npoc_u_m))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+ #apply the tukey's test results
+   labs(x = "Treatment",
+       y = "DOC (uM)") + # provide labels 
+  nunu_theme #i coded a theme above that will be applied to all graphs
+```
+```{r}
+#same steps applied to chunk above
+anova_nunu(DOC, indep_var = treatment, dep_var = npoc_mg_l)
+
+DOC_mgL <- DOC %>% 
+ggplot(aes(treatment, npoc_mg_l))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+    labs(title = "Distribution of the DOC per treatment",
+       x = "Treatment",
+       y = "DOC (uM)",
+       fill = "Treatment") +
+  nunu_theme
+```
+
+
+```{r}
+#same steps applied to chunk above
+anova_nunu(DOC, indep_var = treatment, dep_var = tn_mg_l)
+
+TN_mgL<- DOC %>% 
+ggplot(aes(treatment, tn_mg_l))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(
+       x = "Treatment",
+       y = "TN (mg/L)") +
+  nunu_theme
+```
+
+```{r}
+#same steps applied to chunk above
+anova_nunu(DOC, indep_var = treatment, dep_var = tn_u_m)
+
+TN_uM <- DOC %>% 
+ggplot(aes(treatment, tn_u_m))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(
+       x = "Treatment",
+       y = "TN (uM)") +
+  nunu_theme
+```
+
+
+```{r DOC_summary, fig.width= 12, fig.height=8, fig.path="../outputs/"}
+#using patchwork package to arrange the plot as one figure
+
+p_doc_summary <- (DOC_mgL+DOC_uM)/(TN_mgL+TN_uM)
+p_doc_summary
+
+#ggsave("p_doc_summary.png", path = here("outputs"))
+```
+
+
+#### DOC Linear Model
+```{r}
+# the model uses treatment as predictor and the DOC(uM) as dependent variable
+# this hypothesize that the treatment will change the DOC concentration in tanks
+DOC_lm <- lm(npoc_u_m ~ treatment, data = DOC)
+summary(DOC_lm)
+```
+
+#### Evaluting the F-test given by the ANOVA
+```{r}
+Anova(DOC_lm)
+```
+**Results**:
+
+- F-test is pretty weak (F=1.08) with not significant results (p = 0.38)
+- Variation within tank groups cannot be explained by the treatments...
+
+#### Check the "quality" of the data (skewness..etc.)
+```{r}
+resid_panel(DOC_lm, plots= c("resid", "qq", "lev", "hist"))
+```
+- Residual plot shows that the data is well distributed on either side of the line and respect the independent distribution assumption.
+
+### fDOM Visualization 
+
+
+```{r}
+#apply personal ANOVA + Tukey's test fucntion
+anova_nunu(fDOM, indep_var = treatment, dep_var = coble_a)
+
+# plot a boxplot with the tukey's test results
+cobA<- ggplot(fDOM, aes(treatment, coble_a ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(title = "Distribution of the fDOM index per treatment",
+        caption= "cobbleA: Humic, terrestrial ubiquitous FDOM")+ #,
+  # adding information on the type of fDOM on the graph
+      # x = "Treatment",
+      # y = "fDOM",
+      # fill = "Treatment") + 
+  nunu_theme + # personal theme for these graphs
+  theme(plot.caption = element_text(size=11)) # change font of the footnote
+```
+
+```{r, include = FALSE}
+#same as above
+anova_nunu(fDOM, indep_var = treatment, dep_var = coble_c)
+
+cobC<- ggplot(fDOM, aes(treatment, coble_c ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(caption= "cobleC: Humic-like FDOM, ubiquitous,terrestrial") +
+  nunu_theme +
+  theme(plot.caption = element_text(size=11))
+```
+
+```{r , include = FALSE}
+#same as above
+anova_nunu(fDOM, indep_var = treatment, dep_var = coble_m)
+
+cobM <-ggplot(fDOM, aes(treatment, coble_m ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(caption= "cobleM: marine and freshwater autoch prod of new humics") +
+  nunu_theme +
+  theme(plot.caption = element_text(size=11))
+```
+
+```{r, include = FALSE}
+#same as above
+anova_nunu(fDOM, indep_var = treatment, dep_var = bix)
+
+bix <-ggplot(fDOM, aes(treatment, bix ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(caption= "BIX: B fluorophore presence, autoch bio activity") +
+  nunu_theme +
+  theme(plot.caption = element_text(size=11))
+```
+
+```{r, include = FALSE}
+#same as above
+anova_nunu(fDOM, indep_var = treatment, dep_var = hix)
+
+hix <-ggplot(fDOM, aes(treatment, hix ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(caption= "HIX: humification index, aromatics conc") +
+  nunu_theme +
+  theme(plot.caption = element_text(size=11))
+```
+
+```{r, include = FALSE}
+#same as above
+anova_nunu(fDOM, indep_var = treatment, dep_var = m_to_c)
+
+m2c <-ggplot(fDOM, aes(treatment, m_to_c ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(caption= "M:C : marine/terrestrial humics") +
+  nunu_theme +
+  theme(plot.caption = element_text(size=11))
+```
+
+```{r, include = FALSE}
+#same as above
+anova_nunu(fDOM, indep_var = treatment, dep_var = fi)
+
+fi <-ggplot(fDOM, aes(treatment, fi ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(caption= "FI: microbL fluvic acid") +
+  nunu_theme +
+  theme(plot.caption = element_text(size=11))
+```
+
+```{r, include = FALSE}
+#same as above
+anova_nunu(fDOM, indep_var = treatment, dep_var = lignin)
+
+lignin <-ggplot(fDOM, aes(treatment, lignin ))+
+  geom_boxplot(aes(fill = treatment))+
+  geom_text(data =Tk, aes(x= treatment, y = quant, label = cld),
+            size = 4, vjust = -1, hjust =-0.5)+
+   labs(caption= "lignin: wood DOM ") +
+  nunu_theme +
+  theme(plot.caption = element_text(size=11))
+```
+
+
+```{r fDOM_summary, fig.height=12, fig.width=8, fig.path= "../outputs/"}
+# Using patchwork to consolidated all the plots in one figure
+p_fdom_summary <- (cobA+cobC)/(cobM+m2c)/(bix+hix)/(fi+lignin)
+p_fdom_summary
+#ggsave("p_fdom_summary.png", path = here("outputs"))
+```
+
+```{r, include = FALSE}
+# plotting all of the relevant fDOM variables in one graph 
+# pivoting the dataframe to long format so I can change the fDOM variables as factor and fafcet wrap them
+
+fDOM %>% pivot_longer(cols = coble_a:lignin,
+                      names_to = "fdom_type",
+                      values_to = "values") %>% 
+  ggplot(aes(treatment, values))+
+  geom_boxplot(aes(fill = treatment))+
+   labs(title = "Distribution of the fDOM index per treatment",
+       x = "Treatment",
+       y = "fDOM",
+       fill = "Treatment") +
+  facet_wrap(.~fdom_type, scales = "free")+
+  theme_bw() + 
+  nunu_theme
+
+
+```
+
+
+### fDOM Linear Model
+
+```{r}
+cobA_lm <- lm(coble_a ~ treatment, data = fDOM)
+```
+
+```{r}
+Anova(cobA_lm)
+```
+```{r}
+resid_panel(cobA_lm, plots= c("resid", "qq", "lev", "hist"))
+```
+
+
+
+## 24h experiment 
+
+```{r}
+format <- "%Y-%m-%d %H:%M:%S"
+
+DOC_24h <- DOC %>% 
+  mutate(time = paste0(time, ":00"),
+         date = as.character(date),
+    date_time = as.POSIXct(paste(date, time), format=format),
+    date_time = factor(date_time)) %>% 
+  filter(date == "2024-06-02" | date == "2024-06-03") %>%
+
+  ggplot(aes(date_time, npoc_mg_l)) +
+  geom_boxplot(aes(fill = treatment))+
+  facet_wrap(.~treatment, nrow= 1) +
+  labs(title= "24h variations in DOC",
+       x = "Date-Time",
+       y= "DOC (mg/L)",
+       caption = "Missing time stamps correspond to 00:00")+
+  nunu_theme
+```
+
+```{r}
+
+TN_24h <- DOC %>% 
+  mutate(time = paste0(time, ":00"),
+         date = as.character(date),
+    date_time = as.POSIXct(paste(date, time), format=format),
+    date_time = factor(date_time)) %>% 
+  filter(date == "2024-06-02" | date == "2024-06-03") %>%
+
+  ggplot(aes(date_time, tn_mg_l)) +
+  geom_boxplot(aes(fill = treatment))+
+  facet_wrap(.~treatment, nrow= 1) +
+  labs(title= "24h variations in TN",
+       x = "Date-Time",
+       y= "TN (mg/L)",
+       caption = "Missing time stamps correspond to 00:00")+
+  nunu_theme
+```
+
+
+
+```{r 24h_DOC_TN, fig.width= 12, fig.height=8}
+DOC_24h/TN_24h
+
+ggsave("24h_DOC_TN.png", path = here("outputs"))
+```
+
+
+
+
+
+
