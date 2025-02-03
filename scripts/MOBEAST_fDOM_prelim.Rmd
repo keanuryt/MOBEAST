@@ -1,0 +1,489 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: MOBEAST fDOM Preliminary Results
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE , 
+                      warning = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(GGally)
+library(emmeans)
+```
+
+## Load function
+```{r}
+source(here("functions", "function_ANOVA_nunu.R"))
+```
+
+```{r}
+heatmap <- function(data , x, y, color) {
+  #creating a function using the penguin dataset, 
+  # x and y variables to plot and a color component 
+  # geom_func allows to swap the style of the plot
+  
+
+  ggplot(data , aes(x= {{x}}, y= {{y}}, fill = {{color}})) +
+    geom_tile()+
+    theme_bw() +
+    theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+}
+
+```
+
+
+## Load Data 
+```{r}
+fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
+```
+
+## Data visualization theme
+```{r}
+
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+## Hierarchical hypothesis testing 
+
+### Design function to automate the process 
+```{r}
+fDOM_hyp_test <- function(data, fDOM_var) {
+  
+  # look at the baseline of endmembers: lagoon, bay and ocean channel and rain
+  ## table summary of average and stand dev with endmembers 
+  ## the goal is to see is the endmember values are consistent
+  
+  endmem_summary <<- data %>% group_by(sample_type) %>% 
+  summarise(avg= mean({{fDOM_var}}, rm.na = T), 
+            std_dev = sd({{fDOM_var}}))
+  
+  ## plot the endmember values on a heat map for visualization 
+  heat_map <<- ggplot(data , aes(x= sample_type, y = factor(date_time), 
+                    fill = {{fDOM_var}})) +
+    geom_tile()+
+    scale_fill_distiller(palette = "RdYlBu")+
+    nunu_theme
+  
+  
+  # Is the inflow consistent ? 
+  ## Remove the end members of the data set
+  fDOM_inflow<- data %>% select(tank_number, treatment, sample_type, date,
+                                    time, date_time, {{fDOM_var}}) %>% 
+    filter (treatment != "Endmember", treatment!= "Rain") 
+  
+  ## Boxplot to show the distribution of variables without endmembers
+  boxgraph <<- fDOM_inflow %>% ggplot(aes(x= treatment, y= {{fDOM_var}}))+
+      geom_boxplot(aes(fill = treatment))+
+      nunu_theme
+  
+    ## calculate mean and std dev without the endmembers  
+    inflow_summary <<- fDOM_inflow%>% 
+      group_by(treatment) %>% 
+      summarise(avg = mean({{fDOM_var}}, na.rm = T),
+            std_dev = sd({{fDOM_var}}, na.rm = T))
+    
+  ## graph distribution of the std dev 
+  point_graph <<- fDOM_inflow%>% 
+    group_by(treatment) %>% 
+    summarise(avg = mean({{fDOM_var}}, na.rm = T),
+            std_dev = sd({{fDOM_var}}, na.rm = T)) %>% 
+    ggplot(aes(x= treatment, y= std_dev))+
+    geom_point(aes(color = treatment, size = 3))+
+    scale_y_continuous(limits = c(0, NA))+
+    nunu_theme
+  
+  # remove the inflow data point 
+  fDOM_ctrl_trmt <- fDOM_inflow %>% 
+    filter (treatment != "Inflow") %>% 
+    mutate(treatment = factor(treatment, 
+                            levels= c("Control", "Coral", "Rubble", "Algae")))
+  fDOM_ctrl_trmt <<- fDOM_ctrl_trmt
+      # treatment must be ordered factors for future linear model
+  
+  print("Outputs: endmem_summary, heat_map, boxgraph, inflow_summary,
+        point_graph, fDOM_ctrl_trmt")
+}
+```
+
+
+
+### CobleA
+```{r}
+fDOM_hyp_test(data = fDOM, fDOM_var = coble_a)
+```
+
+#### Baseline assessment
+Endmembers, i.e. Lagoon, Ocean channel, Bay and Rain, were measured to assess the "baseline" values of the environmental parameters measured, here cobleA which is a time of fDOM.  
+
+We calculated the the average and standard deviation.  
+
+From the heat maps, the values of cobleA in the endmembers seem close to one another and the standard deviations are low. We can consider that their values are consistent for now. 
+```{r}
+fDOM %>% group_by(sample_type) %>% 
+  summarise(avg= mean(coble_a, rm.na = T), 
+            std_dev = sd(coble_a))
+
+```
+
+```{r}
+heatmap(data = fDOM, x= sample_type, y = factor(date_time), color = coble_a) +
+  scale_fill_distiller(palette = "RdYlBu")
+
+
+```
+
+
+#### Variations in inflow
+The inflow was measured as a baseline for water that entered the tank.  
+
+It looks like the variation in flow are minimal and are there consistent.  
+The box plot plot shows minimal spread of the data. Plotting the standard deviations shows a low standard deviation.
+```{r}
+fDOM %>% select(tank_number, treatment, sample_type, date, time, date_time, coble_a) %>% filter (treatment != "Endmember", treatment!= "Rain") %>% 
+  group_by(treatment) %>% 
+  ggplot(aes(x= treatment, y= coble_a))+
+  geom_boxplot(aes(fill = treatment))
+
+
+```
+
+```{r}
+fDOM %>% select(tank_number, treatment, sample_type, date, time, date_time, coble_a) %>% filter (treatment != "Endmember", treatment!= "Rain") %>% 
+  group_by(treatment) %>% 
+  summarise(avg = mean(coble_a, na.rm = T),
+            std_dev = sd(coble_a, na.rm = T)) %>% 
+  ggplot(aes(x= treatment, y= std_dev))+
+  geom_point(aes(color = treatment, size = 3))+
+  scale_y_continuous(limits = c(0, NA))
+
+
+```
+
+#### Comparing the treatments to the control tanks
+
+We saw that the inflow was fairly consistent, we can now test the treatments vs. control. We are applying a Dunnett test to calculate the contrast between treatments and control. 
+```{r}
+cobA <- fDOM %>% select(tank_number, treatment, sample_type, date, time, date_time, coble_a) %>% filter (treatment != "Endmember", treatment!= "Rain", treatment != "Inflow") %>% 
+  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "Rubble", "Algae")))
+```
+
+Setting up the linear model to apply the Dunnett test via the emmeans() function. p-values of the contrast show not significant differences between the control and the treatments. 
+```{r}
+cobA_lm <-  lm(coble_a ~ treatment, data = cobA)
+
+emmeans(cobA_lm, specs=(trt.vs.ctrl ~ treatment))
+```
+
+### Conclusion cobleA
+There is no difference between control and treatments
+
+```{r}
+cobA %>% filter(treatment != "Control") %>% 
+   ggplot(aes(x= treatment, y= coble_a))+
+  geom_boxplot(aes(fill = treatment)) +
+  geom_hline(yintercept = 0.009160615, color = "red", linewidth = 2, alpha = 0.5)+
+  labs(caption = "red line is the average value of the inflow")+
+  nunu_theme
+```
+
+
+### CobleM
+
+```{r}
+fDOM_hyp_test(data = fDOM, fDOM_var = coble_m)
+```
+
+```{r}
+heat_map 
+endmem_summary
+boxgraph
+inflow_summary
+point_graph
+```
+
+
+```{r}
+
+# run contrast between control and treatment
+  ##  set up linear model to analyze contrasts
+fDOM_lm <- lm(coble_m ~ treatment, data = fDOM_ctrl_trmt)
+  
+  
+  ## run emmeans to see the difference btwn control and treatment
+emmeans(fDOM_lm, specs=(trt.vs.ctrl ~ treatment))
+```
+
+```{r}
+fDOM_ctrl_trmt %>% filter(treatment != "Control") %>% 
+   ggplot(aes(x= treatment, y= coble_m))+
+  geom_boxplot(aes(fill = treatment)) +
+  geom_hline(yintercept = 0.01105936, color = "red", linewidth = 2, alpha = 0.5)+
+  labs(caption = "red line is the average value of the inflow")+
+  nunu_theme
+```
+
+
+### CobleB
+```{r}
+fDOM_hyp_test(data = fDOM, fDOM_var = coble_b)
+```
+
+```{r}
+endmem_summary 
+```
+
+```{r}
+heat_map
+```
+
+```{r}
+boxgraph
+```
+
+```{r}
+inflow_summary
+```
+
+```{r}
+point_graph
+```
+
+
+```{r}
+# run contrast between control and treatment
+  ##  set up linear model to analyze contrasts
+fDOM_lm <- lm(coble_b ~ treatment, data = fDOM_ctrl_trmt)
+  
+  
+  ## run emmeans to see the difference btwn control and treatment
+emmeans(fDOM_lm, specs=(trt.vs.ctrl ~ treatment))
+```
+
+```{r}
+fDOM_ctrl_trmt %>% filter(treatment != "Control") %>% 
+   ggplot(aes(x= treatment, y= coble_b))+
+  geom_boxplot(aes(fill = treatment)) +
+  geom_hline(yintercept = 0.05406242, color = "red", linewidth = 2, alpha = 0.5)+
+  labs(caption = "red line is the average value of the inflow")+
+  nunu_theme
+```
+
+### CobleC
+```{r}
+fDOM_hyp_test(data = fDOM, fDOM_var = coble_c)
+```
+
+```{r}
+endmem_summary
+```
+
+```{r}
+heat_map
+```
+
+```{r}
+boxgraph
+```
+
+```{r}
+inflow_summary
+```
+
+```{r}
+point_graph
+```
+
+```{r}
+# run contrast between control and treatment
+  ##  set up linear model to analyze contrasts
+fDOM_lm <- lm(coble_c~ treatment, data = fDOM_ctrl_trmt)
+  
+  
+  ## run emmeans to see the difference btwn control and treatment
+emmeans(fDOM_lm, specs=(trt.vs.ctrl ~ treatment))
+```
+
+
+```{r}
+fDOM_ctrl_trmt %>% filter(treatment != "Control") %>% 
+   ggplot(aes(x= treatment, y= coble_c))+
+  geom_boxplot(aes(fill = treatment)) +
+  geom_hline(yintercept = 0.005663924	, color = "red", linewidth = 2, alpha = 0.5)+
+  labs(caption = "red line is the average value of the inflow")+
+  nunu_theme
+```
+
+
+
+### CobleT
+```{r}
+fDOM_hyp_test(data = fDOM, fDOM_var = coble_t)
+```
+
+```{r}
+endmem_summary 
+```
+
+```{r}
+heat_map
+```
+
+```{r}
+boxgraph
+```
+
+```{r}
+inflow_summary
+```
+
+```{r}
+point_graph
+```
+
+
+```{r}
+# run contrast between control and treatment
+  ##  set up linear model to analyze contrasts
+fDOM_lm <- lm(coble_t ~ treatment, data = fDOM_ctrl_trmt)
+  
+  
+  ## run emmeans to see the difference btwn control and treatment
+emmeans(fDOM_lm, specs=(trt.vs.ctrl ~ treatment))
+```
+
+```{r}
+fDOM_ctrl_trmt %>% filter(treatment != "Control") %>% 
+   ggplot(aes(x= treatment, y= coble_t))+
+  geom_boxplot(aes(fill = treatment)) +
+  geom_hline(yintercept = 0.07117004, color = "red", linewidth = 2, alpha = 0.5)+
+  labs(caption = "red line is the average value of the inflow")+
+  nunu_theme
+```
+
+### M to C Ratio 
+```{r}
+fDOM_hyp_test(data = fDOM, fDOM_var = m_to_c)
+```
+
+```{r}
+endmem_summary 
+```
+
+```{r}
+heat_map
+```
+
+```{r}
+boxgraph
+```
+
+```{r}
+inflow_summary
+```
+
+```{r}
+point_graph
+```
+
+
+```{r}
+# run contrast between control and treatment
+  ##  set up linear model to analyze contrasts
+fDOM_lm <- lm(m_to_c ~ treatment, data = fDOM_ctrl_trmt)
+  
+  
+  ## run emmeans to see the difference btwn control and treatment
+emmeans(fDOM_lm, specs=(trt.vs.ctrl ~ treatment))
+```
+
+```{r}
+fDOM_ctrl_trmt %>% filter(treatment != "Control") %>% 
+   ggplot(aes(x= treatment, y= m_to_c))+
+  geom_boxplot(aes(fill = treatment)) +
+  geom_hline(yintercept = 0.5063610	, color = "red", linewidth = 2, alpha = 0.5)+
+  labs(caption = "red line is the average value of the inflow")+
+  nunu_theme
+```
+
+### Fpeak
+```{r}
+fDOM_hyp_test(data = fDOM, fDOM_var = fpeak)
+```
+
+```{r}
+endmem_summary 
+```
+
+```{r}
+heat_map
+```
+
+```{r}
+boxgraph
+```
+
+```{r}
+inflow_summary
+```
+
+```{r}
+point_graph
+```
+
+
+```{r}
+# run contrast between control and treatment
+  ##  set up linear model to analyze contrasts
+fDOM_lm <- lm(fpeak ~ treatment, data = fDOM_ctrl_trmt)
+  
+  
+  ## run emmeans to see the difference btwn control and treatment
+emmeans(fDOM_lm, specs=(trt.vs.ctrl ~ treatment))
+```
+
+```{r}
+fDOM_ctrl_trmt %>% filter(treatment != "Control") %>% 
+   ggplot(aes(x= treatment, y= fpeak))+
+  geom_boxplot(aes(fill = treatment)) +
+  geom_hline(yintercept = 0.02720418		, color = "red", linewidth = 2, alpha = 0.5)+
+  labs(caption = "red line is the average value of the inflow")+
+  nunu_theme
+```
