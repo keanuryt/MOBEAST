@@ -105,7 +105,7 @@ fDOM_hyp_test <- function(data, fDOM_var) {
   
   # Is the inflow consistent ? 
   ## Remove the end members of the data set
-  fDOM_inflow<- data %>% select(tank_number, treatment, sample_type, date,
+  fDOM_inflow <<- data %>% select(tank_number, treatment, sample_type, date,
                                     time, date_time, {{fDOM_var}}) %>% 
     filter (treatment != "Endmember", treatment!= "Rain") 
   
@@ -138,7 +138,7 @@ fDOM_hyp_test <- function(data, fDOM_var) {
   fDOM_ctrl_trmt <<- fDOM_ctrl_trmt
       # treatment must be ordered factors for future linear model
   
-  print("Outputs: endmem_summary, heat_map, boxgraph, inflow_summary,
+  print("Outputs: endmem_summary, heat_map, boxgraph, fDOM_inflow, inflow_summary,
         point_graph, fDOM_ctrl_trmt")
 }
 ```
@@ -414,6 +414,87 @@ heat_map
 ```{r}
 boxgraph
 ```
+
+```{r, fig.height= 8, fig.width=12}
+fDOM_inflow %>% 
+  ggplot(aes(x= as.factor(date_time), y = m_to_c, 
+             group= date_time, fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ treatment )+
+  nunu_theme +
+  theme(axis.text.x = element_text(angle= 90, hjust= 1))
+```
+
+
+```{r, fig.height= 8, fig.width=12}
+# Are the fDOM concentration the same at 12PM  within treatments and different across treatments? 
+
+## Creating a df with only the 12PM samples 
+midday_mtoc <- fDOM_inflow %>% 
+  mutate(time= as.character(time)) %>% 
+  filter(time == "12:00:00") %>% # keep the 12 PM time
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "Rubble", "Algae")))
+
+## set a linear model 
+midday_lm <- lm(m_to_c ~ treatment*date_time, data = midday_mtoc)
+
+## anova to see differences between date_time
+Anova(midday_lm)
+
+## contrast between control and treatments
+emmeans(midday_lm, specs = trt.vs.ctrl ~ treatment)
+
+
+midday_mtoc %>% #mutate(time= as.character(time)) %>% 
+  #filter(time == "12:00:00") %>% 
+  ggplot(aes(x= as.factor(date_time), y = m_to_c, 
+             group= date_time, fill = treatment)) +
+  geom_boxplot()+
+  geom_hline(yintercept = 0.5063610	, color = "red", linewidth = 2, alpha = 0.5)+
+  facet_wrap(.~ treatment )+
+  labs(title = "12 PM samples")+
+  nunu_theme +
+  theme(axis.text.x = element_text(angle= 30, hjust= 1))
+```
+
+```{r}
+
+
+## Creating a df with only the 12PM samples 
+H24_mtoc <- fDOM_inflow %>%  
+  filter(date == "2024-06-02" | date == "2024-06-03") %>% 
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "Rubble", "Algae"))) %>% 
+  mutate(date_time = factor(date_time))
+
+## set a linear model 
+H24_mtoc_lm <- lm(m_to_c ~ date_time*treatment, data = H24_mtoc)
+
+## anova to see differences between date_time
+Anova(H24_mtoc_lm)
+
+## contrast between control and treatments
+pairs(emmeans(H24_mtoc_lm, specs = trt.vs.ctrl ~ date_time))
+
+
+fDOM_inflow %>%  
+  filter(date == "2024-06-02" | date == "2024-06-03") %>% 
+  filter(treatment != "Inflow") %>% 
+  ggplot(aes(x= as.factor(date_time), y = m_to_c, 
+             group= date_time, fill = treatment)) +
+  geom_boxplot()+
+  geom_hline(yintercept = 0.5063610	, color = "red", linewidth = 2, alpha = 0.5)+
+  facet_wrap(.~ treatment )+
+  labs(title = "24h experiment")+
+  nunu_theme +
+  theme(axis.text.x = element_text(angle= 30, hjust= 0.9))
+```
+
 
 ```{r}
 inflow_summary
