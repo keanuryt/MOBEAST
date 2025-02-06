@@ -426,6 +426,20 @@ fDOM_inflow %>%
 ```
 
 
+```{r}
+fDOM_inflow %>% group_by(treatment, date_time) %>% 
+  summarise(date_time, mean_mtoc = mean(m_to_c)) %>% 
+  ggplot(aes(x= date_time, y = mean_mtoc, 
+             color = treatment)) +
+  geom_point(size = 3)+
+  geom_line(linewidth = 1)+
+  #facet_wrap(.~ treatment )+
+  nunu_theme +
+  theme(axis.text.x = element_text(angle= 90, hjust= 1))
+```
+
+
+
 ```{r, fig.height= 8, fig.width=12}
 # Are the fDOM concentration the same at 12PM  within treatments and different across treatments? 
 
