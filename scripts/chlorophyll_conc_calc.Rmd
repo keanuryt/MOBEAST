@@ -24,6 +24,23 @@ library(ghibli)
 chla <- read_csv(here("data", "chlorophyll_MOBEAST.csv"))
 ```
 
+Volume filtered by cholorphyll should be around 125mL
+
+If V1 < 120 mL, then calculate the rest
+If V1, V2, V3 available : V1 + V2 + V3
+If V1 and V3 available: [(V1x2 +V3) + (V1 + V3x3)] /2
+If V2 and V3 available: [(V2x2 +V3) + (V2 + V3x3)] /2
+If V3> 30: (V2+V3)/2 + V2+V3
+```{r}
+
+
+
+
+```
+
+
+
+
 ```{r}
 chla %>% 
   mutate(conc_extractant = fluorometer*dilution_factor,
