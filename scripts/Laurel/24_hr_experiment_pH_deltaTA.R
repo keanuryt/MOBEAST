@@ -36,7 +36,7 @@ pHSlope <- pHSlope%>%
   rename(pH = pH_insitu) %>% # rename it 
   ungroup() %>% 
   mutate(Date = ymd(Date))
-  select(-c(TempInLab, mV, TrisCalDate, TTris, `(Intercept)`, mVTris))
+  #select(-c(TempInLab, mV, TrisCalDate, TTris, `(Intercept)`, mVTris))
 
 ## calculate inflow data using pH slope and flow by each inflow table ##
 InflowData <- pHSlope %>%

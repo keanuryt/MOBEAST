@@ -64,6 +64,8 @@ heatmap <- function(data , x, y, color) {
 ## Load Data 
 ```{r}
 fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
+
+fDOM<- fDOM %>% mutate(treatment = ifelse(treatment == "Rubble", "CCA", treatment))
 ```
 
 ## Data visualization theme
@@ -134,7 +136,7 @@ fDOM_hyp_test <- function(data, fDOM_var) {
   fDOM_ctrl_trmt <- fDOM_inflow %>% 
     filter (treatment != "Inflow") %>% 
     mutate(treatment = factor(treatment, 
-                            levels= c("Control", "Coral", "Rubble", "Algae")))
+                            levels= c("Control", "Coral", "CCA", "Algae")))
   fDOM_ctrl_trmt <<- fDOM_ctrl_trmt
       # treatment must be ordered factors for future linear model
   
@@ -202,7 +204,7 @@ fDOM %>% select(tank_number, treatment, sample_type, date, time, date_time, cobl
 We saw that the inflow was fairly consistent, we can now test the treatments vs. control. We are applying a Dunnett test to calculate the contrast between treatments and control. 
 ```{r}
 cobA <- fDOM %>% select(tank_number, treatment, sample_type, date, time, date_time, coble_a) %>% filter (treatment != "Endmember", treatment!= "Rain", treatment != "Inflow") %>% 
-  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "Rubble", "Algae")))
+  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae")))
 ```
 
 Setting up the linear model to apply the Dunnett test via the emmeans() function. p-values of the contrast show not significant differences between the control and the treatments. 
@@ -261,6 +263,107 @@ fDOM_ctrl_trmt %>% filter(treatment != "Control") %>%
 ```
 
 
+```{r, fig.height= 8, fig.width=12}
+# Are the fDOM concentration the same at 12PM  within treatments and different across treatments? 
+
+## Creating a df with only the 12PM samples 
+midday_cobM <- fDOM_inflow %>% 
+  mutate(time= as.character(time)) %>% 
+  filter(time == "12:00:00") %>% # keep the 12 PM time %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(coble_m[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(coble_m_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), coble_m / inflow_avg, NA)) %>%  # Normalize for coral & algae
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = as.factor(date_time))
+
+
+midday_cobM %>% #mutate(time= as.character(time)) %>% 
+  #filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y = coble_m_norm,  fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ date_time )+
+  labs(title = "12 PM variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "MtoC_norm_12PM.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+midday_lm <- lm(coble_m_norm ~ treatment*date_time, data = midday_cobM)
+
+## anova to see differences between date_time
+Anova(midday_lm)
+
+## contrast between control and treatments
+emmeans(midday_lm, specs = trt.vs.ctrl ~ treatment)
+```
+
+
+```{r}
+
+## Creating a df with only the 12PM samples 
+H24_cobM <- fDOM_inflow %>%  
+  filter(date == "2024-06-02" | date == "2024-06-03") %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(coble_m[treatment == "Inflow"], na.rm = T)) %>%
+  ungroup() %>%
+   mutate(coble_m_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), coble_m / inflow_avg, NA)) %>% 
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = factor(date_time))
+```
+
+```{r, fig.height= 8, fig.width=12}
+date_time_label <- c(
+  "2024-06-02 12:00:00" = "2024-06-02 12:00:00",
+  "2024-06-02 18:00:00" = "2024-06-02 18:00:00",
+  "2024-06-03" = "2024-06-03 00:00:00",
+  "2024-06-03 06:00:00" ="2024-06-03 06:00:00"
+)
+
+H24_cobM %>%  
+  ggplot(aes(x= treatment, y = coble_m_norm, fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ as.character(date_time), nrow = 1,
+              labeller = as_labeller(date_time_label))+
+  labs(title = "24h variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "fDOM_norm_24h.png",plot = last_plot(), path = here("outputs"), width= 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+H24_cobM_lm <- lm(coble_m_norm ~ date_time*treatment, data = H24_cobM)
+
+## anova to see differences between date_time
+Anova(H24_cobM_lm)
+
+## contrast between control and treatments
+pairs(emmeans(H24_cobM_lm, specs = trt.vs.ctrl ~ treatment))
+```
+
+
 ### CobleB
 ```{r}
 fDOM_hyp_test(data = fDOM, fDOM_var = coble_b)
@@ -301,6 +404,7 @@ emmeans(fDOM_lm, specs=(trt.vs.ctrl ~ treatment))
 fDOM_ctrl_trmt %>% filter(treatment != "Control") %>% 
    ggplot(aes(x= treatment, y= coble_b))+
   geom_boxplot(aes(fill = treatment)) +
+  facet_wrap(.~date_time)+
   geom_hline(yintercept = 0.05406242, color = "red", linewidth = 2, alpha = 0.5)+
   labs(caption = "red line is the average value of the inflow")+
   nunu_theme
@@ -353,6 +457,106 @@ fDOM_ctrl_trmt %>% filter(treatment != "Control") %>%
 
 
 
+```{r, fig.height= 8, fig.width=12}
+# Are the fDOM concentration the same at 12PM  within treatments and different across treatments? 
+
+## Creating a df with only the 12PM samples 
+midday_cobC<- fDOM_inflow %>% 
+  mutate(time= as.character(time)) %>% 
+  filter(time == "12:00:00") %>% # keep the 12 PM time %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(coble_c[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(coble_c_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), coble_c / inflow_avg, NA)) %>%  # Normalize for coral & algae
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = as.factor(date_time))
+
+
+midday_cobC %>% #mutate(time= as.character(time)) %>% 
+  #filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y = coble_c_norm,  fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ date_time )+
+  labs(title = "12 PM variations in Coble C",
+       x= "Treatment",
+       y = "Normalized Coble C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "cobC_norm_12PM.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+midday_lm <- lm(coble_c_norm ~ treatment*date_time, data = midday_cobC)
+
+## anova to see differences between date_time
+Anova(midday_lm)
+
+## contrast between control and treatments
+emmeans(midday_lm, specs = trt.vs.ctrl ~ treatment)
+```
+
+
+```{r}
+## Creating a df with only the 24h samples 
+H24_cobC <- fDOM_inflow %>%  
+  filter(date == "2024-06-02" | date == "2024-06-03") %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(coble_c[treatment == "Inflow"], na.rm = T)) %>%
+  ungroup() %>%
+   mutate(coble_c_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), coble_c / inflow_avg, NA)) %>% 
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = factor(date_time))
+```
+
+```{r, fig.height= 8, fig.width=12}
+date_time_label <- c(
+  "2024-06-02 12:00:00" = "2024-06-02 12:00:00",
+  "2024-06-02 18:00:00" = "2024-06-02 18:00:00",
+  "2024-06-03" = "2024-06-03 00:00:00",
+  "2024-06-03 06:00:00" ="2024-06-03 06:00:00"
+)
+
+H24_cobC %>%  
+  ggplot(aes(x= treatment, y = coble_c_norm, fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ as.character(date_time), nrow = 1,
+              labeller = as_labeller(date_time_label))+
+  labs(title = "24h variations in Coble C",
+       x= "Treatment",
+       y = "Normalized Coble C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "cobC_norm_24h.png",plot = last_plot(), path = here("outputs"), width= 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+H24_cobC_lm <- lm(coble_c_norm ~ date_time*treatment, data = H24_cobC)
+
+## anova to see differences between date_time
+Anova(H24_cobC_lm)
+
+## contrast between control and treatments
+pairs(emmeans(H24_cobC_lm, specs = trt.vs.ctrl ~ treatment))
+```
+
+
 ### CobleT
 ```{r}
 fDOM_hyp_test(data = fDOM, fDOM_var = coble_t)
@@ -394,8 +598,110 @@ fDOM_ctrl_trmt %>% filter(treatment != "Control") %>%
    ggplot(aes(x= treatment, y= coble_t))+
   geom_boxplot(aes(fill = treatment)) +
   geom_hline(yintercept = 0.07117004, color = "red", linewidth = 2, alpha = 0.5)+
+  facet_wrap(.~date_time)+
   labs(caption = "red line is the average value of the inflow")+
   nunu_theme
+```
+
+
+
+```{r, fig.height= 8, fig.width=12}
+# Are the fDOM concentration the same at 12PM  within treatments and different across treatments? 
+
+## Creating a df with only the 12PM samples 
+midday_cobT <- fDOM_inflow %>% 
+  mutate(time= as.character(time)) %>% 
+  filter(time == "12:00:00") %>% # keep the 12 PM time %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(coble_t[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(coble_t_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), coble_t / inflow_avg, NA)) %>%  # Normalize for coral & algae
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = as.factor(date_time))
+
+
+midday_cobT %>% #mutate(time= as.character(time)) %>% 
+  #filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y = coble_t_norm,  fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ date_time )+
+  labs(title = "12 PM variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "MtoC_norm_12PM.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+midday_lm <- lm(coble_t_norm ~ treatment*date_time, data = midday_cobT)
+
+## anova to see differences between date_time
+Anova(midday_lm)
+
+## contrast between control and treatments
+emmeans(midday_lm, specs = trt.vs.ctrl ~ treatment)
+```
+
+
+```{r}
+## Creating a df with only the 12PM samples 
+H24_cobT <- fDOM_inflow %>%  
+  filter(date == "2024-06-02" | date == "2024-06-03") %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(coble_t[treatment == "Inflow"], na.rm = T)) %>%
+  ungroup() %>%
+   mutate(coble_t_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), coble_t / inflow_avg, NA)) %>% 
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = factor(date_time))
+```
+
+```{r, fig.height= 8, fig.width=12}
+date_time_label <- c(
+  "2024-06-02 12:00:00" = "2024-06-02 12:00:00",
+  "2024-06-02 18:00:00" = "2024-06-02 18:00:00",
+  "2024-06-03" = "2024-06-03 00:00:00",
+  "2024-06-03 06:00:00" ="2024-06-03 06:00:00"
+)
+
+H24_cobT %>%  
+  ggplot(aes(x= treatment, y = coble_t_norm, fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ as.character(date_time), nrow = 1,
+              labeller = as_labeller(date_time_label))+
+  labs(title = "24h variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "fDOM_norm_24h.png",plot = last_plot(), path = here("outputs"), width= 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+H24_cobT_lm <- lm(coble_t_norm ~ date_time*treatment, data = H24_cobT)
+
+## anova to see differences between date_time
+Anova(H24_cobT_lm)
+
+## contrast between control and treatments
+pairs(emmeans(H24_cobT_lm, specs = trt.vs.ctrl ~ treatment))
 ```
 
 ### M to C Ratio 
@@ -446,67 +752,98 @@ fDOM_inflow %>% group_by(treatment, date_time) %>%
 ## Creating a df with only the 12PM samples 
 midday_mtoc <- fDOM_inflow %>% 
   mutate(time= as.character(time)) %>% 
-  filter(time == "12:00:00") %>% # keep the 12 PM time
+  filter(time == "12:00:00") %>% # keep the 12 PM time %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(m_to_c[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(mtoc_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), m_to_c / inflow_avg, NA)) %>%  # Normalize for coral & algae
   filter(treatment != "Inflow") %>% # remove the inflow 
   mutate(treatment = factor(treatment, # reorder the factor treatments 
                             levels = c("Control","Coral",
-                                       "Rubble", "Algae")))
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = as.factor(date_time))
 
+
+midday_mtoc %>% #mutate(time= as.character(time)) %>% 
+  #filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y = mtoc_norm,  fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ date_time )+
+  labs(title = "12 PM variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "MtoC_norm_12PM.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
 ## set a linear model 
-midday_lm <- lm(m_to_c ~ treatment*date_time, data = midday_mtoc)
+midday_lm <- lm(mtoc_norm ~ treatment*date_time, data = midday_mtoc)
 
 ## anova to see differences between date_time
 Anova(midday_lm)
 
 ## contrast between control and treatments
 emmeans(midday_lm, specs = trt.vs.ctrl ~ treatment)
-
-
-midday_mtoc %>% #mutate(time= as.character(time)) %>% 
-  #filter(time == "12:00:00") %>% 
-  ggplot(aes(x= as.factor(date_time), y = m_to_c, 
-             group= date_time, fill = treatment)) +
-  geom_boxplot()+
-  geom_hline(yintercept = 0.5063610	, color = "red", linewidth = 2, alpha = 0.5)+
-  facet_wrap(.~ treatment )+
-  labs(title = "12 PM samples")+
-  nunu_theme +
-  theme(axis.text.x = element_text(angle= 30, hjust= 1))
 ```
 
-```{r}
 
+```{r}
 
 ## Creating a df with only the 12PM samples 
 H24_mtoc <- fDOM_inflow %>%  
   filter(date == "2024-06-02" | date == "2024-06-03") %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(m_to_c[treatment == "Inflow"], na.rm = T)) %>%
+  ungroup() %>%
+   mutate(mtoc_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), m_to_c / inflow_avg, NA)) %>% 
   filter(treatment != "Inflow") %>% # remove the inflow 
   mutate(treatment = factor(treatment, # reorder the factor treatments 
                             levels = c("Control","Coral",
-                                       "Rubble", "Algae"))) %>% 
+                                       "CCA", "Algae"))) %>% 
   mutate(date_time = factor(date_time))
+```
 
+```{r, fig.height= 8, fig.width=12}
+date_time_label <- c(
+  "2024-06-02 12:00:00" = "2024-06-02 12:00:00",
+  "2024-06-02 18:00:00" = "2024-06-02 18:00:00",
+  "2024-06-03" = "2024-06-03 00:00:00",
+  "2024-06-03 06:00:00" ="2024-06-03 06:00:00"
+)
+
+H24_mtoc %>%  
+  ggplot(aes(x= treatment, y = mtoc_norm, fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ as.character(date_time), nrow = 1,
+              labeller = as_labeller(date_time_label))+
+  labs(title = "24h variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "fDOM_norm_24h.png",plot = last_plot(), path = here("outputs"), width= 12, height = 8)
+```
+
+```{r}
 ## set a linear model 
-H24_mtoc_lm <- lm(m_to_c ~ date_time*treatment, data = H24_mtoc)
+H24_mtoc_lm <- lm(mtoc_norm ~ date_time*treatment, data = H24_mtoc)
 
 ## anova to see differences between date_time
 Anova(H24_mtoc_lm)
 
 ## contrast between control and treatments
-pairs(emmeans(H24_mtoc_lm, specs = trt.vs.ctrl ~ date_time))
-
-
-fDOM_inflow %>%  
-  filter(date == "2024-06-02" | date == "2024-06-03") %>% 
-  filter(treatment != "Inflow") %>% 
-  ggplot(aes(x= as.factor(date_time), y = m_to_c, 
-             group= date_time, fill = treatment)) +
-  geom_boxplot()+
-  geom_hline(yintercept = 0.5063610	, color = "red", linewidth = 2, alpha = 0.5)+
-  facet_wrap(.~ treatment )+
-  labs(title = "24h experiment")+
-  nunu_theme +
-  theme(axis.text.x = element_text(angle= 30, hjust= 0.9))
+pairs(emmeans(H24_mtoc_lm, specs = trt.vs.ctrl ~ treatment))
 ```
 
 
@@ -579,6 +916,112 @@ fDOM_ctrl_trmt %>% filter(treatment != "Control") %>%
    ggplot(aes(x= treatment, y= fpeak))+
   geom_boxplot(aes(fill = treatment)) +
   geom_hline(yintercept = 0.02720418		, color = "red", linewidth = 2, alpha = 0.5)+
+  facet_wrap(.~date_time)+
   labs(caption = "red line is the average value of the inflow")+
   nunu_theme
 ```
+
+
+```{r, fig.height= 8, fig.width=12}
+# Are the fDOM concentration the same at 12PM  within treatments and different across treatments? 
+
+## Creating a df with only the 12PM samples 
+midday_fpeak <- fDOM_inflow %>% 
+  mutate(time= as.character(time)) %>% 
+  filter(time == "12:00:00") %>% # keep the 12 PM time %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(fpeak[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(fpeak_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), fpeak / inflow_avg, NA)) %>%  # Normalize for coral & algae
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = as.factor(date_time))
+
+
+midday_fpeak %>% #mutate(time= as.character(time)) %>% 
+  #filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y = fpeak_norm,  fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ date_time )+
+  labs(title = "12 PM variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "MtoC_norm_12PM.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+midday_lm <- lm(fpeak_norm ~ treatment*date_time, data = midday_fpeak)
+
+## anova to see differences between date_time
+Anova(midday_lm)
+
+## contrast between control and treatments
+emmeans(midday_lm, specs = trt.vs.ctrl ~ treatment)
+```
+
+
+```{r}
+## Creating a df with only the 12PM samples 
+H24_fpeak <- fDOM_inflow %>%  
+  filter(date == "2024-06-02" | date == "2024-06-03") %>% 
+  group_by(date_time) %>% 
+  mutate(inflow_avg = mean(fpeak[treatment == "Inflow"], na.rm = T)) %>%
+  ungroup() %>%
+   mutate(fpeak_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), fpeak / inflow_avg, NA)) %>% 
+  filter(treatment != "Inflow") %>% # remove the inflow 
+  mutate(treatment = factor(treatment, # reorder the factor treatments 
+                            levels = c("Control","Coral",
+                                       "CCA", "Algae"))) %>% 
+  mutate(date_time = factor(date_time))
+```
+
+```{r, fig.height= 8, fig.width=12}
+date_time_label <- c(
+  "2024-06-02 12:00:00" = "2024-06-02 12:00:00",
+  "2024-06-02 18:00:00" = "2024-06-02 18:00:00",
+  "2024-06-03" = "2024-06-03 00:00:00",
+  "2024-06-03 06:00:00" ="2024-06-03 06:00:00"
+)
+
+H24_fpeak %>%  
+  ggplot(aes(x= treatment, y = fpeak_norm, fill = treatment)) +
+  geom_boxplot()+
+  facet_wrap(.~ as.character(date_time), nrow = 1,
+              labeller = as_labeller(date_time_label))+
+  labs(title = "24h variations in M:C",
+       x= "Treatment",
+       y = "Normalized M:C")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "fDOM_norm_24h.png",plot = last_plot(), path = here("outputs"), width= 12, height = 8)
+```
+
+```{r}
+## set a linear model 
+H24_fpeak_lm <- lm(fpeak_norm ~ date_time*treatment, data = H24_fpeak)
+
+## anova to see differences between date_time
+Anova(H24_fpeak_lm)
+
+## contrast between control and treatments
+pairs(emmeans(H24_fpeak_lm, specs = trt.vs.ctrl ~ treatment))
+```
+
+
+
+
+

@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = FALSE,
                       warning = FALSE)
 ```
 
-<!-- ## Load Libraries -->
+## Load Libraries 
 ```{r}
 library(tidyverse)
 library(here)
@@ -19,9 +19,20 @@ library(janitor)
 library(ggrepel)
 library(ghibli)
 library(gt)
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(GGally)
+library(emmeans)
 ```
 
-<!--## Load Data -->
+## Load function
+```{r}
+source(here("functions", "function_ANOVA_nunu.R"))
+```
+
+## Load Data
 ```{r}
 meta <- read_delim(here("data", "MOBEAST_metadata.csv"))
 DOC <- read_delim(here("data", "raw_data", "DOC", "MOBEAST_NPOC_TN_241010.csv"))
@@ -30,17 +41,32 @@ DOC <- read_delim(here("data", "raw_data", "DOC", "MOBEAST_NPOC_TN_241010.csv"))
 ## Codes of the treatment  
 ```{r}
 treat_code <- tibble(
-  treatment = c("A", "K", "C", "R"),
-  full_name = c("Algae", "Coral", "Control", "Rubble")
+  treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
+  full_name = c("Algae", "Coral", "Control", "CCA", "Inflow", "Endmember", "Rain")
 )
-treat_table <- treat_code %>% gt() %>% 
-  cols_label(treatment = "Treatment Code",
-             full_name = "Treatment Name")
-treat_table
+treat_code
+#treat_table <- treat_code %>% gt() %>% 
+#  cols_label(treatment = "Treatment Code",
+#             full_name = "Treatment Name")
+#treat_table
 ```
 
+## Data visualization theme
+```{r}
 
-<!-- ## Data clean up -->
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+## Data clean up 
 ```{r}
 meta <- meta %>% clean_names() %>% drop_na() %>%
   mutate(long_name = str_trim(long_name)) %>% 
@@ -54,9 +80,11 @@ meta <- meta %>% clean_names() %>% drop_na() %>%
 DOC <- DOC %>% clean_names() 
 ```
 
-<!-- ## Joining the data -->
+ ## Joining the data
 ```{r}
 DOC_join <- left_join(meta, DOC, by = "id_number")
+DOC_join <- left_join(DOC_join, treat_code, by = "treatment")
+DOC_join <- DOC_join %>% select(-treatment) %>%  rename(treatment = full_name) %>%  relocate(treatment, .after = tank_number)
 ```
 
 ## Check data for NPOC (mg/L)
@@ -119,7 +147,7 @@ DOC_join %>% drop_na(tn_mg_l) %>% filter(treatment != "Endmember") %>%
    scale_color_ghibli_d("SpiritedMedium", direction=-1)
 ```
 
-<!--
+
 ## Overall Stats
 ```{r}
 DOC_join %>% filter(treatment != "Endmember", treatment != "Rain" ) %>%
@@ -127,6 +155,146 @@ DOC_join %>% filter(treatment != "Endmember", treatment != "Rain" ) %>%
   summarise(avg = mean(npoc_mg_l, na.rm = T),
             std_dev = sd(npoc_mg_l, na.rm = T))
 ```
--->
+# BUOYS figures
+## Preliminary visualization
 
+Let's see how the DOC data behaves. From the graph below, we can see some intriging peaks in the different tanks. This may be off concern later. But also, as of 18 feb 2025, we are also stil waiting for some samples to be re-run by the S-LAB. 
+```{r}
+DOC_join %>% filter(date > as.Date("2024-05-31")) %>% 
+  mutate(time= paste0(time,":00")) %>% 
+  #filter(time != "00:00:00") %>% 
+  mutate(date_time = ymd_hms(paste(date, time))) %>% 
+  group_by(treatment, date_time) %>% 
+  summarise(avg = mean(npoc_u_m, na.rm = T)) %>% 
+  filter(avg <250) %>% 
+  ggplot(aes(date_time, avg, color = treatment)) +
+  geom_point(size= 3)+
+  geom_line()+ nunu_theme
+```
+
+For now, we will exclude the data points that seem like outliers. From conversations with Craig, I will also just remove the 00:00 time point for BUOYS because it's created confusion due to the outliers. We'll simplify my analysis that way. 
+```{r}
+DOC_join %>% filter(date > as.Date("2024-05-31")) %>% 
+  mutate(time= paste0(time,":00")) %>% 
+  filter(time != "00:00:00") %>% 
+  mutate(date_time = ymd_hms(paste(date, time))) %>% 
+  group_by(treatment, date_time) %>% 
+  summarise(avg = mean(npoc_u_m, na.rm = T)) %>% 
+  filter(avg <250) %>% 
+  ggplot(aes(date_time, avg, color = treatment)) +
+  geom_point(size= 3)+
+  geom_line()+ nunu_theme
+```
+
+```{r}
+DOC_norm <- DOC_join %>% filter(date > as.Date("2024-05-31")) %>% 
+  mutate(time= paste0(time,":00")) %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+   group_by(date_time) %>%
+  mutate(inflow_avg = mean(npoc_u_m[treatment == "Inflow"], na.rm = T)) %>%  # Calculate inflow avg
+  ungroup() %>%
+  mutate(npoc_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), npoc_u_m / inflow_avg, NA))  # Normalize for coral & algae
+  
+
+```
+
+
+```{r, fig.height=8, fig.width=12}
+DOC_norm %>% filter(time == "12:00:00") %>% 
+mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
+  ggplot(aes(treatment, npoc_norm, fill = treatment)) +
+  geom_boxplot() + facet_wrap(.~date_time)+
+  #geom_jitter(aes(color = treatment), alpha = 0.5)+
+  labs(title = "12PM variation in normalized DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  #scale_y_continuous(sec.axis = sec_axis(~.*100, name="Average inflow")) +
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "DOC_norm_12PM.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+
+
+## 12PM linear model 
+```{r}
+DOC_treat<- DOC_norm %>% filter(time == "12:00:00") %>% 
+mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) 
+
+
+DOC_norm_lm <- lm(npoc_norm ~ date_time*treatment, data = DOC_treat)
+
+summary(DOC_norm_lm)
+
+emmeans(DOC_norm_lm, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+DOC_norm_lm <- lm(npoc_norm ~ treatment, data = DOC_treat)
+Anova(DOC_norm_lm)
+```
+
+```{r}
+anova_nunu(data = DOC_treat, indep_var = treatment, dep_var = npoc_norm)
+```
+
+
+```{r}
+#resid_panel(DOC_norm_lm, plots = c("resid", "qq", "lev", "hist"))
+```
+
+```{r}
+plot(allEffects(DOC_norm_lm))
+```
+
+```{r, fig.height=6, fig.width=12}
+DOC_norm %>% filter(time != "00:00:00") %>% 
+  filter(date != "2024-06-04", date != "2024-06-06") %>% 
+mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
+  filter(npoc_norm<3.5) %>% 
+  ggplot(aes(treatment, npoc_norm, fill = treatment)) +
+  geom_boxplot() + 
+  facet_wrap(.~ date_time, nrow = 1)+
+  #geom_jitter(aes(color = treatment), alpha= 0.5, size = 3)+
+  labs(title = "24h variation in normalized DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  #scale_y_continuous(sec.axis = sec_axis(~.*100, name="Average inflow")) +
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+  
+
+#ggsave(filename = "DOC_norm_24h.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+## 24h linear model
+
+```{r}
+DOC_24h<- DOC_norm %>% filter(time != "00:00:00") %>% 
+  filter(date != "2024-06-04", date != "2024-06-06") %>% 
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
+  filter(npoc_norm<3.5)
+
+
+DOC_norm_lm <- lm(npoc_norm ~ date_time*treatment, data = DOC_24h)
+
+summary(DOC_norm_lm)
+
+emmeans(DOC_norm_lm, specs = trt.vs.ctrl ~ treatment)
+```
+```{r}
+Anova(DOC_norm_lm)
+```
 
