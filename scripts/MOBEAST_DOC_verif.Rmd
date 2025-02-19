@@ -280,20 +280,21 @@ mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae
 ## 24h linear model
 
 ```{r}
-DOC_24h<- DOC_norm %>% filter(time != "00:00:00") %>% 
+DOC_24h <- DOC_norm %>% filter(time != "00:00:00") %>% 
   filter(date != "2024-06-04", date != "2024-06-06") %>% 
-  mutate(treatment = factor(treatment,
-                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  mutate(date_time = date_time) %>% 
   filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
-  filter(npoc_norm<3.5)
+  filter(npoc_norm<3.5) 
 
 
-DOC_norm_lm <- lm(npoc_norm ~ date_time*treatment, data = DOC_24h)
+DOC_norm_lm <- lm(npoc_norm ~ treatment*date_time, data = DOC_24h)
 
 summary(DOC_norm_lm)
 
 emmeans(DOC_norm_lm, specs = trt.vs.ctrl ~ treatment)
 ```
+
 ```{r}
 Anova(DOC_norm_lm)
 ```
