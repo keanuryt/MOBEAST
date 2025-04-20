@@ -25,6 +25,7 @@ library(effects) #dependency for ggeffects
 library(ggResidpanel) #residual panel
 library(GGally)
 library(emmeans)
+library(ggrepel)
 ```
 
 ## Load function
@@ -155,6 +156,131 @@ DOC_join %>% filter(treatment != "Endmember", treatment != "Rain" ) %>%
   summarise(avg = mean(npoc_mg_l, na.rm = T),
             std_dev = sd(npoc_mg_l, na.rm = T))
 ```
+
+
+## TN
+
+```{r}
+DOC_join
+```
+
+
+```{r}
+TN_norm <- DOC_join %>% filter(date > as.Date("2024-05-31")) %>% 
+  mutate(time= paste0(time,":00")) %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+   group_by(date_time) %>%
+  mutate(inflow_avg = mean(tn_u_m[treatment == "Inflow"], na.rm = T)) %>%  # Calculate inflow avg
+  ungroup() %>%
+  mutate(tn_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), tn_u_m / inflow_avg, NA))  # Normalize for coral & algae
+  
+
+```
+
+
+```{r, fig.height=8, fig.width=12}
+TN_norm %>% filter(time == "12:00:00") %>% 
+mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
+  ggplot(aes(treatment, tn_norm, fill = treatment)) +
+  geom_boxplot() + facet_wrap(.~date_time)+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number))+
+  labs(title = "12PM variation in normalized TN",
+       x= "Treatment",
+       y = "Normalized TN")+
+    #ylim(0.8, 4)+
+  #scale_y_continuous(sec.axis = sec_axis(~.*100, name="Average inflow")) +
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+#ggsave(filename = "TN_norm_12PM.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+
+## 12PM linear model 
+```{r}
+TN_treat<- TN_norm %>% filter(time == "12:00:00") %>% 
+mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) 
+
+
+TN_norm_lm <- lm(tn_norm ~ date_time*treatment, data = TN_treat)
+
+summary(TN_norm_lm)
+
+resid_panel(TN_norm_lm)
+
+emmeans(TN_norm_lm, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+TN_norm_lm <- lm(tn_norm ~ treatment, data = TN_treat)
+Anova(TN_norm_lm)
+
+```
+
+
+```{r, fig.height=6, fig.width=12}
+TN_norm %>% #filter(time != "00:00:00") %>% 
+  filter(date != "2024-06-04", date != "2024-06-06") %>% 
+mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
+  #filter(tn_norm < 7) %>% 
+  ggplot(aes(treatment, tn_norm, fill = treatment)) +
+  geom_boxplot() + 
+  facet_wrap(.~ date_time, nrow = 1)+
+  geom_jitter(aes(color = treatment), alpha= 0.5, size = 3)+
+  geom_text_repel(aes(label = tank_number))+
+  labs(title = "24h variation in normalized TN",
+       x= "Treatment",
+       y = "Normalized TN")+
+  #  ylim(0.8, 4)+
+  #scale_y_continuous(sec.axis = sec_axis(~.*100, name="Average inflow")) +
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+  
+
+#ggsave(filename = "TN_norm_24h.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+## 24h linear model
+
+```{r}
+TN_24h <- TN_norm %>% #filter(time != "00:00:00") %>% 
+  filter(date != "2024-06-04", date != "2024-06-06") %>% 
+  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  #mutate(date_time = date_time) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) #%>% 
+  #filter(tn_norm<7) 
+
+
+
+TN_norm_lm <- lm(tn_norm ~ treatment*date_time, data = TN_24h)
+
+summary(TN_norm_lm)
+resid_panel(TN_norm_lm)
+
+emmeans(TN_norm_lm, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+Anova(TN_norm_lm)
+```
+
+
+
+
+
+
+
+
 # BUOYS figures
 ## Preliminary visualization
 
