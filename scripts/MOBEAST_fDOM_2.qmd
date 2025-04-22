@@ -1,0 +1,515 @@
+---
+title: "MOBEAST fDOM V2"
+format: 
+  html:
+    toc: true
+    toc-location: left
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+#library(GGally)
+library(emmeans)
+library(performance)
+
+
+```
+
+## Data visualization theme
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+## Load Data 
+```{r}
+fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
+
+fDOM <- fDOM %>% mutate(treatment = ifelse(treatment == "Rubble", "CCA", treatment)) %>%
+  select(-sample_type)
+
+table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+
+```
+
+## Data Clean-Up
+
+```{r}
+fDOM_desc <- tibble(fdom = c("coble_a","coble_b","coble_c","coble_m","coble_t",
+  "m_to_c","bix","hix","fpeak","fi",
+  "lignin"),
+  fdom_alt_name = c("UV-Humic","Tyrosine","Visible-Humic","Marine Humic","Tryptophan",
+  "m_to_c","bix","hix","Phenylalanine","Fluvic Acid",
+  "lignin"),
+  fdom_cat= c("Humic","Proteinaceous","Humic","Humic","Proteinaceous",
+  "Humic","Humic","Humic","Proteinaceous","Humic",
+  "Other"))
+
+fDOM_desc %>% gt()
+```
+
+
+```{r}
+table_id <- clean_names(table_id)
+
+table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+  mutate(tank_number = paste0("T", tank_number)) %>% 
+  mutate(inflow_table = paste("Table", inflow_table))
+fDOM <- left_join(fDOM, table_id, by= "tank_number")
+```
+
+```{r}
+fDOM <- fDOM %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, inflow_table)) %>% 
+   mutate(inflow_table = ifelse(inflow_table == "F1", "Table 1", 
+                                ifelse(inflow_table == "F2", "Table 2", inflow_table))) %>% 
+  mutate(inflow_table = factor(inflow_table),
+         tank_number = factor(tank_number)) %>% 
+  relocate(inflow_table, .after = "treatment")
+```
+
+```{r}
+fDOM_long <- fDOM %>% pivot_longer(cols = coble_a:lignin,
+                      names_to = "fdom", 
+                      values_to = "fdom_conc")
+```
+
+
+```{r}
+fdom_long <- left_join(fDOM_long, fDOM_desc, by = "fdom")
+
+```
+
+
+```{r}
+fDOM_norm <- fdom_long %>% filter(date > as.Date("2024-05-31")) %>% # Removes end members
+  filter(treatment != "Rain") %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+   group_by(date_time, inflow_table, fdom) %>%
+  mutate(inflow= fdom_conc[treatment == "Inflow"]) %>%  # Isolate inflow for each date_time and table
+  ungroup() %>% 
+  #group_by(date_time) %>% 
+  #mutate(inflow = ifelse(is.na(inflow),
+   #   inflow[!is.na(inflow)][1],  # get the other table's value for that date
+   #   inflow)) %>% 
+  #ungroup() %>% 
+  mutate(fdom_conc_norm = fdom_conc - inflow)  %>% # Normalize for treatments 
+  relocate(inflow, .after = "fdom_conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+  
+
+head(fDOM_norm, 15)
+```
+
+
+```{r}
+ggplot(fDOM_norm, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_bar(position="stack", stat="identity")+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+```{r}
+fDOM_norm %>% filter(fdom_cat != "Other") %>% 
+  ggplot(aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+```{r}
+fDOM_norm %>% mutate(fdom_cat = factor(fdom_cat, levels = c("Humic", "Proteinaceous", "Other"))) %>% 
+  group_by(fdom_cat,fdom) %>% 
+  summarize(min = round(min(fdom_conc, na.rm = T),3), 
+            avg = round(mean(fdom_conc, na.rm = T),3),
+            max = round(max(fdom_conc, na.rm = T),3)) %>% 
+  ungroup() %>% 
+  gt()
+```
+
+
+## Hypothesis 1: fDOM 12PM
+
+```{r}
+fDOM_12PM <- fDOM_norm %>% filter(treatment != "Inflow") %>% 
+  filter(time == hms("12:00:00")) %>% 
+  filter(fdom_cat != "Other")
+```
+
+### Humic
+
+#### CobleA
+
+```{r}
+fDOM_12PM_cobA <- fDOM_12PM %>% filter(fdom == "coble_a") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_cobA)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs = ~ treatment)
+```
+
+
+##### Interpretation
+
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobA$fdom_conc)$out)
+ggplot(fDOM_12PM_cobA, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+#### CobleM
+```{r}
+fDOM_12PM_cobM <- fDOM_12PM %>% filter(fdom == "coble_m") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_cobM)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs = ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobA$fdom_conc)$out)
+ggplot(fDOM_12PM_cobM, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+#### CobleC
+```{r}
+fDOM_12PM_cobC <- fDOM_12PM %>% filter(fdom == "coble_c") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_cobC)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_cobC, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+#### M:C
+```{r}
+fDOM_12PM_mtoc <- fDOM_12PM %>% filter(fdom == "m_to_c") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_mtoc)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] + ylim(-0.1,0.1) +
+  plot_model(mod, type = "re")[[2]] + ylim(-0.15,0.15)+
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_mtoc, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+```{r}
+(ggplot(fDOM_12PM_cobM, aes(x= treatment, y = fdom_conc))+
+  geom_boxplot(fill = "cornflowerblue")+
+  #geom_jitter(aes(color = treatment), alpha = 0.5)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+   ylim(0,0.02)+
+   labs(title = "cobleM")+
+  #facet_grid(~date)+
+  nunu_theme ) +
+  
+  (ggplot(fDOM_12PM_cobC, aes(x= treatment, y = fdom_conc))+
+  geom_boxplot(fill = "chartreuse3")+
+  #geom_jitter(aes(color = treatment), alpha = 0.5)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+    ylim(0,0.02)+
+    labs(title = "cobleC")+
+  #facet_grid(~date)+
+  nunu_theme ) +
+  
+  (ggplot(fDOM_12PM_mtoc, aes(x= treatment, y = fdom_conc))+
+  geom_boxplot( fill = "yellow")+
+  #geom_jitter(aes(color = treatment), alpha = 0.5)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  #facet_grid(~date)+
+    labs(title = "M:C")+
+  nunu_theme ) 
+```
+
+
+#### FI
+```{r}
+fDOM_12PM_fi <- fDOM_12PM %>% filter(fdom == "fi") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_fi)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_fi, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+#### BIX
+```{r}
+fDOM_12PM_bix <- fDOM_12PM %>% filter(fdom == "bix") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_bix)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_bix, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+#### HIX
+```{r}
+fDOM_12PM_hix <- fDOM_12PM %>% filter(fdom == "hix") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_hix)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_hix, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+### Proteinaceous
+
+#### CobleB
+```{r}
+fDOM_12PM_prot <- fDOM_12PM %>% filter(fdom == "fpeak") 
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_prot)
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs =  pairwise~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_prot, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+

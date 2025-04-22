@@ -1,0 +1,2756 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>MOBEAST fDOM V2</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="MOBEAST_fDOM_2_files/libs/clipboard/clipboard.min.js"></script>
+<script src="MOBEAST_fDOM_2_files/libs/quarto-html/quarto.js"></script>
+<script src="MOBEAST_fDOM_2_files/libs/quarto-html/popper.min.js"></script>
+<script src="MOBEAST_fDOM_2_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="MOBEAST_fDOM_2_files/libs/quarto-html/anchor.min.js"></script>
+<link href="MOBEAST_fDOM_2_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="MOBEAST_fDOM_2_files/libs/quarto-html/quarto-syntax-highlighting-29e2c20b02301cfff04dc8050bf30c7e.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="MOBEAST_fDOM_2_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="MOBEAST_fDOM_2_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="MOBEAST_fDOM_2_files/libs/bootstrap/bootstrap-e19dc0c07aeef78048e587c3f1edba7a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article toc-left">
+<div id="quarto-sidebar-toc-left" class="sidebar toc-left">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#load-libraries" id="toc-load-libraries" class="nav-link active" data-scroll-target="#load-libraries">Load Libraries</a></li>
+  <li><a href="#data-visualization-theme" id="toc-data-visualization-theme" class="nav-link" data-scroll-target="#data-visualization-theme">Data visualization theme</a></li>
+  <li><a href="#load-data" id="toc-load-data" class="nav-link" data-scroll-target="#load-data">Load Data</a></li>
+  <li><a href="#data-clean-up" id="toc-data-clean-up" class="nav-link" data-scroll-target="#data-clean-up">Data Clean-Up</a></li>
+  <li><a href="#hypothesis-1-fdom-12pm" id="toc-hypothesis-1-fdom-12pm" class="nav-link" data-scroll-target="#hypothesis-1-fdom-12pm">Hypothesis 1: fDOM 12PM</a>
+  <ul class="collapse">
+  <li><a href="#humic" id="toc-humic" class="nav-link" data-scroll-target="#humic">Humic</a></li>
+  <li><a href="#proteinaceous" id="toc-proteinaceous" class="nav-link" data-scroll-target="#proteinaceous">Proteinaceous</a></li>
+  </ul></li>
+  </ul>
+</nav>
+</div>
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">MOBEAST fDOM V2</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="load-libraries" class="level2">
+<h2 class="anchored" data-anchor-id="load-libraries">Load Libraries</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(here)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggrepel)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ghibli)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gt)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RColorBrewer)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(car) <span class="co"># ANOVA package</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggeffects)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(effects) <span class="co">#dependency for ggeffects</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggResidpanel) <span class="co">#residual panel</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lme4)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lmerTest)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sjPlot)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="co">#library(GGally)</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(emmeans)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(performance)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="data-visualization-theme" class="level2">
+<h2 class="anchored" data-anchor-id="data-visualization-theme">Data visualization theme</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>nunu_theme <span class="ot">&lt;-</span> <span class="fu">theme_bw</span>() <span class="sc">+</span> </span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size=</span><span class="dv">14</span>, <span class="at">face =</span> <span class="st">"bold"</span>), </span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size=</span><span class="dv">12</span>),</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="at">axis.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">12</span>, <span class="at">face =</span> <span class="st">"bold"</span>),</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="at">axis.text =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">12</span>),</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">strip.text.x =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">12</span>, <span class="at">face =</span> <span class="st">"bold"</span>),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="at">legend.title=</span><span class="fu">element_text</span>(<span class="at">size=</span><span class="dv">12</span>, <span class="at">face =</span> <span class="st">"bold"</span>),</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>        <span class="at">legend.text=</span><span class="fu">element_text</span>(<span class="at">size=</span><span class="dv">12</span>),</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        <span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle=</span> <span class="dv">45</span>, <span class="at">hjust=</span> <span class="dv">1</span>),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>        <span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">"azure1"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="load-data" class="level2">
+<h2 class="anchored" data-anchor-id="load-data">Load Data</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fDOM <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">"data"</span>, <span class="st">"fDOM"</span>, <span class="st">"fDOM_sorted.csv"</span>))</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>fDOM <span class="ot">&lt;-</span> fDOM <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">treatment =</span> <span class="fu">ifelse</span>(treatment <span class="sc">==</span> <span class="st">"Rubble"</span>, <span class="st">"CCA"</span>, treatment)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>sample_type)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>table_id <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">"data"</span>, <span class="st">"Laurel"</span>, <span class="st">"TableID.csv"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="data-clean-up" class="level2">
+<h2 class="anchored" data-anchor-id="data-clean-up">Data Clean-Up</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>fDOM_desc <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">fdom =</span> <span class="fu">c</span>(<span class="st">"coble_a"</span>,<span class="st">"coble_b"</span>,<span class="st">"coble_c"</span>,<span class="st">"coble_m"</span>,<span class="st">"coble_t"</span>,</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"m_to_c"</span>,<span class="st">"bix"</span>,<span class="st">"hix"</span>,<span class="st">"fpeak"</span>,<span class="st">"fi"</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"lignin"</span>),</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">fdom_alt_name =</span> <span class="fu">c</span>(<span class="st">"UV-Humic"</span>,<span class="st">"Tyrosine"</span>,<span class="st">"Visible-Humic"</span>,<span class="st">"Marine Humic"</span>,<span class="st">"Tryptophan"</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"m_to_c"</span>,<span class="st">"bix"</span>,<span class="st">"hix"</span>,<span class="st">"Phenylalanine"</span>,<span class="st">"Fluvic Acid"</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"lignin"</span>),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">fdom_cat=</span> <span class="fu">c</span>(<span class="st">"Humic"</span>,<span class="st">"Proteinaceous"</span>,<span class="st">"Humic"</span>,<span class="st">"Humic"</span>,<span class="st">"Proteinaceous"</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Humic"</span>,<span class="st">"Humic"</span>,<span class="st">"Humic"</span>,<span class="st">"Proteinaceous"</span>,<span class="st">"Humic"</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Other"</span>))</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>fDOM_desc <span class="sc">%&gt;%</span> <span class="fu">gt</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div id="ogmxygyzpt" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ogmxygyzpt table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#ogmxygyzpt thead, #ogmxygyzpt tbody, #ogmxygyzpt tfoot, #ogmxygyzpt tr, #ogmxygyzpt td, #ogmxygyzpt th {
+  border-style: none;
+}
+
+#ogmxygyzpt p {
+  margin: 0;
+  padding: 0;
+}
+
+#ogmxygyzpt .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#ogmxygyzpt .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#ogmxygyzpt .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#ogmxygyzpt .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#ogmxygyzpt .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ogmxygyzpt .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#ogmxygyzpt .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#ogmxygyzpt .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#ogmxygyzpt .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#ogmxygyzpt .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#ogmxygyzpt .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ogmxygyzpt .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#ogmxygyzpt .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#ogmxygyzpt .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#ogmxygyzpt .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ogmxygyzpt .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#ogmxygyzpt .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#ogmxygyzpt .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#ogmxygyzpt .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ogmxygyzpt .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#ogmxygyzpt .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ogmxygyzpt .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#ogmxygyzpt .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ogmxygyzpt .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ogmxygyzpt .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ogmxygyzpt .gt_left {
+  text-align: left;
+}
+
+#ogmxygyzpt .gt_center {
+  text-align: center;
+}
+
+#ogmxygyzpt .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ogmxygyzpt .gt_font_normal {
+  font-weight: normal;
+}
+
+#ogmxygyzpt .gt_font_bold {
+  font-weight: bold;
+}
+
+#ogmxygyzpt .gt_font_italic {
+  font-style: italic;
+}
+
+#ogmxygyzpt .gt_super {
+  font-size: 65%;
+}
+
+#ogmxygyzpt .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#ogmxygyzpt .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#ogmxygyzpt .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#ogmxygyzpt .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#ogmxygyzpt .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#ogmxygyzpt .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#ogmxygyzpt .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#ogmxygyzpt .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#ogmxygyzpt div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<thead>
+<tr class="gt_col_headings header">
+<th id="fdom" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">fdom</th>
+<th id="fdom_alt_name" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">fdom_alt_name</th>
+<th id="fdom_cat" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">fdom_cat</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_left" headers="fdom">coble_a</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">UV-Humic</td>
+<td class="gt_row gt_left" headers="fdom_cat">Humic</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="fdom">coble_b</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">Tyrosine</td>
+<td class="gt_row gt_left" headers="fdom_cat">Proteinaceous</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="fdom">coble_c</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">Visible-Humic</td>
+<td class="gt_row gt_left" headers="fdom_cat">Humic</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="fdom">coble_m</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">Marine Humic</td>
+<td class="gt_row gt_left" headers="fdom_cat">Humic</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="fdom">coble_t</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">Tryptophan</td>
+<td class="gt_row gt_left" headers="fdom_cat">Proteinaceous</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="fdom">m_to_c</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">m_to_c</td>
+<td class="gt_row gt_left" headers="fdom_cat">Humic</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="fdom">bix</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">bix</td>
+<td class="gt_row gt_left" headers="fdom_cat">Humic</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="fdom">hix</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">hix</td>
+<td class="gt_row gt_left" headers="fdom_cat">Humic</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="fdom">fpeak</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">Phenylalanine</td>
+<td class="gt_row gt_left" headers="fdom_cat">Proteinaceous</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="fdom">fi</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">Fluvic Acid</td>
+<td class="gt_row gt_left" headers="fdom_cat">Humic</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="fdom">lignin</td>
+<td class="gt_row gt_left" headers="fdom_alt_name">lignin</td>
+<td class="gt_row gt_left" headers="fdom_cat">Other</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>table_id <span class="ot">&lt;-</span> <span class="fu">clean_names</span>(table_id)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>table_id <span class="ot">&lt;-</span> table_id <span class="sc">%&gt;%</span> <span class="fu">rename</span>(<span class="at">tank_number=</span>tankid) <span class="sc">%&gt;%</span> <span class="fu">select</span>(<span class="sc">-</span>treatment) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tank_number =</span> <span class="fu">paste0</span>(<span class="st">"T"</span>, tank_number)) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">inflow_table =</span> <span class="fu">paste</span>(<span class="st">"Table"</span>, inflow_table))</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>fDOM <span class="ot">&lt;-</span> <span class="fu">left_join</span>(fDOM, table_id, <span class="at">by=</span> <span class="st">"tank_number"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fDOM <span class="ot">&lt;-</span> fDOM <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">inflow_table =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(inflow_table), tank_number, inflow_table)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">inflow_table =</span> <span class="fu">ifelse</span>(inflow_table <span class="sc">==</span> <span class="st">"F1"</span>, <span class="st">"Table 1"</span>, </span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>                                <span class="fu">ifelse</span>(inflow_table <span class="sc">==</span> <span class="st">"F2"</span>, <span class="st">"Table 2"</span>, inflow_table))) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">inflow_table =</span> <span class="fu">factor</span>(inflow_table),</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">tank_number =</span> <span class="fu">factor</span>(tank_number)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(inflow_table, <span class="at">.after =</span> <span class="st">"treatment"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>fDOM_long <span class="ot">&lt;-</span> fDOM <span class="sc">%&gt;%</span> <span class="fu">pivot_longer</span>(<span class="at">cols =</span> coble_a<span class="sc">:</span>lignin,</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                      <span class="at">names_to =</span> <span class="st">"fdom"</span>, </span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                      <span class="at">values_to =</span> <span class="st">"fdom_conc"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>fdom_long <span class="ot">&lt;-</span> <span class="fu">left_join</span>(fDOM_long, fDOM_desc, <span class="at">by =</span> <span class="st">"fdom"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>fDOM_norm <span class="ot">&lt;-</span> fdom_long <span class="sc">%&gt;%</span> <span class="fu">filter</span>(date <span class="sc">&gt;</span> <span class="fu">as.Date</span>(<span class="st">"2024-05-31"</span>)) <span class="sc">%&gt;%</span> <span class="co"># Removes end members</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(treatment <span class="sc">!=</span> <span class="st">"Rain"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">date_time =</span> <span class="fu">factor</span>(<span class="fu">ymd_hms</span>(<span class="fu">paste</span>(date, time)))) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>   <span class="fu">group_by</span>(date_time, inflow_table, fdom) <span class="sc">%&gt;%</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">inflow=</span> fdom_conc[treatment <span class="sc">==</span> <span class="st">"Inflow"</span>]) <span class="sc">%&gt;%</span>  <span class="co"># Isolate inflow for each date_time and table</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">#group_by(date_time) %&gt;% </span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">#mutate(inflow = ifelse(is.na(inflow),</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>   <span class="co">#   inflow[!is.na(inflow)][1],  # get the other table's value for that date</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>   <span class="co">#   inflow)) %&gt;% </span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#ungroup() %&gt;% </span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fdom_conc_norm =</span> fdom_conc <span class="sc">-</span> inflow)  <span class="sc">%&gt;%</span> <span class="co"># Normalize for treatments </span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(inflow, <span class="at">.after =</span> <span class="st">"fdom_conc_norm"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(date_time, <span class="at">.before =</span> <span class="st">"date"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">treatment =</span> <span class="fu">factor</span>(treatment, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"Control"</span>, <span class="st">"Coral"</span>, <span class="st">"CCA"</span>, <span class="st">"Algae"</span>, <span class="st">"Inflow"</span>)))</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(fDOM_norm, <span class="dv">15</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 15 × 14
+   id_number  long_name  tank_number treatment inflow_table date_time date      
+   &lt;chr&gt;      &lt;chr&gt;      &lt;fct&gt;       &lt;fct&gt;     &lt;fct&gt;        &lt;fct&gt;     &lt;date&gt;    
+ 1 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 2 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 3 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 4 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 5 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 6 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 7 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 8 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+ 9 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+10 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+11 MOBEAST001 MOBEAST_F… F1          Inflow    Table 1      2024-06-… 2024-06-02
+12 MOBEAST002 MOBEAST_F… F2          Inflow    Table 2      2024-06-… 2024-06-02
+13 MOBEAST002 MOBEAST_F… F2          Inflow    Table 2      2024-06-… 2024-06-02
+14 MOBEAST002 MOBEAST_F… F2          Inflow    Table 2      2024-06-… 2024-06-02
+15 MOBEAST002 MOBEAST_F… F2          Inflow    Table 2      2024-06-… 2024-06-02
+# ℹ 7 more variables: time &lt;time&gt;, fdom &lt;chr&gt;, fdom_conc &lt;dbl&gt;,
+#   fdom_alt_name &lt;chr&gt;, fdom_cat &lt;chr&gt;, fdom_conc_norm &lt;dbl&gt;, inflow &lt;dbl&gt;</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_norm, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_bar</span>(<span class="at">position=</span><span class="st">"stack"</span>, <span class="at">stat=</span><span class="st">"identity"</span>)<span class="sc">+</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>fDOM_norm <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom_cat <span class="sc">!=</span> <span class="st">"Other"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>fDOM_norm <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">fdom_cat =</span> <span class="fu">factor</span>(fdom_cat, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"Humic"</span>, <span class="st">"Proteinaceous"</span>, <span class="st">"Other"</span>))) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(fdom_cat,fdom) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">min =</span> <span class="fu">round</span>(<span class="fu">min</span>(fdom_conc, <span class="at">na.rm =</span> T),<span class="dv">3</span>), </span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>            <span class="at">avg =</span> <span class="fu">round</span>(<span class="fu">mean</span>(fdom_conc, <span class="at">na.rm =</span> T),<span class="dv">3</span>),</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">max =</span> <span class="fu">round</span>(<span class="fu">max</span>(fdom_conc, <span class="at">na.rm =</span> T),<span class="dv">3</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">gt</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div id="ngkmttkfwv" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ngkmttkfwv table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#ngkmttkfwv thead, #ngkmttkfwv tbody, #ngkmttkfwv tfoot, #ngkmttkfwv tr, #ngkmttkfwv td, #ngkmttkfwv th {
+  border-style: none;
+}
+
+#ngkmttkfwv p {
+  margin: 0;
+  padding: 0;
+}
+
+#ngkmttkfwv .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#ngkmttkfwv .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#ngkmttkfwv .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#ngkmttkfwv .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#ngkmttkfwv .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ngkmttkfwv .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#ngkmttkfwv .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#ngkmttkfwv .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#ngkmttkfwv .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#ngkmttkfwv .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#ngkmttkfwv .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ngkmttkfwv .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#ngkmttkfwv .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#ngkmttkfwv .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#ngkmttkfwv .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ngkmttkfwv .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#ngkmttkfwv .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#ngkmttkfwv .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#ngkmttkfwv .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ngkmttkfwv .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#ngkmttkfwv .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ngkmttkfwv .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#ngkmttkfwv .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ngkmttkfwv .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ngkmttkfwv .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ngkmttkfwv .gt_left {
+  text-align: left;
+}
+
+#ngkmttkfwv .gt_center {
+  text-align: center;
+}
+
+#ngkmttkfwv .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ngkmttkfwv .gt_font_normal {
+  font-weight: normal;
+}
+
+#ngkmttkfwv .gt_font_bold {
+  font-weight: bold;
+}
+
+#ngkmttkfwv .gt_font_italic {
+  font-style: italic;
+}
+
+#ngkmttkfwv .gt_super {
+  font-size: 65%;
+}
+
+#ngkmttkfwv .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#ngkmttkfwv .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#ngkmttkfwv .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#ngkmttkfwv .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#ngkmttkfwv .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#ngkmttkfwv .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#ngkmttkfwv .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#ngkmttkfwv .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#ngkmttkfwv div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<thead>
+<tr class="gt_col_headings header">
+<th id="fdom_cat" class="gt_col_heading gt_columns_bottom_border gt_center" data-quarto-table-cell-role="th" scope="col">fdom_cat</th>
+<th id="fdom" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">fdom</th>
+<th id="min" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">min</th>
+<th id="avg" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">avg</th>
+<th id="max" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">max</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_center" headers="fdom_cat">Humic</td>
+<td class="gt_row gt_left" headers="fdom">bix</td>
+<td class="gt_row gt_right" headers="min">0.364</td>
+<td class="gt_row gt_right" headers="avg">0.868</td>
+<td class="gt_row gt_right" headers="max">1.758</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_center" headers="fdom_cat">Humic</td>
+<td class="gt_row gt_left" headers="fdom">coble_a</td>
+<td class="gt_row gt_right" headers="min">0.002</td>
+<td class="gt_row gt_right" headers="avg">0.009</td>
+<td class="gt_row gt_right" headers="max">0.022</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_center" headers="fdom_cat">Humic</td>
+<td class="gt_row gt_left" headers="fdom">coble_c</td>
+<td class="gt_row gt_right" headers="min">0.001</td>
+<td class="gt_row gt_right" headers="avg">0.008</td>
+<td class="gt_row gt_right" headers="max">0.022</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_center" headers="fdom_cat">Humic</td>
+<td class="gt_row gt_left" headers="fdom">coble_m</td>
+<td class="gt_row gt_right" headers="min">0.003</td>
+<td class="gt_row gt_right" headers="avg">0.012</td>
+<td class="gt_row gt_right" headers="max">0.026</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_center" headers="fdom_cat">Humic</td>
+<td class="gt_row gt_left" headers="fdom">fi</td>
+<td class="gt_row gt_right" headers="min">1.364</td>
+<td class="gt_row gt_right" headers="avg">1.881</td>
+<td class="gt_row gt_right" headers="max">2.806</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_center" headers="fdom_cat">Humic</td>
+<td class="gt_row gt_left" headers="fdom">hix</td>
+<td class="gt_row gt_right" headers="min">0.197</td>
+<td class="gt_row gt_right" headers="avg">0.439</td>
+<td class="gt_row gt_right" headers="max">0.838</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_center" headers="fdom_cat">Humic</td>
+<td class="gt_row gt_left" headers="fdom">m_to_c</td>
+<td class="gt_row gt_right" headers="min">0.318</td>
+<td class="gt_row gt_right" headers="avg">0.633</td>
+<td class="gt_row gt_right" headers="max">1.035</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_center" headers="fdom_cat">Proteinaceous</td>
+<td class="gt_row gt_left" headers="fdom">coble_b</td>
+<td class="gt_row gt_right" headers="min">0.004</td>
+<td class="gt_row gt_right" headers="avg">0.073</td>
+<td class="gt_row gt_right" headers="max">0.159</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_center" headers="fdom_cat">Proteinaceous</td>
+<td class="gt_row gt_left" headers="fdom">coble_t</td>
+<td class="gt_row gt_right" headers="min">0.022</td>
+<td class="gt_row gt_right" headers="avg">0.075</td>
+<td class="gt_row gt_right" headers="max">0.227</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_center" headers="fdom_cat">Proteinaceous</td>
+<td class="gt_row gt_left" headers="fdom">fpeak</td>
+<td class="gt_row gt_right" headers="min">0.000</td>
+<td class="gt_row gt_right" headers="avg">0.026</td>
+<td class="gt_row gt_right" headers="max">0.084</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_center" headers="fdom_cat">Other</td>
+<td class="gt_row gt_left" headers="fdom">lignin</td>
+<td class="gt_row gt_right" headers="min">0.000</td>
+<td class="gt_row gt_right" headers="avg">0.034</td>
+<td class="gt_row gt_right" headers="max">0.132</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="hypothesis-1-fdom-12pm" class="level2">
+<h2 class="anchored" data-anchor-id="hypothesis-1-fdom-12pm">Hypothesis 1: fDOM 12PM</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM <span class="ot">&lt;-</span> fDOM_norm <span class="sc">%&gt;%</span> <span class="fu">filter</span>(treatment <span class="sc">!=</span> <span class="st">"Inflow"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time <span class="sc">==</span> <span class="fu">hms</span>(<span class="st">"12:00:00"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(fdom_cat <span class="sc">!=</span> <span class="st">"Other"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="humic" class="level3">
+<h3 class="anchored" data-anchor-id="humic">Humic</h3>
+<section id="coblea" class="level4">
+<h4 class="anchored" data-anchor-id="coblea">CobleA</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_cobA <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"coble_a"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_cobA)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_cobA
+
+REML criterion at convergence: -374.6
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.2719 -0.4910 -0.1244  0.2281  4.0249 
+
+Random effects:
+ Groups                   Name        Variance  Std.Dev.
+ tank_number:inflow_table (Intercept) 0.000e+00 0.000000
+ date                     (Intercept) 1.850e-06 0.001360
+ inflow_table             (Intercept) 4.277e-07 0.000654
+ Residual                             8.629e-06 0.002937
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+                 Estimate Std. Error         df t value Pr(&gt;|t|)   
+(Intercept)     0.0067071  0.0012553  4.7988821   5.343  0.00348 **
+treatmentCoral -0.0007835  0.0012101 41.9208582  -0.647  0.52086   
+treatmentCCA    0.0008363  0.0012101 41.9208582   0.691  0.49332   
+treatmentAlgae  0.0018472  0.0011992 40.9999940   1.540  0.13116   
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.491              
+treatmntCCA -0.491  0.509       
+treatmntAlg -0.478  0.496  0.496
+optimizer (nloptwrap) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment  emmean      SE   df lower.CL upper.CL
+ Control   0.00671 0.00130 4.60  0.00328   0.0101
+ Coral     0.00592 0.00124 4.64  0.00265   0.0092
+ CCA       0.00754 0.00124 4.64  0.00427   0.0108
+ Algae     0.00855 0.00130 4.60  0.00513   0.0120
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast         estimate      SE   df t.ratio p.value
+ Coral - Control -0.000783 0.00125 11.3  -0.624  0.8418
+ CCA - Control    0.000836 0.00125 11.3   0.667  0.8207
+ Algae - Control  0.001847 0.00120 11.0   1.540  0.3371
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> treatment  emmean      SE   df lower.CL upper.CL
+ Control   0.00671 0.00130 4.60  0.00328   0.0101
+ Coral     0.00592 0.00124 4.64  0.00265   0.0092
+ CCA       0.00754 0.00124 4.64  0.00427   0.0108
+ Algae     0.00855 0.00130 4.60  0.00513   0.0120
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 </code></pre>
+</div>
+</div>
+<section id="interpretation" class="level5">
+<h5 class="anchored" data-anchor-id="interpretation">Interpretation</h5>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co">#sort(boxplot.stats(fDOM_12PM_cobA$fdom_conc)$out)</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_cobA, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="coblem" class="level4">
+<h4 class="anchored" data-anchor-id="coblem">CobleM</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_cobM <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"coble_m"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_cobM)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_cobM
+
+REML criterion at convergence: -358.4
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.3285 -0.5739 -0.1594  0.2656  3.7092 
+
+Random effects:
+ Groups                   Name        Variance  Std.Dev.
+ tank_number:inflow_table (Intercept) 0.000e+00 0.000000
+ date                     (Intercept) 3.193e-06 0.001787
+ inflow_table             (Intercept) 5.213e-07 0.000722
+ Residual                             1.239e-05 0.003520
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+                 Estimate Std. Error         df t value Pr(&gt;|t|)   
+(Intercept)     0.0090049  0.0015467  4.6377837   5.822  0.00271 **
+treatmentCoral -0.0008141  0.0014490 41.9519129  -0.562  0.57721   
+treatmentCCA    0.0008885  0.0014490 41.9519129   0.613  0.54308   
+treatmentAlgae  0.0016765  0.0014370 40.9999833   1.167  0.25008   
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.476              
+treatmntCCA -0.476  0.508       
+treatmntAlg -0.465  0.496  0.496
+optimizer (nloptwrap) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-22-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-23-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment  emmean      SE   df lower.CL upper.CL
+ Control   0.00900 0.00160 4.47  0.00474   0.0133
+ Coral     0.00819 0.00154 4.50  0.00411   0.0123
+ CCA       0.00989 0.00154 4.50  0.00581   0.0140
+ Algae     0.01068 0.00160 4.47  0.00642   0.0149
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast         estimate      SE   df t.ratio p.value
+ Coral - Control -0.000814 0.00151 11.4  -0.540  0.8808
+ CCA - Control    0.000888 0.00151 11.4   0.590  0.8585
+ Algae - Control  0.001677 0.00144 11.0   1.167  0.5332
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> treatment  emmean      SE   df lower.CL upper.CL
+ Control   0.00900 0.00160 4.47  0.00474   0.0133
+ Coral     0.00819 0.00154 4.50  0.00411   0.0123
+ CCA       0.00989 0.00154 4.50  0.00581   0.0140
+ Algae     0.01068 0.00160 4.47  0.00642   0.0149
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co">#sort(boxplot.stats(fDOM_12PM_cobA$fdom_conc)$out)</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_cobM, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-25-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="coblec" class="level4">
+<h4 class="anchored" data-anchor-id="coblec">CobleC</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_cobC <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"coble_c"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_cobC)</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_cobC
+
+REML criterion at convergence: -373.6
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.2378 -0.4396 -0.0512  0.2272  4.3019 
+
+Random effects:
+ Groups                   Name        Variance  Std.Dev.
+ tank_number:inflow_table (Intercept) 0.000e+00 0.000000
+ date                     (Intercept) 1.934e-06 0.001391
+ inflow_table             (Intercept) 0.000e+00 0.000000
+ Residual                             8.966e-06 0.002994
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+                Estimate Std. Error        df t value Pr(&gt;|t|)   
+(Intercept)    4.278e-03  1.180e-03 5.486e+00   3.627  0.01286 * 
+treatmentCoral 7.689e-05  1.222e-03 4.200e+01   0.063  0.95014   
+treatmentCCA   2.002e-03  1.222e-03 4.200e+01   1.638  0.10887   
+treatmentAlgae 3.339e-03  1.222e-03 4.200e+01   2.732  0.00918 **
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.518              
+treatmntCCA -0.518  0.500       
+treatmntAlg -0.518  0.500  0.500
+optimizer (nloptwrap) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span></span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-28-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-29-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment  emmean      SE   df lower.CL upper.CL
+ Control   0.00428 0.00127 4.41 0.000866  0.00769
+ Coral     0.00436 0.00118 4.63 0.001249  0.00746
+ CCA       0.00628 0.00118 4.63 0.003174  0.00939
+ Algae     0.00762 0.00127 4.41 0.004206  0.01103
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast        estimate      SE   df t.ratio p.value
+ Coral - Control 7.69e-05 0.00131 11.7   0.059  0.9987
+ CCA - Control   2.00e-03 0.00131 11.7   1.524  0.3423
+ Algae - Control 3.34e-03 0.00122 11.0   2.732  0.0508
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sort</span>(<span class="fu">boxplot.stats</span>(fDOM_12PM_cobC<span class="sc">$</span>fdom_conc)<span class="sc">$</span>out)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.01008581 0.01057877 0.01077138 0.01389198 0.02190937</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_cobC, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: ggrepel: 1 unlabeled data points (too many overlaps). Consider
+increasing max.overlaps</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-31-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="mc" class="level4">
+<h4 class="anchored" data-anchor-id="mc">M:C</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_mtoc <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"m_to_c"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_mtoc)</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_mtoc
+
+REML criterion at convergence: -59.2
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-2.2868 -0.5601 -0.1069  0.8310  1.4298 
+
+Random effects:
+ Groups                   Name        Variance  Std.Dev.
+ tank_number:inflow_table (Intercept) 4.407e-04 0.020992
+ date                     (Intercept) 2.449e-03 0.049487
+ inflow_table             (Intercept) 2.373e-05 0.004871
+ Residual                             1.100e-02 0.104876
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+               Estimate Std. Error       df t value Pr(&gt;|t|)    
+(Intercept)     0.45598    0.04310  4.73032  10.579 0.000180 ***
+treatmentCoral  0.08654    0.04535 11.63170   1.908 0.081324 .  
+treatmentCCA    0.16838    0.04535 11.63170   3.713 0.003120 ** 
+treatmentAlgae  0.21337    0.04532 10.99879   4.709 0.000641 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.527              
+treatmntCCA -0.527  0.501       
+treatmntAlg -0.526  0.500  0.500</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span> <span class="fu">ylim</span>(<span class="sc">-</span><span class="fl">0.1</span>,<span class="fl">0.1</span>) <span class="sc">+</span></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span> <span class="fu">ylim</span>(<span class="sc">-</span><span class="fl">0.15</span>,<span class="fl">0.15</span>)<span class="sc">+</span></span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-34-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-35-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment emmean     SE   df lower.CL upper.CL
+ Control    0.456 0.0465 4.73    0.334    0.578
+ Coral      0.543 0.0431 4.98    0.432    0.653
+ CCA        0.624 0.0431 4.98    0.514    0.735
+ Algae      0.669 0.0465 4.73    0.548    0.791
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast        estimate     SE   df t.ratio p.value
+ Coral - Control   0.0865 0.0486 11.6   1.780  0.2372
+ CCA - Control     0.1684 0.0486 11.6   3.463  0.0132
+ Algae - Control   0.2134 0.0453 11.0   4.709  0.0018
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="co">#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)</span></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_mtoc, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-37-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>(<span class="fu">ggplot</span>(fDOM_12PM_cobM, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc))<span class="sc">+</span></span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>(<span class="at">fill =</span> <span class="st">"cornflowerblue"</span>)<span class="sc">+</span></span>
+<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_jitter(aes(color = treatment), alpha = 0.5)+</span></span>
+<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_text_repel(aes(label = tank_number), alpha = 0.4)+</span></span>
+<span id="cb54-5"><a href="#cb54-5" aria-hidden="true" tabindex="-1"></a>   <span class="fu">ylim</span>(<span class="dv">0</span>,<span class="fl">0.02</span>)<span class="sc">+</span></span>
+<span id="cb54-6"><a href="#cb54-6" aria-hidden="true" tabindex="-1"></a>   <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"cobleM"</span>)<span class="sc">+</span></span>
+<span id="cb54-7"><a href="#cb54-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">#facet_grid(~date)+</span></span>
+<span id="cb54-8"><a href="#cb54-8" aria-hidden="true" tabindex="-1"></a>  nunu_theme ) <span class="sc">+</span></span>
+<span id="cb54-9"><a href="#cb54-9" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb54-10"><a href="#cb54-10" aria-hidden="true" tabindex="-1"></a>  (<span class="fu">ggplot</span>(fDOM_12PM_cobC, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc))<span class="sc">+</span></span>
+<span id="cb54-11"><a href="#cb54-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>(<span class="at">fill =</span> <span class="st">"chartreuse3"</span>)<span class="sc">+</span></span>
+<span id="cb54-12"><a href="#cb54-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_jitter(aes(color = treatment), alpha = 0.5)+</span></span>
+<span id="cb54-13"><a href="#cb54-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_text_repel(aes(label = tank_number), alpha = 0.4)+</span></span>
+<span id="cb54-14"><a href="#cb54-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ylim</span>(<span class="dv">0</span>,<span class="fl">0.02</span>)<span class="sc">+</span></span>
+<span id="cb54-15"><a href="#cb54-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"cobleC"</span>)<span class="sc">+</span></span>
+<span id="cb54-16"><a href="#cb54-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">#facet_grid(~date)+</span></span>
+<span id="cb54-17"><a href="#cb54-17" aria-hidden="true" tabindex="-1"></a>  nunu_theme ) <span class="sc">+</span></span>
+<span id="cb54-18"><a href="#cb54-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb54-19"><a href="#cb54-19" aria-hidden="true" tabindex="-1"></a>  (<span class="fu">ggplot</span>(fDOM_12PM_mtoc, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc))<span class="sc">+</span></span>
+<span id="cb54-20"><a href="#cb54-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>( <span class="at">fill =</span> <span class="st">"yellow"</span>)<span class="sc">+</span></span>
+<span id="cb54-21"><a href="#cb54-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_jitter(aes(color = treatment), alpha = 0.5)+</span></span>
+<span id="cb54-22"><a href="#cb54-22" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_text_repel(aes(label = tank_number), alpha = 0.4)+</span></span>
+<span id="cb54-23"><a href="#cb54-23" aria-hidden="true" tabindex="-1"></a>  <span class="co">#facet_grid(~date)+</span></span>
+<span id="cb54-24"><a href="#cb54-24" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"M:C"</span>)<span class="sc">+</span></span>
+<span id="cb54-25"><a href="#cb54-25" aria-hidden="true" tabindex="-1"></a>  nunu_theme ) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Removed 1 row containing non-finite outside the scale range (`stat_boxplot()`).
+Removed 1 row containing non-finite outside the scale range (`stat_boxplot()`).</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-38-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="fi" class="level4">
+<h4 class="anchored" data-anchor-id="fi">FI</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_fi <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"fi"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb57"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_fi)</span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_fi
+
+REML criterion at convergence: 18.8
+
+Scaled residuals: 
+     Min       1Q   Median       3Q      Max 
+-1.67285 -0.52328 -0.07147  0.48365  2.09812 
+
+Random effects:
+ Groups                   Name        Variance  Std.Dev.
+ tank_number:inflow_table (Intercept) 0.0250861 0.15839 
+ date                     (Intercept) 0.0223416 0.14947 
+ inflow_table             (Intercept) 0.0006236 0.02497 
+ Residual                             0.0507148 0.22520 
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+               Estimate Std. Error       df t value Pr(&gt;|t|)    
+(Intercept)     1.90236    0.13538  5.95209  14.052 8.65e-06 ***
+treatmentCoral  0.03516    0.14514 11.60334   0.242    0.813    
+treatmentCCA    0.02569    0.14514 11.60334   0.177    0.863    
+treatmentAlgae -0.14564    0.14490 10.99967  -1.005    0.336    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.538              
+treatmntCCA -0.538  0.502       
+treatmntAlg -0.535  0.499  0.499</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb59"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span></span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span></span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-41-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-42-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb61"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment emmean    SE   df lower.CL upper.CL
+ Control     1.90 0.146 5.95     1.54     2.26
+ Coral       1.94 0.135 6.38     1.61     2.26
+ CCA         1.93 0.135 6.38     1.60     2.25
+ Algae       1.76 0.146 5.95     1.40     2.11
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast        estimate    SE   df t.ratio p.value
+ Coral - Control   0.0352 0.155 11.6   0.227  0.9796
+ CCA - Control     0.0257 0.155 11.6   0.166  0.9893
+ Algae - Control  -0.1456 0.145 11.0  -1.005  0.6286
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb63"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="co">#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)</span></span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_fi, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-44-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="bix" class="level4">
+<h4 class="anchored" data-anchor-id="bix">BIX</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_bix <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"bix"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb65"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_bix)</span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_bix
+
+REML criterion at convergence: 11.3
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.6243 -0.6494 -0.1733  0.6039  2.8187 
+
+Random effects:
+ Groups                   Name        Variance Std.Dev.
+ tank_number:inflow_table (Intercept) 0.001035 0.03218 
+ date                     (Intercept) 0.046108 0.21473 
+ inflow_table             (Intercept) 0.000000 0.00000 
+ Residual                             0.052537 0.22921 
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+               Estimate Std. Error       df t value Pr(&gt;|t|)  
+(Intercept)     0.76164    0.14144  2.91385   5.385   0.0135 *
+treatmentCoral  0.12469    0.09630 12.00006   1.295   0.2197  
+treatmentCCA    0.06408    0.09630 12.00006   0.665   0.5184  
+treatmentAlgae  0.10012    0.09630 12.00006   1.040   0.3190  
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.340              
+treatmntCCA -0.340  0.500       
+treatmntAlg -0.340  0.500  0.500
+optimizer (nloptwrap) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span></span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span></span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-47-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb68"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-48-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb69"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment emmean    SE   df lower.CL upper.CL
+ Control    0.762 0.146 2.88    0.284     1.24
+ Coral      0.886 0.141 2.89    0.427     1.35
+ CCA        0.826 0.141 2.89    0.366     1.29
+ Algae      0.862 0.146 2.88    0.384     1.34
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast        estimate     SE   df t.ratio p.value
+ Coral - Control   0.1247 0.1040 11.7   1.204  0.5098
+ CCA - Control     0.0641 0.1040 11.7   0.619  0.8444
+ Algae - Control   0.1001 0.0963 11.0   1.040  0.6080
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="co">#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_bix, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb71-7"><a href="#cb71-7" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-50-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="hix" class="level4">
+<h4 class="anchored" data-anchor-id="hix">HIX</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_hix <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"hix"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb73"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_hix)</span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_hix
+
+REML criterion at convergence: -74.9
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.8355 -0.5076  0.0424  0.5004  3.0690 
+
+Random effects:
+ Groups                   Name        Variance Std.Dev.
+ tank_number:inflow_table (Intercept) 0.001088 0.03298 
+ date                     (Intercept) 0.002988 0.05466 
+ inflow_table             (Intercept) 0.000000 0.00000 
+ Residual                             0.006989 0.08360 
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+               Estimate Std. Error       df t value Pr(&gt;|t|)    
+(Intercept)     0.36940    0.04302  4.80121   8.587 0.000431 ***
+treatmentCoral -0.03060    0.04134 12.00014  -0.740 0.473424    
+treatmentCCA    0.03677    0.04134 12.00014   0.890 0.391212    
+treatmentAlgae  0.03707    0.04134 12.00014   0.897 0.387449    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.480              
+treatmntCCA -0.480  0.500       
+treatmntAlg -0.480  0.500  0.500
+optimizer (nloptwrap) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb75"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span></span>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-53-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb76"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-54-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb77"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment emmean    SE   df lower.CL upper.CL
+ Control    0.369 0.046 4.43    0.246    0.492
+ Coral      0.339 0.043 4.59    0.225    0.452
+ CCA        0.406 0.043 4.59    0.293    0.520
+ Algae      0.406 0.046 4.43    0.283    0.529
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast        estimate     SE   df t.ratio p.value
+ Coral - Control  -0.0306 0.0444 11.7  -0.688  0.8092
+ CCA - Control     0.0368 0.0444 11.7   0.827  0.7326
+ Algae - Control   0.0371 0.0413 11.0   0.897  0.6928
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb79"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a><span class="co">#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)</span></span>
+<span id="cb79-2"><a href="#cb79-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_hix, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb79-3"><a href="#cb79-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb79-4"><a href="#cb79-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb79-5"><a href="#cb79-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb79-6"><a href="#cb79-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb79-7"><a href="#cb79-7" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-56-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="proteinaceous" class="level3">
+<h3 class="anchored" data-anchor-id="proteinaceous">Proteinaceous</h3>
+<section id="cobleb" class="level4">
+<h4 class="anchored" data-anchor-id="cobleb">CobleB</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb80"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a>fDOM_12PM_prot <span class="ot">&lt;-</span> fDOM_12PM <span class="sc">%&gt;%</span> <span class="fu">filter</span>(fdom <span class="sc">==</span> <span class="st">"fpeak"</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb81"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">lmer</span>(fdom_conc <span class="sc">~</span> treatment <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>date)<span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>inflow_table<span class="sc">/</span>tank_number), <span class="at">data =</span> fDOM_12PM_prot)</span>
+<span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: fdom_conc ~ treatment + (1 | date) + (1 | inflow_table/tank_number)
+   Data: fDOM_12PM_prot
+
+REML criterion at convergence: -216.4
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-1.7291 -0.5097 -0.1106  0.3558  2.3471 
+
+Random effects:
+ Groups                   Name        Variance  Std.Dev.
+ tank_number:inflow_table (Intercept) 2.317e-05 0.004813
+ date                     (Intercept) 6.824e-05 0.008261
+ inflow_table             (Intercept) 2.376e-06 0.001542
+ Residual                             3.004e-04 0.017331
+Number of obs: 48, groups:  
+tank_number:inflow_table, 16; date, 3; inflow_table, 2
+
+Fixed effects:
+                Estimate Std. Error        df t value Pr(&gt;|t|)  
+(Intercept)     0.029275   0.007417  5.028830   3.947   0.0108 *
+treatmentCoral -0.002834   0.007868 11.590035  -0.360   0.7252  
+treatmentCCA   -0.006526   0.007868 11.590035  -0.829   0.4236  
+treatmentAlgae  0.003245   0.007851 11.000520   0.413   0.6873  
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) trtmnC trtCCA
+treatmntCrl -0.533              
+treatmntCCA -0.533  0.502       
+treatmntAlg -0.529  0.499  0.499</code></pre>
+</div>
+</div>
+<div class="cell" data-fig_height="10">
+<div class="sourceCode cell-code" id="cb83"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">1</span>]] <span class="sc">+</span></span>
+<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"re"</span>)[[<span class="dv">2</span>]] <span class="sc">+</span></span>
+<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"eff"</span>, <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">'treatment'</span>)) <span class="sc">+</span></span>
+<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_model</span>(mod, <span class="at">type =</span> <span class="st">"diag"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-59-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb84"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resid_panel</span>(mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-60-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb85"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span> trt.vs.ctrl <span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment emmean      SE   df lower.CL upper.CL
+ Control   0.0293 0.00797 5.03  0.00883   0.0497
+ Coral     0.0264 0.00740 5.30  0.00774   0.0451
+ CCA       0.0227 0.00740 5.30  0.00405   0.0415
+ Algae     0.0325 0.00797 5.03  0.01207   0.0530
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast        estimate      SE   df t.ratio p.value
+ Coral - Control -0.00283 0.00839 11.6  -0.338  0.9538
+ CCA - Control   -0.00653 0.00839 11.6  -0.778  0.7607
+ Algae - Control  0.00325 0.00785 11.0   0.413  0.9304
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: dunnettx method for 3 tests </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb87"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb87-1"><a href="#cb87-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(mod, <span class="at">specs =</span>  pairwise<span class="sc">~</span> treatment)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$emmeans
+ treatment emmean      SE   df lower.CL upper.CL
+ Control   0.0293 0.00797 5.03  0.00883   0.0497
+ Coral     0.0264 0.00740 5.30  0.00774   0.0451
+ CCA       0.0227 0.00740 5.30  0.00405   0.0415
+ Algae     0.0325 0.00797 5.03  0.01207   0.0530
+
+Degrees-of-freedom method: kenward-roger 
+Confidence level used: 0.95 
+
+$contrasts
+ contrast        estimate      SE   df t.ratio p.value
+ Control - Coral  0.00283 0.00839 11.6   0.338  0.9860
+ Control - CCA    0.00653 0.00839 11.6   0.778  0.8629
+ Control - Algae -0.00325 0.00785 11.0  -0.413  0.9750
+ Coral - CCA      0.00369 0.00785 11.0   0.470  0.9641
+ Coral - Algae   -0.00608 0.00839 11.6  -0.725  0.8853
+ CCA - Algae     -0.00977 0.00839 11.6  -1.165  0.6592
+
+Degrees-of-freedom method: kenward-roger 
+P value adjustment: tukey method for comparing a family of 4 estimates </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb89"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb89-1"><a href="#cb89-1" aria-hidden="true" tabindex="-1"></a><span class="co">#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)</span></span>
+<span id="cb89-2"><a href="#cb89-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fDOM_12PM_prot, <span class="fu">aes</span>(<span class="at">x=</span> treatment, <span class="at">y =</span> fdom_conc, <span class="at">fill =</span> fdom))<span class="sc">+</span></span>
+<span id="cb89-3"><a href="#cb89-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>()<span class="sc">+</span></span>
+<span id="cb89-4"><a href="#cb89-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="fu">aes</span>(<span class="at">color =</span> treatment), <span class="at">alpha =</span> <span class="fl">0.5</span>)<span class="sc">+</span></span>
+<span id="cb89-5"><a href="#cb89-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="fu">aes</span>(<span class="at">label =</span> tank_number), <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb89-6"><a href="#cb89-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_grid</span>(fdom_cat<span class="sc">~</span>date, <span class="at">scales =</span> <span class="st">"free"</span>)<span class="sc">+</span></span>
+<span id="cb89-7"><a href="#cb89-7" aria-hidden="true" tabindex="-1"></a>  nunu_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MOBEAST_fDOM_2_files/figure-html/unnamed-chunk-62-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
