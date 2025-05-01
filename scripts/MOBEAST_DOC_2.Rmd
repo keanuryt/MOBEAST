@@ -1,0 +1,380 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: MOBEAST DOC V2
+output: 
+  html_document:
+     toc: true
+     toc_float: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+#library(GGally)
+library(emmeans)
+library(performance)
+
+
+```
+
+## Load Data 
+```{r}
+DOC <- read_csv(here("data", "DOC", "DOC_clean.csv"))
+table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+```
+
+## Data visualization theme
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+## Data Clean Up
+
+```{r}
+table_id <- clean_names(table_id)
+
+table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+  mutate(tank_number = paste0("T", tank_number)) %>% 
+  mutate(inflow_table = paste("Table", inflow_table))
+DOC <- left_join(DOC, table_id, by= "tank_number")
+```
+
+```{r}
+DOC <- DOC %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, inflow_table)) %>% 
+   mutate(inflow_table = ifelse(inflow_table == "F1", "Table 1", 
+                                ifelse(inflow_table == "F2", "Table 2", inflow_table))) %>% 
+  mutate(inflow_table = factor(inflow_table),
+         tank_number = factor(tank_number)) %>% 
+  relocate(inflow_table, .after = "treatment")
+```
+
+
+```{r}
+
+DOC_norm <- DOC %>% filter(date > as.Date("2024-05-31")) %>% # Removes end members
+  filter(treatment != "Rain") %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+   group_by(date_time, inflow_table) %>%
+  mutate(inflow= npoc_u_m[treatment == "Inflow"]) %>%  # Isolate inflow for each date_time and table
+  ungroup() %>%
+  group_by(date_time) %>% 
+  mutate(inflow = ifelse(is.na(inflow),
+      inflow[!is.na(inflow)][1],  # get the other table's value for that date
+      inflow)) %>%
+  ungroup() %>% 
+  mutate(npoc_u_m_norm = npoc_u_m - inflow)  %>% # Normalize for treatments 
+  relocate(inflow, .after = "npoc_u_m_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+  
+```
+
+
+## Hypothesis 0: endmembers and inflow comparison
+
+```{r}
+DOC %>% filter(treatment == "Endmember" | treatment == "Rain"| treatment == "Inflow") %>% 
+  filter(time != hms("00:00:00")) %>% 
+  mutate(tank_number = as.character(tank_number)) %>% 
+  mutate(tank_number = ifelse(tank_number == "Lagoon Tiahura", "Lagoon", tank_number),
+         tank_number = factor(tank_number)) %>% 
+  group_by(tank_number) %>% 
+  summarize(avg = mean(npoc_u_m, na.rm =T),
+            min = min(npoc_u_m, na.rm =T),
+            max = max(npoc_u_m, na.rm =T))
+```
+
+
+
+```{r}
+DOC_verif <- DOC %>% filter(treatment == "Endmember" | treatment == "Rain"| treatment == "Inflow") %>% 
+  filter(time != hms("00:00:00")) %>% 
+  mutate(tank_number = as.character(tank_number)) %>% 
+  mutate(tank_number = ifelse(tank_number == "Lagoon Tiahura", "Lagoon", tank_number),
+         tank_number = factor(tank_number, levels = c("Lagoon", "Ocean", "Bay", "F1", "F2")))
+```
+
+```{r}
+mod <- lmer(npoc_u_m ~ tank_number + (1|date)+ (1|time)+  (1|treatment), data = DOC_verif)
+
+summary(mod)
+```
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ tank_number)
+```
+
+```{r}
+ggplot(DOC_verif, aes(x= tank_number, npoc_u_m, fill = treatment)) +
+  geom_boxplot()+
+  geom_jitter(aes(color = tank_number), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "All samples variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  facet_wrap(~date) + 
+  #scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       #values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+```
+
+
+
+## Hypothesis  1: Different communities will release difference amounts of DOC (12PM)
+
+```{r}
+DOC_norm_12PM <- DOC_norm %>% 
+  filter(time == hms("12:00:00")) %>% 
+  filter(treatment != "Inflow") 
+```
+
+```{r}
+mod <- lmer(npoc_u_m_norm ~ treatment + (1|date) +(1|inflow_table/tank_number), data = DOC_norm_12PM)
+
+summary(mod)
+```
+
+```{r, fig_height = 14, fig.width = 10}
+plot_model(mod, type = "re")[[3]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+#emmeans(mod, pairwise ~ treatment)
+
+```
+
+### Interpretation
+
+- Random Effects: Sample date can explain 8 std of variation, Inflow table can explain 3.5 std of variation. Te residuals indicate that 22.6 std still remains unexplained by the model.
+- Random effect for (1|tank_number) is 0 variance or std dev.
+- Random effect for (1|inflow_table/tank_number) is 0 variance or std dev.
+- Fixed effects: DOC values increased in algae tanks and stayed lower in coral tanks. There is a significant difference between algae tank and control (p = 0.025). Corals and CCA are not different from the control.
+- Residual points are are close to the regression line, except for one point
+- Emmeans does a paired comparison between control and treatments. The p-values are not significant. But algae tank is much smaller p-value than the other treatments. 
+
+```{r}
+ggplot(DOC_norm_12PM, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "12PM variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  facet_wrap(~date) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+```
+
+
+## Hypothesis 2: There are variation in exudation on a diel cycle 24h 
+
+```{r}
+DOC_norm_24h <- DOC_norm %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  filter(time != hms("00:00:00")) %>% 
+  filter(treatment != "Inflow") %>% 
+  filter(!(tank_number %in% c("T8", "T11") & time == hms("18:00:00")))
+```
+
+```{r}
+mod <- lmer(npoc_u_m_norm ~ treatment + (1|time)+ (1|date)+ (1|inflow_table/tank_number), data = DOC_norm_24h)
+
+summary(mod)
+```
+
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+
+### Interpretation
+- Removed 00:00:00 because it was drastically different than the other 3 time points. Need to figure out what happened.
+- Removed 18:00:00 T8 and T11 (control tanks) because they looked like outliers on the boxplots and also they skewed the model a lot!
+- Random effect : inflow table does not explain the variance (variance = 0), nested effect helps to explain some of the variation. 
+- Fixed effects: the p-values for the t-test are not significant but algae still has a smaller p-value than the other treatments. 
+- Emmeans contrasts also do not show significant difference between the treatments. p>0.05
+
+```{r}
+ggplot(DOC_norm_24h, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "24h variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  facet_wrap(~time) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+```
+
+## Hypothesis 3: We'll see differences if we compare opposite times
+```{r}
+DOC_norm_6_18 <- DOC_norm %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  filter(time != hms("00:00:00")) %>% 
+  filter(time != hms("12:00:00")) %>%
+  filter(treatment != "Inflow") %>% 
+  filter(!(tank_number %in% c("T8", "T11") & time == hms("18:00:00")))
+```
+
+
+```{r}
+mod <- lmer(npoc_u_m_norm ~ treatment+ (1|time)+ (1|date)+ (1|inflow_table/tank_number), 
+            data = DOC_norm_6_18)
+
+summary(mod)
+```
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+
+```
+
+
+### Interpretion
+
+- 06:00 vs 18:00 did not show significant differences in DOC concentrations between treatments either
+
+```{r}
+ggplot(DOC_norm_6_18, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "06:00-18:00 variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  facet_wrap(~time) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+```
+
+## Hypothesis 4: All samples
+
+```{r}
+DOC_norm_all <- DOC_norm %>% 
+  filter(time != hms("00:00:00")) %>% 
+  filter(treatment != "Inflow") %>% 
+  filter(!(tank_number %in% c("T8", "T11") & time == hms("18:00:00")))
+```
+
+```{r}
+mod <- lmer(npoc_u_m_norm ~ treatment + (1|time)+ (1|date), 
+            data = DOC_norm_all)
+
+summary(mod)
+```
+
+```{r, fig_height = 10, fig.width = 10}
+plot_model(mod, type = "re")[[1]] +
+  plot_model(mod, type = "re")[[2]] +
+  plot_model(mod, type = "eff", terms = c('treatment')) +
+  plot_model(mod, type = "diag")[[1]]
+```
+
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+plot(emmeans(mod, ~ treatment), comparisons = TRUE)
+```
+
+### Interpretation
+
+- Looking at all the samples together, lmer seems to indicate that Algae tanks are significantly different from the control
+- Emmeans show that the difference between pairs is not significant. But the algae tanks have much low p-values than the other treatments
+
+
+
+```{r}
+ggplot(DOC_norm_all, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "All samples variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  facet_wrap(~date_time) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+```
+

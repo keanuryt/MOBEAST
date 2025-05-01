@@ -1,0 +1,87 @@
+---
+title: "For Keanu 16S Analysis"
+author: "Rayna McClintock"
+date: "2025-05-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Load Libraries and Data
+
+```{r, echo=FALSE, result = hide, collapse=TRUE}
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(vegan)
+library(devtools)
+library(ComplexHeatmap)
+library(ggplot2)
+library(RColorBrewer)
+library(ggpubr)
+library(viridis)
+library(gridExtra)
+library(circlize)
+library(ape)
+
+#install_github("https://github.com/jokergoo/ComplexHeatmap.git")
+
+```
+
+
+
+
+```{r, echo=FALSE, collapse=TRUE}
+#read in relative abundance data and metadata
+#without cabral seep samples
+relabun = read.csv("Metalica_abundance_table_97.csv", header = TRUE)
+metadata = read.csv("Metalica_metadata.csv", header = TRUE)
+taxonomy = read.csv("Metalica_taxonomy.csv", header = TRUE)
+
+
+
+#load Wesleys culling scripts
+source("cull.otu.script.R")
+source("generate.long.format.script.R")
+
+
+```
+
+
+################################### cull the data ###################################
+
+```{r, echo=FALSE, collapse=TRUE}
+
+relabund <-relabun[,-1]
+rownames(relabund) <- relabun[,1]
+
+#Transpose and create a data frame so now OTUs are the column names
+relabund.2 = as.data.frame(t(relabund[]))
+
+#Cull abundance and make into a dataframe
+culled.abund.asv = cull.abundance.prevalence(relabund.2, 3, 0.001, 0.01) 
+culled.abund.asv.transposed = as.data.frame(t(culled.abund.asv))
+#culled.abund.asv.transposed <- rownames_to_column(culled.abund.asv.transposed, var = "OTUNumber")
+
+
+#save a data frame with true/false designations from culling script
+cull.df<- data.frame(cull.vec) 
+taxonomy.culled = taxonomy[taxonomy$OTUNumber %in% colnames(culled.abund.asv),]
+culled.long.table = generate.long.format.OTUs(culled.abund.asv.transposed,metadata,taxonomy.culled)
+
+##### Want to make where column names are taxa.string.asv, not just asv, so can have that for heatmap of taxa highlighted by LM
+culled.abund.asv.transposed$ASV = rownames(culled.abund.asv.transposed)
+culled.abund.asv.transposed.w.taxonomy = merge(culled.abund.asv.transposed, taxonomy.culled, by.x = "ASV", by.y = "OTUNumber")
+rownames(culled.abund.asv.transposed.w.taxonomy) = culled.abund.asv.transposed.w.taxonomy$taxa.string.asv
+#culled.abund.asv.transposed.w.taxonomy = culled.abund.asv.transposed.w.taxonomy[,c(2:291)]
+
+```
+
+
+
+
+
+

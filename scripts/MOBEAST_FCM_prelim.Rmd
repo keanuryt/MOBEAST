@@ -1,0 +1,477 @@
+---
+title: "FCM Prelim Data"
+author: "Keanu Rochette-Yu Tsuen"
+date: "2025-02-16"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE , 
+                      warning = FALSE)
+```
+
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+library(ggpmisc)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(GGally)
+library(emmeans)
+
+```
+
+## Data visualization theme
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+## functions
+```{r}
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+```
+
+
+# Load Data
+```{r}
+FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
+meta <- read_csv(here("data", "MOBEAST_metadata.csv"))
+
+FCM<- FCM %>% clean_names()
+meta <-meta %>% clean_names()
+```
+
+```{r}
+treat_code <- tibble(
+  treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
+  full_name = c("Algae", "Coral", "Control", "CCA", "Inflow", "Endmember", "Rain")
+)
+
+```
+
+
+# Note
+**Mislabeling**:  
+- There were 2 batches of MOBEAST 2024-06-02 18:00 containing a total of 3 T4 samples. 
+- MOBEAST 2024-06-02 21:00 is missing, one of the 18:00 is actually the 21:00 time point.
+- One tube was missing a label (marked "X"). Assume it's the bay sample (2024-05-25).
+
+For the preliminary results, I removed the duplicates for T4, only keeping 1 random T4 sample.  
+I will be averaging the values of MOBEAST 2024-06-02 18:00. 
+```{r}
+FCM_pre <- FCM %>% filter(str_detect(sample, pattern = "MOBEAST")) %>% 
+    mutate(sample = str_remove(sample, pattern = "X_")) %>% 
+  filter(sample!= "2_MOBEAST_T4_A_2024-06-02_18:00", 
+         sample!= "3_MOBEAST_T4_A_2024-06-02_18:00") %>% 
+  separate_wider_delim(sample, names= c("project", "tank", "treatement", "date","time"), 
+                             delim = "_") 
+
+
+```
+
+```{r}
+FCM_pre<-FCM_pre %>% mutate(treatment = ifelse(treatement %in% treat_code$treatment, 
+                                      treat_code$full_name, treatement)) %>% 
+  relocate(treatment,.before = treatement) %>% 
+  select(-treatement, -project)
+```
+
+```{r}
+FCM_pre <- FCM_pre %>% mutate(date_time = ymd_hms(paste0(date," ", time,":00"))) %>% 
+  select(tank, treatment, date_time, date, time, 
+                   include_vol, 
+                   het_bact = het_bact_events_u_l,
+                   pico_euk = pico_euk_events_u_l,
+                   syn = syn_events_u_l,
+                   pro = pro_events_u_l,
+                   tot_bact = bacteria_events_u_l) %>% 
+  group_by(date_time, treatment, tank) %>% 
+  mutate(cyano = sum(syn, pro, het_bact) - het_bact) %>%  
+  ungroup()
+```
+
+```{r}
+FCM_pre %>% pivot_longer(cols = het_bact:syn,
+               names_to = "org", 
+               values_to = "conc_ul") %>% 
+  filter(str_detect(date, "06")) %>% 
+  filter(treatment != "Endmember", treatment != "Rain" ) %>%
+  ggplot(aes(date_time, conc_ul, color = treatment, group = org))+
+  geom_point()+
+  geom_line()+ 
+  facet_wrap(.~treatment)
+```
+
+
+## BUOYS 
+
+### 12PM 
+```{r}
+FCM_12PM <- FCM_pre %>% filter(time == "12:00")
+```
+
+```{r}
+FCM_12PM_norm <- FCM_12PM %>% 
+  select(-pro, -tot_bact, -cyano, -include_vol) %>% 
+  pivot_longer(cols = het_bact:syn,
+               names_to = "org", 
+               values_to = "conc_ul") %>% 
+   group_by(date_time, org) %>% 
+  mutate(inflow_avg = mean(conc_ul[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(conc_ul_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), conc_ul / inflow_avg, NA)) %>%  # Normalize for coral & algae
+  filter(treatment != "Inflow") %>% # remove the inflow  
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) 
+
+FCM_12PM_norm %>% 
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(org~date_time, scales = "free")+
+  nunu_theme
+```
+
+```{r}
+FCM_12PM_norm %>% 
+  ggplot(aes(date_time, conc_ul_norm, group = date_time,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(org~treatment, scales = "free")+
+  nunu_theme
+```
+
+
+
+#### Het bact 
+```{r}
+FCM_12PM_norm %>% filter(org == "het_bact") %>% 
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(.~date_time)+
+  nunu_theme
+```
+
+```{r}
+FCM_12PM_norm_hb <- FCM_12PM_norm %>% filter(org == "het_bact") 
+FCM_12_hb_lm<- lm(conc_ul_norm ~ date_time*treatment, data = FCM_12PM_norm_hb)
+
+summary(FCM_12_hb_lm)
+
+emmeans(FCM_12_hb_lm, specs = trt.vs.ctrl ~ treatment )
+```
+
+
+#### Synechococcus
+```{r}
+FCM_12PM_norm %>% filter(org == "syn") %>% 
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(.~date_time)+
+  nunu_theme
+```
+
+```{r}
+FCM_12PM_norm_syn <- FCM_12PM_norm %>% filter(org == "syn") 
+FCM_12_syn_lm<- lm(conc_ul_norm ~ date_time*treatment, 
+                   data = FCM_12PM_norm_syn)
+
+summary(FCM_12_syn_lm)
+
+Anova(FCM_12_syn_lm)
+
+emmeans(FCM_12_syn_lm, specs = trt.vs.ctrl ~ treatment )
+```
+
+#### Pico Euks
+```{r}
+FCM_12PM_norm %>% filter(org == "pico_euk") %>% 
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(.~date_time)+
+  nunu_theme
+```
+
+```{r}
+FCM_12PM_norm_pe <- FCM_12PM_norm %>% filter(org == "pico_euk") 
+FCM_12_pe_lm<- lm(conc_ul_norm ~ date_time*treatment, 
+                   data = FCM_12PM_norm_pe)
+
+summary(FCM_12_pe_lm)
+
+Anova(FCM_12_pe_lm)
+
+emmeans(FCM_12_pe_lm, specs = trt.vs.ctrl ~ treatment )
+```
+
+
+
+### 24h 
+```{r}
+FCM_24h <- FCM_pre %>%  filter(date != "2024-06-04", date != "2024-06-06") 
+```
+
+```{r}
+FCM_24h_norm <- FCM_24h %>% 
+  select(-pro, -tot_bact, -cyano, -include_vol) %>% 
+  pivot_longer(cols = het_bact:syn,
+               names_to = "org", 
+               values_to = "conc_ul") %>% 
+   group_by(date_time, org) %>% 
+  mutate(inflow_avg = mean(conc_ul[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(conc_ul_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), conc_ul / inflow_avg, NA)) %>%  # Normalize for coral & algae
+  filter(treatment != "Inflow") %>% # remove the inflow  
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>%  
+  filter(!str_detect(tank, "Lagoon")) %>% 
+  filter(!str_detect(tank, "Ocean"))
+
+FCM_24h_norm %>%  
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_wrap(.~date_time, scales = "free", nrow = 1)+
+  nunu_theme
+```
+
+#### Het bact 
+```{r}
+FCM_24h_norm %>% filter(org == "het_bact") %>% 
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(.~date_time)+
+  nunu_theme
+```
+```{r}
+FCM_24h_norm %>% filter(org == "het_bact") %>% 
+  group_by(treatment, date_time) %>% 
+  summarize(avg = mean(conc_ul_norm)) %>% 
+  ggplot(aes(date_time, avg, group = treatment,color= treatment))+
+  geom_point()+
+  geom_line()+
+ facet_grid(.~treatment)+
+  nunu_theme
+```
+
+```{r}
+FCM_24h_norm_hb <- FCM_24h_norm %>% filter(org == "het_bact") 
+FCM_24_hb_lm<- lm(conc_ul_norm ~ date_time*treatment, data = FCM_24h_norm_hb)
+
+summary(FCM_24_hb_lm)
+
+emmeans(FCM_24_hb_lm, specs = trt.vs.ctrl ~ treatment )
+```
+
+
+#### Synechococcus
+```{r}
+FCM_24h_norm %>% filter(org == "syn") %>% 
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(.~date_time)+
+  nunu_theme
+```
+
+```{r}
+FCM_24h_norm %>% filter(org == "syn") %>% 
+  group_by(treatment, date_time) %>% 
+  summarize(avg = mean(conc_ul_norm)) %>% 
+  ggplot(aes(date_time, avg, group = treatment,color= treatment))+
+  geom_point()+
+  geom_line()+
+ facet_grid(.~treatment)+
+  nunu_theme
+```
+
+```{r}
+FCM_24h_norm_syn <- FCM_24h_norm %>% filter(org == "syn") 
+FCM_24_syn_lm<- lm(conc_ul_norm ~ date_time*treatment, 
+                   data = FCM_24h_norm_syn)
+
+summary(FCM_24_syn_lm)
+
+emmeans(FCM_24_syn_lm, specs = trt.vs.ctrl ~ treatment )
+```
+
+#### Pico Euks
+```{r}
+FCM_24h_norm %>% filter(org == "pico_euk") %>% 
+  ggplot(aes(treatment, conc_ul_norm, group = treatment,fill= treatment))+
+  geom_boxplot()+
+  facet_grid(.~date_time)+
+  nunu_theme
+```
+
+```{r}
+FCM_12PM_norm_pe <- FCM_12PM_norm %>% filter(org == "pico_euk") 
+FCM_12_pe_lm<- lm(conc_ul_norm ~ date_time*treatment, 
+                   data = FCM_12PM_norm_pe)
+
+summary(FCM_12_pe_lm)
+
+Anova(FCM_12_pe_lm)
+
+emmeans(FCM_12_pe_lm, specs = trt.vs.ctrl ~ treatment )
+```
+
+
+```{r}
+FCM_norm <- FCM_pre %>% 
+  select(-pro, -tot_bact, -cyano, -include_vol) %>% 
+  pivot_longer(cols = het_bact:syn,
+               names_to = "org", 
+               values_to = "conc_ul") %>% 
+   group_by(date_time, org) %>% 
+  mutate(inflow_avg = mean(conc_ul[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(conc_ul_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"), conc_ul / inflow_avg, NA)) %>%  # Normalize for coral & algae
+  filter(treatment != "Inflow") %>% # remove the inflow  
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
+  select(-conc_ul, -inflow_avg) %>% 
+  pivot_wider(names_from = org, 
+              values_from = conc_ul_norm)
+```
+
+```{r}
+DOC_norm<- DOC_norm %>% mutate(date_time=ymd_hms(date_time))
+DOC_FCM_norm <- left_join(FCM_norm, DOC_norm, by= c("date_time", "treatment"))
+
+```
+
+```{r}
+DOC_FCM_norm<- DOC_FCM_norm %>% select(-date.y, -time.y, -npoc_mg_l,-tn_mg_l,-tn_u_m) %>% 
+  rename(date=date.x,time=time.x) %>% 
+  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae")))
+```
+
+
+
+
+
+
+
+```{r}
+# syn
+syn_doc_fcm <- DOC_FCM_norm %>% 
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment != "Control") %>% 
+  ggplot(aes(x= npoc_norm, y = syn, color = treatment))+
+  geom_point()+
+  stat_poly_line() +
+  stat_poly_eq(use_label(c("R2","p")),label.x = "left", label.y = "bottom") +
+  #geom_smooth(method = "lm")+
+  labs(title= "Synechococcus",
+    x= "Normalized DOC",
+       y= "Normalized Concentration")+
+  facet_wrap(.~treatment)+
+  nunu_theme+
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5)) +
+  scale_color_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))
+  
+syn_doc_fcm 
+ggsave(filename = "syn x doc.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
+# het_bact
+hb_doc_fcm <- DOC_FCM_norm %>% 
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment != "Control") %>% 
+  ggplot(aes(x= npoc_norm, y = het_bact, color = treatment))+
+  geom_point()+
+  stat_poly_line() +
+  stat_poly_eq(use_label(c("R2","p")), label.x = "right",
+  label.y = "top") +
+  #geom_smooth(method = "lm")+
+  labs(title= "Heterotrophic Bacteria",
+    x= "Normalized DOC",
+       y= "Normalized Concentration")+
+  facet_wrap(.~treatment)+
+  nunu_theme+
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5)) +
+  scale_color_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))
+hb_doc_fcm 
+#dggsave(filename = "hb x doc.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
+# pico euk
+pe_doc_fcm <- DOC_FCM_norm %>% 
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment != "Control") %>% 
+  ggplot(aes(x= npoc_norm, y = pico_euk, color = treatment))+
+  geom_point()+
+  stat_poly_line() +
+  stat_poly_eq(use_label(c("R2","p")),label.x = "right",
+  label.y = "top") +
+  #geom_smooth(method = "lm")+
+  labs(title= "Picoeukaryotes",
+    x= "Normalized DOC",
+       y= "Normalized Concentration")+
+  facet_wrap(.~treatment)+
+  nunu_theme+
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5)) +
+  scale_color_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))
+pe_doc_fcm
+#ggsave(filename = "pe x doc.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+
+```{r}
+syn_doc_fcm/ hb_doc_fcm / pe_doc_fcm
+
+#ggsave(filename = "fcm x doc.png",plot = last_plot(), path = here("outputs"), width = 12, height = 8)
+```
+### Linear model FCM DOC
+```{r}
+syn_lm <- lm(syn~npoc_norm*treatment, data= DOC_FCM_norm)
+emmeans(syn_lm, specs = trt.vs.ctrl ~ treatment)
+aov(syn_lm)
+
+#plot(allEffects(syn_lm))
+#resid_panel(syn_lm, plots = c("resid", "qq", "lev", "hist"))
+```
+
