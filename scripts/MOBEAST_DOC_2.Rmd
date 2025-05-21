@@ -130,6 +130,13 @@ mod <- lmer(npoc_u_m ~ tank_number + (1|date)+ (1|time)+  (1|treatment), data = 
 summary(mod)
 ```
 
+
+```{r}
+anova(mod, type = "2")
+```
+
+
+
 ```{r, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
   plot_model(mod, type = "re")[[2]] +
@@ -163,17 +170,107 @@ ggplot(DOC_verif, aes(x= tank_number, npoc_u_m, fill = treatment)) +
 
 ## Hypothesis  1: Different communities will release difference amounts of DOC (12PM)
 
+### Testing removing outliers first, then normalizing the data 
+```{r}
+DOC_12_pre_norm <- DOC %>% filter(date > as.Date("2024-05-31")) %>% # Removes end members
+  filter(treatment != "Rain") %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+  ## Only keep the 12PM data points
+  filter(time == hms("12:00:00")) %>% 
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(npoc_u_m, probs = 0.25),
+         quant3 = quantile(npoc_u_m, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( npoc_u_m > quant3 + (IQR*1.5) | npoc_u_m < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  
+  # Normalizing DOC data in tanks based on the inflow measurements
+  group_by(date_time, inflow_table) %>%
+  mutate(inflow= npoc_u_m[treatment == "Inflow"]) %>%  # Isolate inflow for each date_time and table
+  ungroup() %>%
+  group_by(date_time) %>% 
+  mutate(inflow = ifelse(is.na(inflow),
+      inflow[!is.na(inflow)][1],  # get the other table's value for that date
+      inflow)) %>%
+  ungroup() %>% 
+  mutate(npoc_u_m_norm = npoc_u_m - inflow)  %>% # Normalize for treatments 
+  relocate(inflow, .after = "npoc_u_m_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) %>% 
+  
+  # removing the inflow data for modeling 
+  filter(treatment != "Inflow")
+  
+```
+
+```{r}
+mod <- lmer(npoc_u_m_norm ~ treatment + (1|date) +(1|tank_number) , data = DOC_12_pre_norm)
+mod <- lmer(npoc_u_m_norm ~ treatment + (1|date) , data = DOC_12_pre_norm)
+summary(mod)
+```
+
+```{r}
+Anova(mod, type= "2")
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+### data visualization 
+```{r}
+ggplot(DOC_12_pre_norm, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "12PM variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  facet_wrap(~date) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+```
+
+### modeling with data pre-normalized 
+this is not the right approach
 ```{r}
 DOC_norm_12PM <- DOC_norm %>% 
   filter(time == hms("12:00:00")) %>% 
   filter(treatment != "Inflow") 
 ```
 
-```{r}
-mod <- lmer(npoc_u_m_norm ~ treatment + (1|date) +(1|inflow_table/tank_number), data = DOC_norm_12PM)
 
+```{r}
+DOC_std_12PM<- DOC_norm_12PM %>% group_by(date, time, treatment) %>% 
+  mutate(two_std = 2*sd(npoc_u_m_norm, na.rm = T)) %>% 
+  mutate(outlier = ifelse(npoc_u_m_norm< -two_std | npoc_u_m_norm > two_std, "outlier", "not outlier")) %>% 
+  ungroup() %>% filter(outlier =="not outlier")
+
+```
+
+```{r}
+mod <- lmer(npoc_u_m_norm ~ treatment + (1|date) +(1|tank_number) +(1|inflow_table) , data = DOC_std_12PM)
+#mod <- lm(npoc_u_m_norm ~ treatment, data = DOC_std_12PM)
 summary(mod)
 ```
+
+
+```{r}
+Anova(mod)
+```
+
 
 ```{r, fig_height = 14, fig.width = 10}
 plot_model(mod, type = "re")[[3]] +
@@ -199,16 +296,85 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 - Residual points are are close to the regression line, except for one point
 - Emmeans does a paired comparison between control and treatments. The p-values are not significant. But algae tank is much smaller p-value than the other treatments. 
 
+
+
+
+## Hypothesis 2: There are variation in exudation on a diel cycle 24h 
+
+
+### Testing removing outliers first, then normalizing the data 
 ```{r}
-ggplot(DOC_norm_12PM, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
+DOC_24_pre_norm <- DOC %>% filter(date > as.Date("2024-05-31")) %>% # Removes end members
+  filter(treatment != "Rain") %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+  
+  # Only keep the 24h data points
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  filter(time != hms("00:00:00")) %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(npoc_u_m, probs = 0.25, na.rm = TRUE),
+         quant3 = quantile(npoc_u_m, probs = 0.75, na.rm = TRUE),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( npoc_u_m > quant3 + (IQR*1.5) | npoc_u_m < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  
+  # Normalizing DOC data in tanks based on the inflow measurements
+  group_by(date, time, inflow_table) %>%
+  mutate(inflow = npoc_u_m[treatment == "Inflow"]) %>%  # Isolate inflow for each date_time and table
+  ungroup() %>%
+  
+  group_by(date_time) %>% 
+  mutate(inflow = ifelse(is.na(inflow),
+      inflow[!is.na(inflow)][1],  # get the other table's value for that date
+      inflow)) %>%
+  ungroup() %>% 
+    
+    ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  
+  # Normalize for treatment
+  mutate(npoc_u_m_norm = npoc_u_m - inflow)  %>% 
+  relocate(inflow, .after = "npoc_u_m_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) %>% 
+  
+  # removing the inflow data for modeling 
+  filter(treatment != "Inflow")
+  
+```
+
+
+```{r}
+mod <- lmer(npoc_u_m_norm ~ treatment * time + (1|date), data = DOC_24_pre_norm)
+
+summary(mod)
+```
+
+```{r}
+Anova(mod, type = "2")
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+### Data visualization 
+```{r}
+ggplot(DOC_24_pre_norm, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
   geom_boxplot()+
   geom_jitter(aes(color = treatment), alpha = 0.5)+
   geom_text_repel(aes(label = tank_number), alpha = 0.4)+
-  labs(title = "12PM variation in normalized DOC",
-       subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+  labs(title = "24h variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
        x= "Treatment",
        y = "Normalized DOC")+
-  facet_wrap(~date) + 
+  facet_wrap(~time, scales= "free") + 
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   nunu_theme +
@@ -217,12 +383,11 @@ ggplot(DOC_norm_12PM, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
 ```
 
 
-## Hypothesis 2: There are variation in exudation on a diel cycle 24h 
-
+### Detecting outliers after normalization 
 ```{r}
 DOC_norm_24h <- DOC_norm %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
-  filter(time != hms("00:00:00")) %>% 
+  filter(time != hms("00:00:00")) %>%
   filter(treatment != "Inflow") %>% 
   filter(!(tank_number %in% c("T8", "T11") & time == hms("18:00:00")))
 ```
@@ -247,29 +412,16 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ```
 
 
-### Interpretation
+#### Interpretation
 - Removed 00:00:00 because it was drastically different than the other 3 time points. Need to figure out what happened.
 - Removed 18:00:00 T8 and T11 (control tanks) because they looked like outliers on the boxplots and also they skewed the model a lot!
 - Random effect : inflow table does not explain the variance (variance = 0), nested effect helps to explain some of the variation. 
 - Fixed effects: the p-values for the t-test are not significant but algae still has a smaller p-value than the other treatments. 
 - Emmeans contrasts also do not show significant difference between the treatments. p>0.05
 
-```{r}
-ggplot(DOC_norm_24h, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
-  geom_boxplot()+
-  geom_jitter(aes(color = treatment), alpha = 0.5)+
-  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
-  labs(title = "24h variation in normalized DOC",
-       subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
-       x= "Treatment",
-       y = "Normalized DOC")+
-  facet_wrap(~time) + 
-  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
-                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-  nunu_theme +
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle= 0, hjust= 0.5))
-```
+
+
+
 
 ## Hypothesis 3: We'll see differences if we compare opposite times
 ```{r}
@@ -324,7 +476,53 @@ ggplot(DOC_norm_6_18, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
         axis.text.x = element_text(angle= 0, hjust= 0.5))
 ```
 
+
+
 ## Hypothesis 4: All samples
+
+### Testing removing outliers first, then normalizing the data 
+```{r}
+DOC_24_pre_norm <- DOC %>% filter(date > as.Date("2024-05-31")) %>% # Removes end members
+  filter(treatment != "Rain") %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(npoc_u_m, probs = 0.25, na.rm = TRUE),
+         quant3 = quantile(npoc_u_m, probs = 0.75, na.rm = TRUE),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( npoc_u_m > quant3 + (IQR*1.5) | npoc_u_m < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  
+  # Normalizing DOC data in tanks based on the inflow measurements
+  group_by(date, time, inflow_table) %>%
+  mutate(inflow = npoc_u_m[treatment == "Inflow"]) %>%  # Isolate inflow for each date_time and table
+  ungroup() %>%
+  
+  group_by(date_time) %>% 
+  mutate(inflow = ifelse(is.na(inflow),
+      inflow[!is.na(inflow)][1],  # get the other table's value for that date
+      inflow)) %>%
+  ungroup() %>% 
+    
+    ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  
+  # Normalize for treatment
+  mutate(npoc_u_m_norm = npoc_u_m - inflow)  %>% 
+  relocate(inflow, .after = "npoc_u_m_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) %>% 
+  
+  # removing the inflow data for modeling 
+  filter(treatment != "Inflow")
+  
+```
+
 
 ```{r}
 DOC_norm_all <- DOC_norm %>% 
