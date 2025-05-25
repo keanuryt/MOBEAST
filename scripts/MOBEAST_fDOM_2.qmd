@@ -175,12 +175,41 @@ fDOM_12PM_cobA <- fDOM_12PM %>% filter(fdom == "coble_a")
 ```
 
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_cobA)
-summary(mod)
+## Outlier detection
+
+fDOM_12PM_cobA <- fDOM_12PM_cobA %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
 ```
 
 
-```{r, fig_height = 10, fig.width = 10}
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date), data = fDOM_12PM_cobA)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+
+
+```{, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
   plot_model(mod, type = "re")[[2]] +
   plot_model(mod, type = "eff", terms = c('treatment')) +
@@ -204,7 +233,7 @@ emmeans(mod, specs = ~ treatment)
 
 ```{r}
 #sort(boxplot.stats(fDOM_12PM_cobA$fdom_conc)$out)
-ggplot(fDOM_12PM_cobA, aes(x= treatment, y = fdom_conc, fill = fdom))+
+ggplot(fDOM_12PM_cobA, aes(x= treatment, y = fdom_conc_norm, fill = fdom))+
   geom_boxplot()+
   geom_jitter(aes(color = treatment), alpha = 0.5)+
   geom_text_repel(aes(label = tank_number), alpha = 0.4)+
@@ -217,11 +246,38 @@ ggplot(fDOM_12PM_cobA, aes(x= treatment, y = fdom_conc, fill = fdom))+
 fDOM_12PM_cobM <- fDOM_12PM %>% filter(fdom == "coble_m") 
 ```
 
+
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_cobM)
+## Outlier detection
+
+fDOM_12PM_cobM <- fDOM_12PM_cobM %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_cobM)
 summary(mod)
 ```
 
+```{r}
+anova(mod, type= "2")
+```
 
 ```{r, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
@@ -251,16 +307,42 @@ ggplot(fDOM_12PM_cobM, aes(x= treatment, y = fdom_conc, fill = fdom))+
   nunu_theme
 ```
 
-#### CobleC
+#### CobleC SIGNIFICANT
 ```{r}
 fDOM_12PM_cobC <- fDOM_12PM %>% filter(fdom == "coble_c") 
 ```
 
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_cobC)
+## Outlier detection
+
+fDOM_12PM_cobC <- fDOM_12PM_cobC %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_cobC)
 summary(mod)
 ```
 
+```{r}
+anova(mod)
+```
 
 ```{r, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
@@ -268,7 +350,6 @@ plot_model(mod, type = "re")[[1]] +
   plot_model(mod, type = "eff", terms = c('treatment')) +
   plot_model(mod, type = "diag")[[1]]
 ```
-
 
 
 ```{r}
@@ -280,24 +361,51 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ```
 
 ```{r}
-sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
 ggplot(fDOM_12PM_cobC, aes(x= treatment, y = fdom_conc, fill = fdom))+
-  geom_boxplot()+
-  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_violin()+
+  geom_point(aes(color = treatment), alpha = 0.5)+
   geom_text_repel(aes(label = tank_number), alpha = 0.4)+
-  facet_grid(fdom_cat~date, scales = "free")+
+  #facet_grid(fdom_cat~date, scales = "free")+
   nunu_theme
 ```
 
 
-#### M:C
+#### M:C SIGNIFICANT
 ```{r}
 fDOM_12PM_mtoc <- fDOM_12PM %>% filter(fdom == "m_to_c") 
 ```
 
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_mtoc)
+## Outlier detection
+
+fDOM_12PM_mtoc <- fDOM_12PM_mtoc %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_mtoc)
 summary(mod)
+```
+
+```{r}
+anova(mod)
 ```
 
 
@@ -321,10 +429,10 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ```{r}
 #sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
 ggplot(fDOM_12PM_mtoc, aes(x= treatment, y = fdom_conc, fill = fdom))+
-  geom_boxplot()+
+  geom_violin()+
   geom_jitter(aes(color = treatment), alpha = 0.5)+
   geom_text_repel(aes(label = tank_number), alpha = 0.4)+
-  facet_grid(fdom_cat~date, scales = "free")+
+  #facet_grid(fdom_cat~date, scales = "free")+
   nunu_theme
 ```
 
@@ -363,12 +471,38 @@ fDOM_12PM_fi <- fDOM_12PM %>% filter(fdom == "fi")
 ```
 
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_fi)
+## Outlier detection
+
+fDOM_12PM_fi <- fDOM_12PM_fi %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_fi)
 summary(mod)
 ```
 
+```{r}
+anova(mod, type= "2")
+```
 
-```{r, fig_height = 10, fig.width = 10}
+```{, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
   plot_model(mod, type = "re")[[2]] +
   plot_model(mod, type = "eff", terms = c('treatment')) +
@@ -400,10 +534,37 @@ fDOM_12PM_bix <- fDOM_12PM %>% filter(fdom == "bix")
 ```
 
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_bix)
+## Outlier detection
+
+fDOM_12PM_bix <- fDOM_12PM_bix %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_bix)
 summary(mod)
 ```
 
+
+```{r}
+anova(mod, type= "2")
+```
 
 ```{r, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
@@ -439,10 +600,36 @@ fDOM_12PM_hix <- fDOM_12PM %>% filter(fdom == "hix")
 ```
 
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_hix)
+## Outlier detection
+
+fDOM_12PM_hix <- fDOM_12PM_hix %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_hix)
 summary(mod)
 ```
 
+```{r}
+anova(mod, type= "2")
+```
 
 ```{r, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
@@ -473,15 +660,46 @@ ggplot(fDOM_12PM_hix, aes(x= treatment, y = fdom_conc, fill = fdom))+
 
 
 ### Proteinaceous
+```{r}
+fDOM_12PM %>% filter(fdom_cat == "Proteinaceous") %>% 
+  select(fdom) %>% distinct()
+```
 
 #### CobleB
 ```{r}
-fDOM_12PM_prot <- fDOM_12PM %>% filter(fdom == "fpeak") 
+fDOM_12PM_cobB <- fDOM_12PM %>% filter(fdom == "coble_b") 
 ```
 
 ```{r}
-mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table/tank_number), data = fDOM_12PM_prot)
+## Outlier detection
+
+fDOM_12PM_cobB <- fDOM_12PM_cobB %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_cobB)
 summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
 ```
 
 
@@ -490,6 +708,65 @@ plot_model(mod, type = "re")[[1]] +
   plot_model(mod, type = "re")[[2]] +
   plot_model(mod, type = "eff", terms = c('treatment')) +
   plot_model(mod, type = "diag")[[1]]
+```
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs =  pairwise~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_cobB, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+#### CobleT
+
+```{r}
+fDOM_12PM_cobT <- fDOM_12PM %>% filter(fdom == "coble_t") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_cobT <- fDOM_12PM_cobT %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date), data = fDOM_12PM_cobT)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
 ```
 
 
@@ -505,11 +782,75 @@ emmeans(mod, specs =  pairwise~ treatment)
 
 ```{r}
 #sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
-ggplot(fDOM_12PM_prot, aes(x= treatment, y = fdom_conc, fill = fdom))+
+ggplot(fDOM_12PM_cobT, aes(x= treatment, y = fdom_conc, fill = fdom))+
   geom_boxplot()+
   geom_jitter(aes(color = treatment), alpha = 0.5)+
   geom_text_repel(aes(label = tank_number), alpha = 0.4)+
   facet_grid(fdom_cat~date, scales = "free")+
   nunu_theme
 ```
+
+#### Fpeak
+
+```{r}
+fDOM_12PM_fpeak <- fDOM_12PM %>% filter(fdom == "fpeak") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_fpeak <- fDOM_12PM_fpeak %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_fpeak)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs =  pairwise~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_fpeak, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+
+
+
 

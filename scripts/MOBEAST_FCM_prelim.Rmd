@@ -9,8 +9,7 @@ output:
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE,
-                      message = FALSE , 
-                      warning = FALSE)
+                      message = FALSE)
 ```
 
 
@@ -32,6 +31,11 @@ library(effects) #dependency for ggeffects
 library(ggResidpanel) #residual panel
 library(GGally)
 library(emmeans)
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+#library(GGally)
+library(performance)
 
 ```
 
@@ -76,6 +80,10 @@ treat_code <- tibble(
   treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
   full_name = c("Algae", "Coral", "Control", "CCA", "Inflow", "Endmember", "Rain")
 )
+
+```
+
+```{r}
 
 ```
 
