@@ -111,7 +111,7 @@ DOC_norm <- DOC %>% filter(date > as.Date("2024-05-31")) %>% # Removes endmember
 #write_csv(DOC_norm, here("data", "DOC", "DOC_norm.csv"))
 ```
 
-
+<!--
 ## Hypothesis 0: endmembers and inflow comparison
 
 ```{r}
@@ -185,9 +185,10 @@ ggplot(DOC_verif, aes(x= tank_number, npoc_u_m, fill = treatment)) +
 
 
 
+-->
+
+
 ## Hypothesis  1: Different communities will release difference amounts of DOC (12PM)
-
-
 <!--
 ### Testing removing outliers first, then normalizing the data 
 ```{r}
@@ -249,15 +250,16 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 
 -->
 
-### Normality and Homogenity 
+### No transformation 
+#### Normality and Homogenity 
 Data is not normal and variances are not homogenous
 ```{r}
-bartlett.test(yjPower(npoc_u_m_norm) ~ treatment,data = DOC_12PM) # homogeneity
+bartlett.test(npoc_u_m_norm ~ treatment,data = DOC_12PM) # homogeneity
 shapiro.test(DOC_12PM$npoc_u_m_norm) # normality
 ```
 
 
-### modeling with data pre-normalized 
+#### Modeling with data pre-normalized 
 
 ```{r}
 DOC_norm_12PM <- DOC_norm %>% 
@@ -289,6 +291,8 @@ DOC_12PM <- DOC_norm_12PM %>%
 
 ```
 
+
+
 ```{r}
 mod <- lmer(npoc_u_m_norm ~ treatment +(1|tank_number), data = DOC_12PM)
 #mod <- lm(npoc_u_m_norm ~ treatment, data = DOC_std_12PM)
@@ -303,13 +307,6 @@ kruskal.test(npoc_u_m_norm ~ treatment, data = DOC_12PM )
 ```
 
 
-```{, fig_height = 14, fig.width = 10}
-plot_model(mod, type = "re")[[1]] +
-  plot_model(mod, type = "re")[[2]] +
-  plot_model(mod, type = "eff", terms = c('treatment')) +
-  plot_model(mod, type = "diag")[[1]]
-```
-
 ```{r}
 resid_panel(mod)
 
@@ -323,11 +320,11 @@ cld_letters <- cld(emm, Letters = letters)
 ```
 
 
-### data visualization 
-```{r, fig.width= 10, fig.height = 6}
+### Data visualization 
+```{r, fig.width= 16, fig.height = 8}
 ggplot(DOC_12PM, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
-  geom_hline(yintercept = 0, lty = 2)+
-  geom_violin()+
+  geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 0.8)+
   geom_point(color = "black", alpha = 0.5)+
   #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
   stat_summary(color = "yellow", alpha =0.5)+
@@ -341,8 +338,72 @@ ggplot(DOC_12PM, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
   nunu_theme +
   theme(legend.position = "none") 
 
-ggsave("DOC_12PM.png", width = 10,height = 6,path = here("outputs", "OOSC_2025"))
+#ggsave("DOC_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
 ```
+
+
+### With data transformation 
+#### Transforming the data
+
+```{r}
+power_model <- powerTransform(DOC_12PM$npoc_u_m_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+## lambda = 0.643 according to the above 
+```
+
+#### Normality and Homogenity 
+Data is not normal and variances are not homogenous
+```{r}
+bartlett.test(yjPower(npoc_u_m_norm, lambda = 0.6425) ~ treatment,data = DOC_12PM) # homogeneity
+shapiro.test(yjPower(DOC_12PM$npoc_u_m_norm, lambda = 0.6425)) # normality
+```
+
+#### Model Setup
+```{r}
+mod <- lmer(yjPower(npoc_u_m_norm, lambda = 0.6425) ~ treatment +(1|tank_number), data = DOC_12PM)
+
+summary(mod)
+```
+
+
+```{r}
+anova(mod)
+kruskal.test(yjPower(npoc_u_m_norm, lambda = 0.6425) ~ treatment, data = DOC_12PM )
+```
+
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, ~ treatment)
+```
+```{r}
+emm <- emmeans(mod, ~ treatment)
+cld_letters <- multcomp::cld(emm, Letters = letters)
+```
+
+### data visualization 
+```{r, fig.width= 18, fig.height = 8}
+
+ggplot(DOC_12PM, aes(x= treatment, yjPower(npoc_u_m_norm, lambda = 0.6425), fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 0.8)+
+  geom_point(color = "black", alpha = 0.5, size = 3)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "DOC Enrichment",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "DOC Production (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_y_continuous(limits = c(-19,33), breaks = seq(-20, 33, by = 10))+
+  nunu_theme +
+  theme(legend.position = "none") 
+
+#ggsave("DOC_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
+
 
 ## Hypothesis 2: There are variation in exudation on a diel cycle 24h 
 
@@ -414,15 +475,16 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 
 -->
 
-
 ### Detecting outliers after normalization 
 ```{r}
 DOC_norm_24h <- DOC_norm %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
-  #filter(time != hms("00:00:00")) %>%
   filter(treatment != "Inflow") %>% 
-  mutate(time_fac = factor(time)) %>% 
-  mutate(date_fac = factor(date))
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>% 
+  mutate(date_fac = factor(date)) %>% 
+  filter(time != hms("00:00:00")) %>%
+  filter(!(tank_number %in% c("T8", "T11") & time == hms("18:00:00")))
 ```
 
 
@@ -450,20 +512,21 @@ DOC_24h <- DOC_norm_24h %>%
 ```
 
 
+### No transformation 
 
+#### Normality and Homogenity 
+Data is not normal and variances are not homogenous
+```{r}
+bartlett.test(npoc_u_m_norm ~ treatment,data = DOC_24h) # homogeneity
+shapiro.test(DOC_12PM$npoc_u_m_norm) # normality
+```
+
+#### Model Setup
 ```{r}
 mod <- lmer(npoc_u_m_norm ~ treatment*time_fac + (1|tank_number), data = DOC_24h)
 
 summary(mod)
 anova(mod)
-```
-
-
-```{, fig_height = 10, fig.width = 10}
-plot_model(mod, type = "re")[[1]] +
-  plot_model(mod, type = "re")[[2]] +
-  plot_model(mod, type = "eff", terms = c('treatment')) +
-  plot_model(mod, type = "diag")[[1]]
 ```
 
 
@@ -475,16 +538,15 @@ emmeans(mod, pairwise ~ treatment)
 ```
 
 
-#### Interpretation
-- Removed 00:00:00 because it was drastically different than the other 3 time points. Need to figure out what happened.
-- Removed 18:00:00 T8 and T11 (control tanks) because they looked like outliers on the boxplots and also they skewed the model a lot!
-- Random effect : inflow table does not explain the variance (variance = 0), nested effect helps to explain some of the variation. 
-- Fixed effects: the p-values for the t-test are not significant but algae still has a smaller p-value than the other treatments. 
-- Emmeans contrasts also do not show significant difference between the treatments. p>0.05
 
 
-### Data visualization 
-```{r}
+#### Justfications
+- Removed 18:00 T8 and T11 because they are very high and they are control tanks. Suspicion of contamination because there is no way that a control looks so different from the inflow. 
+- Remove 00:00 because there is a inflow values are very high and it makes controls and corals have negative values while the control should be around the same value as the inflows. CCA and algae have large positive values indicating a large amount of enrichment, big enough to surpass the inflow values that are already high. Need further attention before being able to rule anything here. 
+
+
+
+```{r, fig.width=10}
 ggplot(DOC_24h, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
   geom_boxplot()+
   geom_jitter(aes(color = treatment), alpha = 0.5)+
@@ -493,7 +555,7 @@ ggplot(DOC_24h, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
        subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
        x= "Treatment",
        y = "Normalized DOC")+
-  facet_wrap(~time, scales= "free") + 
+  facet_wrap(~time_fac, scales= "free") + 
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   nunu_theme +
@@ -501,6 +563,95 @@ ggplot(DOC_24h, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
         axis.text.x = element_text(angle= 0, hjust= 0.5))
 ```
 
+
+
+
+### With data transformation 
+#### Transforming the data
+
+```{r}
+power_model <- powerTransform(DOC_24h$npoc_u_m_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+## lambda = 1.2012 according to the above with 00:00:00 time points
+## lambda = 0.6717 according to the above without 00:00:00 time points
+```
+
+#### Normality and Homogenity 
+Data is not normal and variances are not homogenous
+```{r}
+bartlett.test(yjPower(npoc_u_m_norm, lambda = 0.6717) ~ treatment,data = DOC_24h) # homogeneity
+## bartlett test show that the variance are not homogenous so we cant do an anova here. 
+
+shapiro.test(yjPower(DOC_24h$npoc_u_m_norm, lambda = 0.6717)) # normality
+#shapiro test show that the data is normally distributed now. 
+
+```
+
+```{r}
+mod <- lmer(yjPower(npoc_u_m_norm, lambda = 0.6717) ~ treatment*time_fac + (1|tank_number), data = DOC_24h)
+
+summary(mod)
+```
+
+
+```{r}
+anova(mod)
+kruskal.test(yjPower(npoc_u_m_norm, lambda = 0.6717) ~ treatment, data = DOC_24h )
+```
+
+
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, ~ treatment)
+```
+
+
+
+
+#### Data visualization 
+
+```{r, fig.width= 18, fig.height = 8}
+
+ggplot(DOC_12PM, aes(x= treatment, yjPower(npoc_u_m_norm, lambda = 0.6425), fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 1.5)+
+  geom_point(color = "black", alpha = 0.5, size = 4)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "DOC Enrichment",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "DOC Production (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_y_continuous(limits = c(-19,33), breaks = seq(-20, 33, by = 10))+
+  nunu_theme +
+  theme(legend.position = "none") 
+
+#ggsave("DOC_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
+
+```{r, fig.width= 18, fig.height = 8}
+ggplot(DOC_24h, aes(x= treatment, yjPower(npoc_u_m_norm, lambda = 0.6717), fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
+  geom_violin(linewidth = 0.8)+
+  geom_point(color = "black", alpha = 0.5, size = 3)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "24h variation in normalized DOC",
+       #subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
+       x= "Treatment",
+       y = "DOC Production (µmol/L)")+
+  facet_wrap(~time_fac) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+#ggsave("DOC_24h_freescale.png", width = 18, height = 8,path = here("outputs", "OOSC_2025"))
+```
 
 
 ## Hypothesis 3: All samples
@@ -566,7 +717,7 @@ anova(mod, type = "2")
 ### analysis post norm
 ```{r}
 DOC_norm_all <- DOC_norm %>% 
-  #filter(time != hms("00:00:00")) %>% 
+  filter(time != hms("00:00:00")) %>% 
   filter(treatment != "Inflow") 
 ```
 
@@ -592,9 +743,10 @@ DOC_all <- DOC_norm_all %>%
   mutate(date_fac = factor(date))
 ```
 
+### XXXX
 
 ```{r}
-mod <- lmer(npoc_u_m_norm ~ treatment + (1|time)+(1|date), data = DOC_all)
+mod <- lmer(npoc_u_m_norm ~ treatment +(1|tank_number), data = DOC_all)
 
 summary(mod)
 ```
@@ -627,10 +779,8 @@ plot(emmeans(mod, ~ treatment), comparisons = TRUE)
 
 
 
+
 ### Data visualization 
-
-
-
 
 ```{r}
 ggplot(DOC_all, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
@@ -651,8 +801,67 @@ ggplot(DOC_all, aes(x= treatment, npoc_u_m_norm, fill = treatment)) +
 ```
 
 
+### With data transformation 
+#### Transforming the data
+
+```{r}
+power_model <- powerTransform(DOC_all$npoc_u_m_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+## lambda = 1.0694 according to the above with 00:00:00 time points
+## lambda = 0.5511 according to the above with 00:00:00 time points
+```
+
+#### Normality and Homogenity 
+Data is not normal and variances are not homogeneous
+```{r}
+bartlett.test(yjPower(npoc_u_m_norm, lambda = 0.5511) ~ treatment,data = DOC_all) # homogeneity
+## bartlett test show that the variance are not homogenous so we cant do an anova here. 
+
+shapiro.test(yjPower(DOC_all$npoc_u_m_norm, lambda = 0.5511)) # normality
+#shapiro test show that the data is normally distributed now. 
+
+```
+
+```{r}
+mod <- lmer(yjPower(npoc_u_m_norm, lambda = 0.5511) ~ treatment + (1|tank_number), data = DOC_all)
+
+summary(mod)
+```
 
 
+```{r}
+anova(mod)
+kruskal.test(yjPower(npoc_u_m_norm, lambda = 0.5511) ~ treatment, data = DOC_all)
+```
+
+
+```{r}
+resid_panel(mod)
+
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, ~ treatment)
+```
+
+#### Data visualization 
+```{r, fig.width= 18, fig.height = 8}
+ggplot(DOC_all, aes(x= treatment, yjPower(npoc_u_m_norm, lambda = 0.5511), fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 0.8)+
+  geom_point(color = "black", alpha = 0.5)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  labs(#title = "24h variation in normalized DOC",
+       #subtitle = "Norm DOC = Tank DOC - Avg Inflow DOC",
+       x= "Treatment",
+       y = "DOC Production (µmol/L)")+
+  facet_wrap(~date_time, scales= "free") + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+ggsave("DOC_24h.png", width = 18, height = 8,path = here("outputs", "OOSC_2025"))
+```
 
 
 
