@@ -1,0 +1,160 @@
+---
+title: "Process Lahaina DNA"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    smooth_scroll: true 
+    fig_height: 5
+    fig_width: 7
+    code_folding: hide  
+date: '`r Sys.Date()`'
+---
+
+# Overview
+
+The purpose of this script is to pre-process and clean up the lahaina 16S bacterial sequencing data. First, outputs from the metaflowmics pipline are loaded, samples that are not part of the project are filtered out, sample names are matched to the sample collection sheet, and real samples are checked against blanks.
+
+DNA data will be spread across multiple libraries.
+
+** Round 1 (MGAL name Nelson_2023-0040)**
+
+- Total 497 samples in the library (mix of NASTE, KM, SGD)
+- 57 Lahaina samples
+- includes samples from 10/08/2023 (initial trip) - 12/02/2023 (small rain event)
+- samples included 2 field blanks (lcms water in 3X rinsed collection bottle or niskin)
+- there are also sterivex blanks for this run associated with Justin's samples, which could be included as extraction blanks
+
+
+## Round 1 Library
+
+### Read in files
+
+Read in all the different files that are required to interpret the sequencing data:
+
+- OTU table (97% clustered, counts, subsampled to 10K reads by pipeline)
+- taxonomy table 
+- unifrac distances (weighted)
+- DNA key (matches DNA sample IDs used for library organization to sample collection IDs)
+- sample sheet (master sheet of all collections for Lahaina project)
+
+```{r}
+library(data.table)
+
+# read in otu table, taxonomy table, and unifrac distances
+raw_otus = fread("Results/main/details/abundance_table_97.shared")
+raw_tax = fread("Results/main/details/annotations_97.taxonomy")
+raw_unifrac = read.csv("Results/postprocessing/unifrac/unifrac_weighted_97.csv")
+
+# read in sample DNA sample key and master collection sheet
+dna_key = fread("Nelson_Lab_Sterivex_Sheet_2_12_2023.csv", check.names = T)
+sample_sheet = fread("Lahaina Sample Collection Sheet - Grab.csv")
+```
+
+## Clean up data
+
+Most of these files need some cleaning to be useful. 
+
+- Taxonomy = by default, taxonomic levels are separated by semicolons
+- OTUs = includes a couple extraneous metadata columns
+- unifrac = column names need to be cleaned, convert to matrix
+- sample sheet and DNA key = sample names need to be matched up
+
+Once data is clean, we need to subset it to the Lahaina samples and check that all samples made it through the pipeline.
+
+```{r}
+# clean taxonomy table
+tax = fread(text = raw_tax$Taxonomy,
+            sep = ";")
+
+# fix the names
+names(tax) = c(
+  "kingdom",
+  "phylum",
+  "class",
+  "order",
+  "family",
+  "genus",
+  "species"
+)
+
+# drop the species column because it looks messy
+tax[ , species := NULL]
+
+# add the OTU identifier back into the taxonomy table (everything should still be in the same order)
+tax[ , OTU := raw_tax$OTU]
+
+```
+
+
+
+```{r}
+# clean unifrac matrix
+row.names(raw_unifrac) = raw_unifrac$X
+raw_unifrac = raw_unifrac[ , colnames(raw_unifrac) != "X"]
+colnames(raw_unifrac) = gsub("X(.+)",
+                         "\\1",
+                         colnames(raw_unifrac))
+unifrac= as.matrix(raw_unifrac)
+
+```
+
+
+```{r}
+#####
+# TODO: Match library sampleID to collection in master sheet!
+#####
+
+lahaina_sample_key = dna_key[grepl("LAH", Tube.ID)]
+
+lahaina_dict = lahaina_sample_key$collection
+names(lahaina_dict) = lahaina_sample_key$SampleID
+
+
+# subset OTU, taxonomy, and unifrac to only include lahaina samples
+otus = raw_otus[Group %in% names(lahaina_dict)]
+unifrac = unifrac[otus$Group, otus$Group]
+
+# fix sample names so they match 'collection' in sheet
+otus$Group = lahaina_dict[otus$Group]
+colnames(unifrac) = lahaina_dict[colnames(unifrac)]
+row.names(unifrac) = lahaina_dict[row.names(unifrac)]
+
+# check that all samples are in the master collection sheet (except blanks)
+lahaina_dict[!(lahaina_dict %in%
+                    sample_sheet$collection)]
+
+# The only samples not found in the master sheet should be the two blanks (BLANK_20231007   NISKIN_BLANK_20231009)
+```
+
+
+```{r}
+# drop unused columns
+otus[ , label := NULL]
+otus[ , numOtus := NULL]
+
+# make a long transposed (OTUs as rows) otu table for ocean era samples for use with heatmaps
+lah_otu = transpose(otus,
+                    keep.names = "OTU",
+                    make.names = "Group")
+
+lah_otu = lah_otu[rowSums(lah_otu[ ,
+                                   .SD,
+                                   .SDcols = !"OTU"]) > 0]
+# match taxonomy
+lah_tax = tax[OTU %in% lah_otu$OTU]
+
+```
+
+### Write out
+
+Write out the cleaned tables
+```{r}
+fwrite(lah_otu, "output/round_1_clean_tables/lahaina_round1_otu_table.csv")
+write.csv(unifrac, "output/round_1_clean_tables/lahaina_round1_unifrac.csv", row.names = F)
+fwrite(lah_tax, "output/round_1_clean_tables/lahaina_round1_taxonomy.csv")
+
+```
+
+

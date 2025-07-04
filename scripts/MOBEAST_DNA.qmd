@@ -1,7 +1,7 @@
 ---
-title: "MOBEAST_DNA"
+title: "MOBEAST DNA"
 format: html
-editor: source
+editor: visual
 ---
 
 ```{r setup, include = FALSE}
@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ## Load Libraries
 ```{r}
 library(tidyverse)
+library(lubridate)
 library(here)
 library(janitor)
 library(ggrepel)
@@ -20,17 +21,64 @@ library(gt)
 library(patchwork)
 library(RColorBrewer)
 
-library(car) # ANOVA package
-library(ggeffects)
-library(effects) #dependency for ggeffects
-library(ggResidpanel) #residual panel
-library(lme4)
-library(lmerTest)
-library(sjPlot)
-#library(GGally)
-library(emmeans)
-library(performance)
+library(ComplexHeatmap)
+library(data.table)
 
+
+```
+
+## Functions
+
+```{r}
+# Heat map funciton
+# function to sum by family
+prep_ht_mat = function(otus,
+                       tax_table,
+                       tax_level = "family",
+                       cutoff = 40,
+                       min_sam = 2,
+                       scale_vals = F){
+  if(tax_level == "OTU"){
+    otu_sum = otus
+    
+  }else{
+    otu_key = merge(otus,
+                    tax_table[,
+                              .SD,
+                              .SDcols = c(tax_level, "OTU")],
+                    by = "OTU",
+                    all.x = T)
+    
+    otu_key[, OTU := NULL]
+    
+    # sum by tax level
+    otu_sum = otu_key[, lapply(.SD, sum), by = tax_level]
+  }
+  
+  # order by most abundant taxa and subset to top N
+  otu_sum[ , tax_sums := rowSums(otu_sum[ , .SD, .SDcols = !tax_level])]
+  otu_sum = otu_sum[tax_sums > 0]
+  otu_sum = otu_sum[order(tax_sums, decreasing = T)]
+  otu_sum[ , tax_sums := NULL]
+  otu_sum = otu_sum[1:cutoff,]
+  
+  # transform data.table to matrix
+  otu_mat = as.matrix(otu_sum[, .SD,
+                              .SDcols = !tax_level],
+                      rownames.value = otu_sum[[tax_level]])
+  
+  # drop taxa that don't meet min sample count
+  keep_tax = apply(otu_mat, 1, function(x)
+    length(x[x > 0]) > min_sam)
+  otu_mat = otu_mat[keep_tax, ]
+  
+  # optionally z-score a.k.a. scale values
+  if (isTRUE(scale_vals)) {
+    otu_mat = t(scale(t(otu_mat)))
+  }
+  
+  return(otu_mat)
+}
 ```
 
 ## Data visualization theme
@@ -47,74 +95,129 @@ nunu_theme <- theme_bw() +
         panel.background = element_rect(fill = "azure1"))
 ```
 
+### Color palette
+```{r}
+treatment_colors = c(
+  #Treatments
+  "Control" = "grey",
+  "Coral" = "#03A9F4",
+  "CCA" = "#EF5350",
+  "Algae" = "#4CAF50"
+)
+
+```
+
+## Creating metadata file
+```{}
+meta <- read_csv(here("data", "MOBEAST_metadata.csv"))
+meta <-meta %>% clean_names()
+table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+
+table_id <- clean_names(table_id)
+
+table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+  mutate(tank_number = paste0("T", tank_number)) %>% 
+  mutate(inflow_table = paste("Table", inflow_table))
+
+inflow_id <- tibble(tank_number = c("F1", "F2"),
+       inflow_table = c("Table 1", "Table 2"))
+table_id <- rbind(table_id, inflow_id)
+
+meta <- left_join(meta, table_id)
+
+meta %>% relocate(inflow_table, .before = tank_number)
+
+treat_code <- tibble(
+  treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
+  full_name = c("Algae", "Coral", "Control", "CCA", "Inflow", "Endmember", "Rain")
+)
+treat_code
+
+meta<- left_join(meta, treat_code)
+
+meta <- meta %>% relocate(full_name, .before = treatment) %>% 
+  select(-treatment) %>% 
+  rename(treatment = full_name) %>% 
+  filter(id_number != is.na(id_number),
+         id_number == ifelse(str_detect(meta$id_number,"[ABC]"), id_number, "NA")) 
+#write_csv(meta, here("data","MOBEAST_metadata_V2.csv"))
+```
+
 ## Load Data 
 ```{r}
-DNA <- read_csv(here("data", "MOBEAST_DNA.csv"))
-#DNA <- clean_names(DNA)
-tax <- DNA[,c(193:195)]
+OTU <- read.csv(here("data", "DNA","MOBEAST_OTU_culled.csv"))
+meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
+tax <- read_csv(here("data","DNA", "MOBEAST_tax_culled.csv"))
 ```
 
-make sure the MOBEAST metadata and MOBEAST sample list in DNA match 
+
+## Data clean-up
+```{r, meta data clean up}
+meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
+               time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
+  # "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters
+  # "\\1:\\2", group1 + ":" + group2
+  mutate(time = paste0(time, ":00"),
+               date_time = paste(date, time),
+               date = mdy(date), 
+               date_time = mdy_hms(date_time),
+               time = factor(time))
+  
+  
+```
+
+
 ```{r}
-mobeast <- DNA[,c(1:122)]
-rotui <- DNA[,c(123:192)]
-meta <- clean_names(read_delim(here("data", "MOBEAST_metadata.csv")))
-meta <-meta[c(1:115),]
+OTU <- OTU %>% mutate(ASV = toupper(ASV))
 ```
 
+
+```{r, OTU matrix}
+OTU_matrix <- data.matrix(OTU) 
+rownames(OTU_matrix) <- OTU$ASV
+OTU_matrix <- OTU_matrix[,-122]
+```
 
 ```{r}
-tax<- tax %>% rename(OTUNumber=repSeqName) %>% 
-  separate(OTUConTaxonomy,c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "junk"), ";" ) %>% 
-  select(-repSeq, -junk)
+OTU <- OTU %>% mutate(OTU = ASV)
+```
+
+## Setting order of variables 
+```{r}
+meta<- meta %>%  
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+```{r}
+# filtering and organization
+# = sample_sheet[Depth != "-999" & Cast != "Deep", collection]
+#cruise_samples = cruise_samples[cruise_samples %in% colnames(otu)]
+#cruise_otu = otu[, .SD, ,.SDcols = c("OTU", cruise_samples)]
+
+MOBEAST_samples <- meta$id_number 
+MOBEAST_samples <- MOBEAST_samples[MOBEAST_samples %in% colnames(OTU)]
+#MOBEAST_OTU <- OTU[, .SD, ,.SDcols = c("ASV", MOBEAST_samples)]
+MOBEAST_OTU <- OTU[, c("OTU", MOBEAST_samples)]
+
+
+```
+
+```{r}
+MOBEAST_mat_nd = prep_ht_mat(otu = MOBEAST_OTU,
+                                  tax_table = tax,
+                                  tax_level = "family",
+                                  cutoff = 40,
+                                  scale_vals = T)
 ```
 
 
-```{r, echo=FALSE, collapse=TRUE}
-#read in relative abundance data and metadata
-#without cabral seep samples
-relabun = as.data.frame(mobeast)
-metadata = meta
-taxonomy = tax
-
-```
-
-```{r, echo=FALSE, collapse=TRUE}
-#load Wesleys culling scripts
-source("cull.otu.script.R")
-source("generate.long.format.script.R")
-
-```
 
 
-################################### cull the data ###################################
-
-```{r, echo=FALSE, collapse=TRUE}
-
-relabund <-relabun[,-1]
-rownames(relabund) <- relabun[,1]
-
-#Transpose and create a data frame so now OTUs are the column names
-relabund.2 = as.data.frame(t(relabund[]))
-
-#Cull abundance and make into a dataframe
-culled.abund.asv = cull.abundance.prevalence(relabund.2, 3, 0.001, 0.01) 
-culled.abund.asv.transposed = as.data.frame(t(culled.abund.asv))
-#culled.abund.asv.transposed <- rownames_to_column(culled.abund.asv.transposed, var = "OTUNumber")
 
 
-#save a data frame with true/false designations from culling script
-cull.df<- data.frame(cull.vec) 
-taxonomy.culled = taxonomy[taxonomy$OTUNumber %in% colnames(culled.abund.asv),]
-culled.long.table = generate.long.format.OTUs(culled.abund.asv.transposed,metadata,taxonomy.culled)
 
-##### Want to make where column names are taxa.string.asv, not just asv, so can have that for heatmap of taxa highlighted by LM
-culled.abund.asv.transposed$ASV = rownames(culled.abund.asv.transposed)
-culled.abund.asv.transposed.w.taxonomy = merge(culled.abund.asv.transposed, taxonomy.culled, by.x = "ASV", by.y = "OTUNumber")
-rownames(culled.abund.asv.transposed.w.taxonomy) = culled.abund.asv.transposed.w.taxonomy$taxa.string.asv
-#culled.abund.asv.transposed.w.taxonomy = culled.abund.asv.transposed.w.taxonomy[,c(2:291)]
 
-```
+
 
 
 

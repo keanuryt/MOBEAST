@@ -649,8 +649,8 @@ ggplot(DOC_24h, aes(x= treatment, yjPower(npoc_u_m_norm, lambda = 0.6717), fill 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   nunu_theme +
   theme(legend.position = "none",
-        axis.text.x = element_text(angle= 0, hjust= 0.5))
-#ggsave("DOC_24h_freescale.png", width = 18, height = 8,path = here("outputs", "OOSC_2025"))
+        strip.background = element_rect(fill = "white"))
+ggsave("DOC_24h_freescale.png", width = 18, height = 8,path = here("outputs", "OOSC_2025"))
 ```
 
 

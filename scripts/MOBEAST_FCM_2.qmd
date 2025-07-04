@@ -1,0 +1,616 @@
+---
+title: "MOBEAST FCM"
+author: "Keanu Rochette"
+created: '22 May 2025'
+updated: '`r format(Sys.Date())`'
+format: 
+  html:
+    toc: true
+    toc-location: left
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+#library(ggpmisc)
+library(hms)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+#library(GGally)
+library(emmeans)
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(performance)
+
+```
+
+## Data visualization theme
+
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=32, face = "bold"), 
+        plot.subtitle = element_text(size=30),
+        axis.title = element_text(size = 28, face = "bold"),
+        axis.text = element_text(size = 28),
+        strip.text.x = element_text(size = 28, face = "bold"),
+        legend.title=element_text(size=28, face = "bold"),
+        legend.text=element_text(size=28))
+```
+
+## functions
+```{}
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+```
+
+
+# Load Data
+```{r}
+FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
+meta <- read_csv(here("data", "MOBEAST_metadata.csv"))
+
+FCM<- FCM %>% clean_names()
+meta <-meta %>% clean_names()
+```
+
+```{r}
+treat_code <- tibble(
+  treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
+  full_name = c("Algae", "Coral", "Control", "CCA", "Inflow", "Endmember", "Rain")
+)
+
+```
+
+```{r}
+table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+table_id <- clean_names(table_id)
+
+table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+  mutate(tank_number = paste0("T", tank_number)) %>% 
+  mutate(inflow_table = paste("Table", inflow_table))
+```
+
+# Note
+**Mislabeling**:  
+- There were 2 batches of MOBEAST 2024-06-02 18:00 containing a total of 3 T4 samples. 
+- MOBEAST 2024-06-02 21:00 is missing, one of the 18:00 is actually the 21:00 time point.
+- One tube was missing a label (marked "X"). Assume it's the bay sample (2024-05-25).
+
+For the preliminary results, I removed the duplicates for T4, only keeping 1 random T4 sample.  
+I will be averaging the values of MOBEAST 2024-06-02 18:00. 
+
+```{r}
+FCM_pre <- FCM %>% filter(str_detect(sample, pattern = "MOBEAST")) %>% 
+    mutate(sample = str_remove(sample, pattern = "X_")) %>% 
+  filter(sample!= "2_MOBEAST_T4_A_2024-06-02_18:00", 
+         sample!= "3_MOBEAST_T4_A_2024-06-02_18:00") %>% 
+  separate_wider_delim(sample, names= c("project", "tank", "treatment", "date","time"), 
+                             delim = "_") 
+
+
+```
+
+```{r}
+FCM_pre <- left_join(FCM_pre, treat_code, by= "treatment")
+
+FCM_pre <- FCM_pre %>% relocate(full_name,.before = treatment) %>%
+  select(-treatment) %>% 
+  rename(treatment = full_name)
+```
+
+```{r}
+FCM_pre <- FCM_pre %>% mutate(date_time = ymd_hms(paste0(date," ", time,":00"))) %>% 
+  select(tank, treatment, date_time, date, time, 
+                   include_vol, 
+                   het_bact = het_bact_events_u_l,
+                   pico_euk = pico_euk_events_u_l,
+                   syn = syn_events_u_l,
+                   pro = pro_events_u_l,
+                   tot_bact = bacteria_events_u_l) %>% 
+  group_by(date_time, treatment, tank) %>% 
+  mutate(cyano = sum(syn, pro, het_bact) - het_bact) %>%  
+  ungroup() %>% 
+  rename(tank_number = tank) %>% 
+  mutate(date =  ymd(date),
+         time = paste0(time,":00"),
+         time = as_hms(time))
+```
+
+
+```{r}
+FCM_norm <- FCM_pre %>% 
+  select(-pro, -tot_bact, -cyano, -include_vol) %>% 
+  pivot_longer(cols = het_bact:syn,
+               names_to = "org", 
+               values_to = "conc_ul") %>% 
+   group_by(date_time, org) %>% 
+  mutate(inflow_avg = mean(conc_ul[treatment == "Inflow"], na.rm = T)) %>%
+  #calculating inflow average to normalize the data
+  ungroup() %>%
+   mutate(conc_ul_norm = ifelse(treatment %in% c("Coral", "Algae", "CCA", "Control"),
+                                conc_ul-inflow_avg, NA)) %>%  # Normalize for coral & algae
+  #filter(treatment != "Inflow") %>% # remove the inflow  
+  mutate(treatment = factor(treatment,
+                          levels= c("Control", "Coral", "CCA", "Algae"))) %>% 
+  filter(treatment %in% c("Coral", "Algae", "CCA", "Control")) %>% 
+  select(-conc_ul, -inflow_avg) 
+```
+
+
+
+
+```{}
+DOC_norm <- read_csv(here("data", "DOC", "DOC_norm.csv"))
+DOC_norm <- DOC_norm %>% select(-npoc_mg_l, -tn_mg_l,
+                                -tn_u_m,-inflow,
+                                -sample) 
+```
+
+```{}
+DOC_FCM_norm <- left_join(FCM_norm, DOC_norm, 
+                          by= c("date","time","date_time", "tank_number"))
+
+DOC_FCM_norm <- DOC_FCM_norm %>% select(-treatment.y) %>% 
+  relocate(date_time, .before=tank_number) %>% 
+  relocate(date, .after= date_time) %>% 
+  relocate(time, .after= date) %>% 
+  relocate(id_number, .before=date_time) %>% 
+  relocate(long_name, .after= id_number) %>% 
+  relocate(inflow_table, .after= long_name) %>% 
+  rename(treatment = treatment.x)
+```
+
+```{}
+DOC_FCM_norm<- left_join(DOC_FCM_norm, table_id, by= "tank_number")
+
+DOC_FCM_norm <-DOC_FCM_norm %>% 
+  relocate(inflow_table.y, .after= inflow_table.x) %>% 
+  select(-inflow_table.x) %>% 
+  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae")))
+```
+
+```{}
+## Outlier detection
+
+DOC_FCM <- DOC_FCM_norm %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(npoc_u_m_norm, probs = 0.25, na.rm= TRUE),
+         quant3 = quantile(npoc_u_m_norm, probs = 0.75, na.rm= TRUE),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( npoc_u_m_norm > quant3 + (IQR*1.5) | npoc_u_m_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+
+## 12PM 
+```{r}
+FCM_12PM_norm <- FCM_norm %>% filter(time == as_hms("12:00:00"))
+```
+
+```{r}
+## Outlier detection
+
+FCM_12PM_norm <- FCM_12PM_norm %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment, org) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(conc_ul_norm, probs = 0.25, na.rm= TRUE),
+         quant3 = quantile(conc_ul_norm, probs = 0.75, na.rm= TRUE),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( conc_ul_norm > quant3 + (IQR*1.5) | conc_ul_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+
+### Hypothesis 1: there will be more heterotrophic bacteria in algae tanks
+
+```{r}
+hbact_12PM <- FCM_12PM_norm %>% filter(org == "het_bact")
+```
+
+#### Normality and Homogenity 
+
+```{r}
+bartlett.test(conc_ul_norm ~ treatment,data = hbact_12PM) # homogeneity
+shapiro.test(hbact_12PM$conc_ul_norm) # normality
+```
+
+```{r}
+power_model <- powerTransform(hbact_12PM$conc_ul_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+## lambda = 0.9345 according to the above 
+```
+
+
+```{}
+hbact_12PM <- hbact_12PM %>% mutate(conc_ul_trans = yjPower(conc_ul_norm, lambda = 0.9345)) %>% 
+  relocate(conc_ul_trans, .after =conc_ul_norm )
+```
+
+```{}
+bartlett.test(conc_ul_trans ~ treatment,data = hbact_12PM) # homogeneity
+shapiro.test(hbact_12PM$conc_ul_norm) # normality
+```
+
+```{r}
+mod <- lmer(conc_ul_norm ~ treatment +(1|tank_number), data = hbact_12PM)
+
+summary(mod)
+```
+
+```{r}
+resid_panel(mod)
+anova(mod)
+kruskal.test(conc_ul_norm ~ treatment, data = hbact_12PM)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+emm <- emmeans(mod, ~ treatment)
+cld_letters <- multcomp::cld(emm, Letters = letters)
+```
+
+
+
+
+```{r, fig.width= 18, fig.height = 8}
+ggplot(hbact_12PM, aes(x= treatment, conc_ul_norm, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
+  geom_violin(linewidth = 1.5)+
+  geom_point(color = "black", alpha = 0.5, size = 3)+ #aes(color = treatment)
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  #stat_summary(color = "orange", alpha = 0.5)+
+  labs(#title = "12PM variation in normalized DOC",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Abundance (ind/µL)")+
+  #facet_wrap(~date) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_y_continuous(limits = c(-200,380), breaks = seq(-200, 400, by = 100))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+#ggsave("hbact_12PM.png", width = 18, height = 8,path = here("outputs", "OOSC_2025"))
+```
+
+
+### Hypothesis 2: Synechococcus
+
+```{r}
+syn_12PM <- FCM_12PM_norm %>% filter(org == "syn")
+```
+
+```{r}
+
+ggplot(syn_12PM, aes(x= treatment, conc_ul_norm, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2)+
+  #stat_summary()+
+  geom_violin()+
+  geom_point(aes(color = treatment), alpha = 0.5)+
+#  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "12PM variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  #facet_wrap(~date) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+```
+
+### Hypothesis 3: Picoeukaryotes
+
+```{r}
+picoeuk_12PM <- FCM_12PM_norm %>% filter(org == "pico_euk")
+```
+
+```{r}
+
+ggplot(picoeuk_12PM, aes(x= treatment, conc_ul_norm, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2)+
+  #stat_summary()+
+  geom_violin()+
+  geom_point(aes(color = treatment), alpha = 0.5)+
+#  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "12PM variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  #facet_wrap(~date) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+
+```
+
+## 24h 
+WARNING !!! 18:00 IS DUPLICATED SOMEHOW! 
+
+```{r}
+FCM_24h_norm <- FCM_norm %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) 
+
+```
+
+```{}
+FCM_18PM_norm <- FCM_24h_norm %>% filter(time == as_hms("18:00:00")) %>% 
+  group_by(tank_number, org) %>% 
+  reframe(tank_number, treatment,date_time, date, time, org, conc_ul_norm = mean(conc_ul_norm)) %>% 
+  ungroup() %>% distinct()
+```
+
+```{}
+FCM_24h_norm <- FCM_24h_norm %>% filter(time != as_hms("18:00:00"))
+```
+
+```{}
+FCM_24h_norm <- rbind(FCM_24h_norm, FCM_18PM_norm)
+```
+
+```{}
+FCM_24h_norm %>% mutate(time_fac = factor(time_fac, 
+                                          levels=c("12:00:00", "15:00:00","18:00:00",
+                                                   "21:00:00","00:00:00","03:00:00",
+                                                   "06:00:00")))
+```
+
+
+
+```{r}
+## Outlier detection
+
+FCM_24h_norm <- FCM_24h_norm %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment, org) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(conc_ul_norm, probs = 0.25, na.rm= TRUE),
+         quant3 = quantile(conc_ul_norm, probs = 0.75, na.rm= TRUE),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( conc_ul_norm > quant3 + (IQR*1.5) | conc_ul_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+### Hypothesis 1: there will be more heterotrophic bacteria in algae tanks on a diel cycle 
+
+```{r}
+hbact_24h <- FCM_24h_norm %>% filter(org == "het_bact") %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","15:00:00",
+                                                         "18:00:00","21:00:00",
+                                            "00:00:00","03:00:00","06:00:00",
+                                            "09:00:00"))) %>% 
+  mutate(date_fac = factor(date)) %>% 
+  filter(time == as_hms("12:00:00") | 
+         time == as_hms("18:00:00")|
+         time == as_hms("06:00:00"))
+
+```
+
+#### Temporary correction of 18:00 mess up
+
+```{r}
+hbact_24h_temp <- hbact_24h %>% select(-quant1, -quant3, -IQR, - outlier)
+```
+
+```{r}
+hbact_18h <- hbact_24h_temp %>% filter(time == as_hms("18:00:00")) %>% 
+  group_by(tank_number, treatment, date_time, date, time, org) %>% 
+  reframe(conc_ul_norm = mean(conc_ul_norm)) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","15:00:00",
+                                                         "18:00:00","21:00:00",
+                                            "00:00:00","03:00:00","06:00:00",
+                                            "09:00:00"))) %>% 
+  mutate(date_fac = factor(date))
+
+
+```
+
+```{r}
+hbact_24h_no_18 <- hbact_24h_temp %>% filter(time != as_hms("18:00:00"))
+```
+
+
+```{r}
+hbact_24h_temp2 <- rbind(hbact_24h_no_18, hbact_18h)
+```
+
+
+
+#### Normality and Homogenity 
+
+```{r}
+bartlett.test(conc_ul_norm ~ treatment,data = hbact_24h_temp2) # homogeneity
+shapiro.test(hbact_12PM$conc_ul_norm) # normality
+```
+
+```{r}
+power_model <- powerTransform(hbact_24h_temp2$conc_ul_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+## lambda = 0.9753 according to the above 
+```
+
+```{r}
+hbact_24h_temp2 <- hbact_24h_temp2 %>% mutate(conc_ul_trans = yjPower(conc_ul_norm, lambda = 0.9753)) %>% 
+  relocate(conc_ul_trans, .after =conc_ul_norm )
+```
+
+```{}
+bartlett.test(conc_ul_trans ~ treatment,data = hbact_24h_temp2) # homogeneity
+shapiro.test(hbact_24h$conc_ul_trans) # normality
+```
+
+```{r}
+mod <- lmer(conc_ul_norm ~ treatment*time_fac +(1|tank_number), data = hbact_24h_temp2)
+
+#summary(mod)
+```
+
+```{r}
+resid_panel(mod)
+anova(mod)
+kruskal.test(conc_ul_norm ~ treatment, data = hbact_24h_temp2)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+
+```{r, fig.width = 18, fig.height = 8}
+
+ggplot(hbact_24h_temp2, aes(x= treatment, conc_ul_norm, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2)+
+  geom_violin(linewidth = 1)+
+  geom_point(color = "black", alpha = 0.5, size = 4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+#  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(
+       x= "Treatment",
+       y = "Abundance (ind/µL)")+
+  facet_wrap(~time_fac) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        strip.background = element_rect(fill = "white"))
+
+ggsave("hbact_24_TEMPORARY.png", width = 18, height = 8, path = here("outputs", "OOSC_2025"))
+```
+
+
+#### Reference section 
+```{r}
+power_model <- powerTransform(hbact_24h$conc_ul_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+## lambda = 0.9779 according to the above 
+```
+
+
+```{r}
+hbact_24h <- hbact_24h %>% mutate(conc_ul_trans = yjPower(conc_ul_norm, lambda = 0.9779)) %>% 
+  relocate(conc_ul_trans, .after =conc_ul_norm )
+```
+
+```{r}
+bartlett.test(conc_ul_trans ~ treatment,data = hbact_24h) # homogeneity
+shapiro.test(hbact_24h$conc_ul_trans) # normality
+```
+
+```{r}
+mod <- lmer(conc_ul_norm ~ treatment*time_fac +(1|tank_number), data = hbact_24h)
+
+#summary(mod)
+```
+
+```{r}
+resid_panel(mod)
+anova(mod)
+kruskal.test(conc_ul_norm ~ treatment, data = hbact_24h)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+
+
+```{r}
+hbact_24h %>% #filter(time == as_hms("18:00:00")) %>%
+  ggplot(aes(x= tank_number, conc_ul_norm, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2)+
+  #stat_summary()+
+  #geom_violin()+
+  geom_point(color = "black", alpha = 0.5)+ #aes(color = treatment)
+#  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(title = "12PM variation in normalized DOC",
+       subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Normalized DOC")+
+  #facet_wrap(~time_fac) + 
+  scale_color_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle= 0, hjust= 0.5))
+```
+
+
+```{r, fig.width = 18, fig.height = 11}
+
+ggplot(hbact_24h, aes(x= treatment, conc_ul_norm, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2)+
+  geom_violin(linewidth = 0.8)+
+  geom_point(color = "black", alpha = 0.5)+ #aes(color = treatment)
+  stat_summary(color = "yellow", alpha = 0.5)+
+#  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  labs(
+       x= "Treatment",
+       y = "Abundance (ind/µL)")+
+  facet_wrap(~time_fac) + 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+#ggsave("hbact_24.png", width = 18, height = 8, path = here("outputs", "OOSC_2025"))
+```

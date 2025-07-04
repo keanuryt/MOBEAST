@@ -1,0 +1,128 @@
+---
+title: "MOBEAST Culling DNA Data"
+format: html
+editor: source
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+#library(GGally)
+library(emmeans)
+library(performance)
+
+```
+
+## Data visualization theme
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+## Load Data 
+```{r}
+DNA <- read_csv(here("data", "MOBEAST_DNA_raw.csv"))
+#DNA <- clean_names(DNA)
+tax <- DNA[,c(193:195)]
+```
+
+make sure the MOBEAST metadata and MOBEAST sample list in DNA match 
+```{r}
+mobeast <- DNA[,c(1:122)]
+rotui <- DNA[,c(123:192)]
+meta <- clean_names(read_delim(here("data", "MOBEAST_metadata.csv")))
+meta <-meta[c(1:115),]
+```
+
+
+```{r}
+tax<- tax %>% rename(OTUNumber=repSeqName) %>% 
+  separate(OTUConTaxonomy,c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "junk"), ";" ) %>% 
+  select(-repSeq, -junk)
+```
+
+
+```{r, echo=FALSE, collapse=TRUE}
+#read in relative abundance data and metadata
+#without cabral seep samples
+relabun = as.data.frame(mobeast)
+metadata = meta
+taxonomy = tax
+
+```
+
+```{r, echo=FALSE, collapse=TRUE}
+#load Wesleys culling scripts
+source("cull.otu.script.R")
+source("generate.long.format.script.R")
+
+```
+
+
+################################### cull the data ###################################
+
+```{r, echo=FALSE, collapse=TRUE}
+
+relabund <-relabun[,-1]
+rownames(relabund) <- relabun[,1]
+
+#Transpose and create a data frame so now OTUs are the column names
+relabund.2 = as.data.frame(t(relabund[]))
+
+#Cull abundance and make into a dataframe
+culled.abund.asv = cull.abundance.prevalence(relabund.2, 3, 0.001, 0.01) 
+culled.abund.asv.transposed = as.data.frame(t(culled.abund.asv))
+#culled.abund.asv.transposed <- rownames_to_column(culled.abund.asv.transposed, var = "OTUNumber")
+
+
+#save a data frame with true/false designations from culling script
+cull.df<- data.frame(cull.vec) 
+taxonomy.culled = taxonomy[taxonomy$OTUNumber %in% colnames(culled.abund.asv),]
+culled.long.table = generate.long.format.OTUs(culled.abund.asv.transposed,metadata,taxonomy.culled)
+
+##### Want to make where column names are taxa.string.asv, not just asv, so can have that for heatmap of taxa highlighted by LM
+culled.abund.asv.transposed$ASV = rownames(culled.abund.asv.transposed)
+culled.abund.asv.transposed.w.taxonomy = merge(culled.abund.asv.transposed, taxonomy.culled, by.x = "ASV", by.y = "OTUNumber")
+rownames(culled.abund.asv.transposed.w.taxonomy) = culled.abund.asv.transposed.w.taxonomy$taxa.string.asv
+#culled.abund.asv.transposed.w.taxonomy = culled.abund.asv.transposed.w.taxonomy[,c(2:291)]
+
+```
+
+```{}
+write_csv(culled.long.table, here("data", "MOBEAST_DNA_long.csv"))
+write_csv(culled.abund.asv.transposed, here("data", "MOBEAST_OTU_culled.csv"))
+write_csv(taxonomy.culled, here("data","DNA", "MOBEAST_tax_culled.csv"))
+```
+
+
+
+
+

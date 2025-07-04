@@ -968,8 +968,100 @@ ggplot(fDOM_12PM_fpeak, aes(x= treatment, y = fdom_conc, fill = fdom))+
 ```
 
 
+## 24h 
+
+```{r}
+fDOM_24h <- fDOM_norm %>% filter(treatment != "Inflow") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>% 
+  mutate(date_fac = factor(date)) %>% 
+  filter(fdom_cat != "Other")
+```
 
 
+### Humics
+#### M:C 
 
+
+```{r}
+fDOM_24h_mtoc <- fDOM_24h %>% filter(fdom == "m_to_c") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_24h_mtoc <- fDOM_24h_mtoc %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier")
+
+```
+
+##### No data transformation 
+###### Normality and Homogeneity
+```{r}
+bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_24h_mtoc) # homogeneity
+shapiro.test(fDOM_24h_mtoc$fdom_conc_norm) # normality
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment*time_fac + (1|tank_number), data = fDOM_24h_mtoc)
+summary(mod)
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+anova(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+emm <- emmeans(mod, ~ treatment)
+cld_letters <- multcomp::cld(emm, Letters = letters)
+```
+
+##### Data Visualization 
+
+```{r,fig.width = 18, fig.height = 8}
+
+fDOM_24h_mtoc %>% filter(time_fac != as.character("00:00:00")) %>% 
+  ggplot(aes(x= treatment, fdom_conc, fill = treatment)) +
+  #geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 1)+
+  geom_point(color = "black", alpha = 0.5, size = 4)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "DOC Enrichment",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Marine:Colored (M:C) Ratio ")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~time_fac)+
+  ylim(0.3,0.9)+
+  nunu_theme +
+  theme(legend.position = "none",
+        strip.background = element_rect(fill = "white")) 
+
+ggsave("MtoC_24h.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
 
 
