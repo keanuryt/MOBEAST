@@ -24,11 +24,24 @@ library(RColorBrewer)
 library(ComplexHeatmap)
 library(data.table)
 
+# Rayna library
+library(dendsort)
+library(ggsci)
+library(randomForest)
+library(vegan)
+library(ape)
+library(devtools)
+library(ggpubr)
+library(viridis)
+library(colorspace)
+library(readr)
+library(circlize)
 
 ```
 
 ## Functions
 
+### Heatmap Sean's function
 ```{r}
 # Heat map funciton
 # function to sum by family
@@ -45,14 +58,15 @@ prep_ht_mat = function(otus,
     otu_key = merge(otus,
                     tax_table[,
                               .SD,
-                              .SDcols = c(tax_level, "OTU")],
+                              .SDcols = c(tax_level, "OTU")], ## Make sure the seq are "ASV"
                     by = "OTU",
                     all.x = T)
     
     otu_key[, OTU := NULL]
     
     # sum by tax level
-    otu_sum = otu_key[, lapply(.SD, sum), by = tax_level]
+    otu_sum = otu_key[, lapply(.SD, sum), by = tax_level] #### maybe code crashes here
+        ## Aggregates data by family
   }
   
   # order by most abundant taxa and subset to top N
@@ -79,6 +93,24 @@ prep_ht_mat = function(otus,
   
   return(otu_mat)
 }
+```
+
+### Rayna's z-score function 
+
+```{r, echo=FALSE, collapse=TRUE}
+
+zscore.calculation = function(x) {
+  #Inputs: x = dummy variable that function will be run on. Must be a vector of numbers.
+  
+  zscoredat=x #duplicate vector x, save as a new df zscoredat.
+  
+  for (i in 1:length(x)) { #for each value in vector x
+    zscoredat[i]=(x[i]-mean(x))/sd(x) #subset the input data to the corresponding position, and make it equal to the zscored value of the original cell value at that position.
+    #zscoring is done by subtracting the mean value for a vector from the value of the vector at position i, and then dividing by the SD for the vector.
+  }
+  zscoredat1 <<- zscoredat #save output as new df, zscoredat1
+}
+
 ```
 
 ## Data visualization theme
@@ -145,13 +177,17 @@ meta <- meta %>% relocate(full_name, .before = treatment) %>%
 
 ## Load Data 
 ```{r}
-OTU <- read.csv(here("data", "DNA","MOBEAST_OTU_culled.csv"))
+OTU <- read_csv(here("data", "DNA","MOBEAST_OTU_culled.csv"))
 meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
 tax <- read_csv(here("data","DNA", "MOBEAST_tax_culled.csv"))
+OTU_long <- read_csv(here("data","MOBEAST_DNA_long.csv"))
+
 ```
 
 
 ## Data clean-up
+
+Reformating the date, time and date-time in the metadata file 
 ```{r, meta data clean up}
 meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
                time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
@@ -166,49 +202,114 @@ meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0")
   
 ```
 
+Clean up the long format data to make it easier to merge with the meta data file
+```{r}
+OTU_long<- OTU_long %>% clean_names() %>% 
+  mutate(id_number = sample_id) %>% 
+  relocate(id_number, .before= otu_number) %>% 
+  select(-sample_id, -date, -treatment, -time)
+```
+
+Fusion!
+```{r}
+OTU_htm <- left_join(OTU_long, meta)
+```
+
+
+## Z-Scored Heatmap
+```{r, echo=TRUE, collapse=TRUE}
+#Make a heatmap of z-scored relative abundance data after it was summed by family
+
+#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
+
+family.culled.long.table <- OTU_htm %>%
+  group_by(id_number, family) %>%
+  summarize(abund = sum(abund, na.rm = TRUE))
+
+family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family, values_from = abund)
+
+```
+
+
+```{r, nunu's}
+#Remove sample ID from culled.abund.asv
+culled.abund.OTU <- family.culled.abund %>% ungroup() %>% tibble() %>%  select(-id_number)
+
+```
+
+
+```{r, nunu's}
+#zscore the data.subset1 dataset (i.e. no metadata)
+#z.otu.subset = culled.abund.OTU.3[,c(2:92)]
+z.zscore.data.otu.subset <- as.data.frame(apply(culled.abund.OTU, 2, FUN=zscore.calculation))
+#Bring back Type.6 into df
+z.zscore.data.otu.subset$id_number = family.culled.abund$id_number
+```
+
+
+```{r, nunu's}
+#Make row names sample type, then remove group.1
+rownames(z.zscore.data.otu.subset) = z.zscore.data.otu.subset$id_number
+
+zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>% 
+  as.matrix() %>% t()
+```
 
 ```{r}
-OTU <- OTU %>% mutate(ASV = toupper(ASV))
-```
-
-
-```{r, OTU matrix}
-OTU_matrix <- data.matrix(OTU) 
-rownames(OTU_matrix) <- OTU$ASV
-OTU_matrix <- OTU_matrix[,-122]
+meta <- meta %>% mutate(treatment = as.character(treatment)) %>% 
+  mutate(treatment = ifelse(id_number == "MOBEAST115", "Rain", 
+                            ifelse(is.na(treatment), "Endmember", treatment))) %>% 
+  mutate(inflow_table = ifelse(is.na(inflow_table), "Environmental data", inflow_table)) %>% 
+  as.data.frame()
 ```
 
 ```{r}
-OTU <- OTU %>% mutate(OTU = ASV)
-```
+treatment = meta[match(colnames(zscore.data.otu.matrix),
+                           meta$id_number), 
+                 "treatment"]
 
-## Setting order of variables 
-```{r}
-meta<- meta %>%  
-  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
-```
-
-```{r}
-# filtering and organization
-# = sample_sheet[Depth != "-999" & Cast != "Deep", collection]
-#cruise_samples = cruise_samples[cruise_samples %in% colnames(otu)]
-#cruise_otu = otu[, .SD, ,.SDcols = c("OTU", cruise_samples)]
-
-MOBEAST_samples <- meta$id_number 
-MOBEAST_samples <- MOBEAST_samples[MOBEAST_samples %in% colnames(OTU)]
-#MOBEAST_OTU <- OTU[, .SD, ,.SDcols = c("ASV", MOBEAST_samples)]
-MOBEAST_OTU <- OTU[, c("OTU", MOBEAST_samples)]
+inflow_table = meta[match(colnames(zscore.data.otu.matrix),
+                           meta$id_number),
+                     "inflow_table"]
 
 
 ```
 
 ```{r}
-MOBEAST_mat_nd = prep_ht_mat(otu = MOBEAST_OTU,
-                                  tax_table = tax,
-                                  tax_level = "family",
-                                  cutoff = 40,
-                                  scale_vals = T)
+
+ha = HeatmapAnnotation(
+  treatment = treatment,
+  inflow_table = inflow_table,
+  col = list(treatment = c("Inflow"="#00838F","Control"="grey", "Coral"="#03A9F4", 
+                           "CCA"="#EF5350", "Algae"="#4CAF50","Endmember" = "black", "Rain"= "yellow"),
+             inflow_table = c("Table 1" = "yellow", "Table 2" = "orange", 
+                              "Environmental data" = "blue"))
+)
+
+
 ```
+
+```{r, fig.height = 10, fig.width = 16}
+ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "white", lwd = 0.1),
+        column_title = "id_number", column_title_side = "bottom",
+        row_title = "family",
+        row_names_gp = gpar(fontsize = 10),
+        column_names_gp = gpar(fontsize = 10),
+        row_km = 10, #number of forced segregation in rows 
+        column_km = 6,#number of forced segregation in columns 
+        top_annotation = ha
+
+        )
+
+draw(ht)
+
+#ggsave("MOBEAST_heatmap.png", width = 16, height = 10, path = here("outputs"))
+
+```
+
+
+
+
 
 
 

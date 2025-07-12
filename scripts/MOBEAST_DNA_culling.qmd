@@ -69,6 +69,10 @@ tax<- tax %>% rename(OTUNumber=repSeqName) %>%
   select(-repSeq, -junk)
 ```
 
+```{r}
+mobeast<- mobeast %>% select(-P1_PCRPos,-P2_PCRPos,-P3_PCRPos,-P4_PCRPos,-P5_PCRPos)
+```
+
 
 ```{r, echo=FALSE, collapse=TRUE}
 #read in relative abundance data and metadata
@@ -98,7 +102,7 @@ rownames(relabund) <- relabun[,1]
 relabund.2 = as.data.frame(t(relabund[]))
 
 #Cull abundance and make into a dataframe
-culled.abund.asv = cull.abundance.prevalence(relabund.2, 3, 0.001, 0.01) 
+culled.abund.asv = cull.abundance.prevalence(relabund.2, 3, 0.001, 0.01)  
 culled.abund.asv.transposed = as.data.frame(t(culled.abund.asv))
 #culled.abund.asv.transposed <- rownames_to_column(culled.abund.asv.transposed, var = "OTUNumber")
 
@@ -114,6 +118,10 @@ culled.abund.asv.transposed.w.taxonomy = merge(culled.abund.asv.transposed, taxo
 rownames(culled.abund.asv.transposed.w.taxonomy) = culled.abund.asv.transposed.w.taxonomy$taxa.string.asv
 #culled.abund.asv.transposed.w.taxonomy = culled.abund.asv.transposed.w.taxonomy[,c(2:291)]
 
+```
+
+```{r}
+culled.long.table %>% filter(Family == "Bacillaceae")
 ```
 
 ```{}

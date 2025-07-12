@@ -1,0 +1,120 @@
+---
+title: "MOBEAST Ordination"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+library(vegan)
+library(phyloseq)
+library(GUniFrac)
+```
+
+## Load Data
+```{r}
+otu <- read_csv(here("data", "DNA", "MOBEAST_OTU_culled.csv"))
+meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
+tax <- read_csv(here("data","DNA", "MOBEAST_tax_culled.csv"))
+```
+
+### Transform the dataframes into matrices 
+```{r}
+## Make an OTU matrix
+otu<- otu %>% mutate(ASV = toupper(ASV))
+otu_list<- otu$ASV
+otu<- otu %>% select(-(117:122))
+otu_mat <- as.matrix(otu)
+rownames(otu_mat) <- otu_list
+
+## Make a taxonomy matrix
+tax_mat <- tax %>% mutate(OTUNumber = toupper(OTUNumber)) %>% 
+   tibble::column_to_rownames("OTUNumber") %>% 
+   as.matrix()
+
+```
+
+
+```{r}
+## Clean the metadata 
+meta_mat <-meta %>% select(-long_name) %>% 
+  mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
+               time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
+  # "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters
+  # "\\1:\\2", group1 + ":" + group2
+  mutate(time = paste0(time, ":00"),
+               date_time = paste(date, time),
+               date = mdy(date), 
+               date_time = mdy_hms(date_time),
+               time = factor(time)) %>% 
+    tibble::column_to_rownames("id_number") 
+```
+
+
+## Transform the data to phyloseq object
+```{r}
+OTU <- otu_table(otu_mat, taxa_are_rows = TRUE)
+TAX <- tax_table(tax_mat)
+samples <- sample_data(meta_mat)
+```
+
+```{r}
+phy <- phyloseq(OTU, TAX, samples)
+```
+
+```{r}
+tax_concatonate <- data.frame(tax_mat)
+tax_concatonate<- tax_concatonate %>% mutate(OTU = rownames(tax_concatonate)) 
+rownames(tax_concatonate) <- NULL
+
+tax_concatonate<- tax_concatonate %>% 
+  mutate(tax_id = paste0(Phylum, "_", Class, "_", Order, "_", Family, "_", Genus,  "_",OTU)) %>% 
+  relocate(tax_id, .before = Kingdom)
+
+tax_id_df <- tax_concatonate %>% select(OTU,tax_id)
+```
+
+```{r}
+otu_w_tax <- otu_mat
+rownames(otu_w_tax) <- tax_id_df$tax_id
+
+```
+
+
+## 
+```{r}
+otu_tab <- t(otu_table(phy))
+treefile <- phy_tree(phy,errorIfNULL=TRUE)
+?phy_tree
+```
+
+```{r}
+unifracs <- GUniFrac(otu_tab, treefile, alpha = c(0, 0.5, 1))$unifracs
+```
+
+
+```{r}
+d5 <- unifracs[, , "d_0.5"]   # GUniFrac with alpha 0.5 
+```
+
+```{r}
+sample_data(otu)
+```
+
+
+
+

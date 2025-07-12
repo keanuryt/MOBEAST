@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 ## Load Libraries
+
 ```{r}
 library(tidyverse)
 library(here)
@@ -39,6 +40,7 @@ library(performance)
 ```
 
 ## Data visualization theme
+
 ```{r}
 nunu_theme <- theme_bw() + 
   theme(plot.title = element_text(size=32, face = "bold"), 
@@ -50,7 +52,8 @@ nunu_theme <- theme_bw() +
         legend.text=element_text(size=28))
 ```
 
-## Load Data 
+## Load Data
+
 ```{r}
 fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
 
@@ -77,7 +80,6 @@ fDOM_desc <- tibble(fdom = c("coble_a","coble_b","coble_c","coble_m","coble_t",
 fDOM_desc %>% gt()
 ```
 
-
 ```{r}
 table_id <- clean_names(table_id)
 
@@ -102,12 +104,10 @@ fDOM_long <- fDOM %>% pivot_longer(cols = coble_a:lignin,
                       values_to = "fdom_conc")
 ```
 
-
 ```{r}
 fdom_long <- left_join(fDOM_long, fDOM_desc, by = "fdom")
 
 ```
-
 
 ```{r}
 fDOM_norm <- fdom_long %>% filter(date > as.Date("2024-05-31")) %>% # Removes end members
@@ -130,7 +130,8 @@ fDOM_norm <- fdom_long %>% filter(date > as.Date("2024-05-31")) %>% # Removes en
 head(fDOM_norm, 15)
 ```
 
-## Quick visulitation 
+## Quick visulitation
+
 ```{r}
 ggplot(fDOM_norm, aes(x= treatment, y = fdom_conc, fill = fdom))+
   geom_bar(position="stack", stat="identity")+
@@ -155,8 +156,6 @@ fDOM_norm %>% mutate(fdom_cat = factor(fdom_cat, levels = c("Humic", "Proteinace
   ungroup() %>% 
   gt()
 ```
-
-
 
 ## Hypothesis 1: fDOM 12PM
 
@@ -197,7 +196,6 @@ fDOM_12PM_cobA <- fDOM_12PM_cobA %>%
 
 ```
 
-
 ```{r}
 mod <- lmer(fdom_conc_norm ~ treatment + (1|date), data = fDOM_12PM_cobA)
 summary(mod)
@@ -207,16 +205,7 @@ summary(mod)
 anova(mod, type= "2")
 ```
 
-
-
-```{, fig_height = 10, fig.width = 10}
-plot_model(mod, type = "re")[[1]] +
-  plot_model(mod, type = "re")[[2]] +
-  plot_model(mod, type = "eff", terms = c('treatment')) +
-  plot_model(mod, type = "diag")[[1]]
-```
-
-
+`{, fig_height = 10, fig.width = 10} plot_model(mod, type = "re")[[1]] +   plot_model(mod, type = "re")[[2]] +   plot_model(mod, type = "eff", terms = c('treatment')) +   plot_model(mod, type = "diag")[[1]]`
 
 ```{r}
 resid_panel(mod)
@@ -227,9 +216,7 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 emmeans(mod, specs = ~ treatment)
 ```
 
-
 ##### Interpretation
-
 
 ```{r}
 #sort(boxplot.stats(fDOM_12PM_cobA$fdom_conc)$out)
@@ -242,10 +229,10 @@ ggplot(fDOM_12PM_cobA, aes(x= treatment, y = fdom_conc_norm, fill = fdom))+
 ```
 
 #### CobleM
+
 ```{r}
 fDOM_12PM_cobM <- fDOM_12PM %>% filter(fdom == "coble_m") 
 ```
-
 
 ```{r}
 ## Outlier detection
@@ -271,6 +258,7 @@ fDOM_12PM_cobM <- fDOM_12PM_cobM %>%
 ```
 
 ###### Normality and Homogeneity
+
 ```{r}
 bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_12PM_cobM) # homogeneity
 shapiro.test(fDOM_12PM_cobM$fdom_conc_norm) # normality
@@ -290,12 +278,10 @@ anova(mod)
 kruskal.test(fdom_conc_norm ~ treatment, data = fDOM_12PM_cobM )
 ```
 
-
 ```{r}
 emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 emmeans(mod, specs = ~ treatment)
 ```
-
 
 ```{r}
 emm <- emmeans(mod, ~ treatment)
@@ -323,6 +309,7 @@ ggplot(fDOM_12PM_cobM, aes(x= treatment, fdom_conc, fill = treatment)) +
 ```
 
 #### CobleC
+
 ```{r}
 fDOM_12PM_cobC <- fDOM_12PM %>% filter(fdom == "coble_c") 
 ```
@@ -350,13 +337,14 @@ fDOM_12PM_cobC <- fDOM_12PM_cobC %>%
 
 ```
 
-##### No data transformation 
+##### No data transformation
+
 ###### Normality and Homogeneity
+
 ```{r}
 bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_12PM_cobC) # homogeneity
 shapiro.test(fDOM_12PM_cobC$fdom_conc_norm) # normality
 ```
-
 
 ```{r}
 mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_cobC)
@@ -366,7 +354,6 @@ summary(mod)
 ```{r}
 anova(mod)
 ```
-
 
 ```{r}
 resid_panel(mod)
@@ -385,7 +372,8 @@ ggplot(fDOM_12PM_cobC, aes(x= treatment, y = fdom_conc, fill = fdom))+
   nunu_theme
 ```
 
-##### With data transformation 
+##### With data transformation
+
 ###### Normality and Homogeneity
 
 ```{r}
@@ -395,17 +383,16 @@ summary(power_model)
 
 ```
 
-
 ```{r}
 bartlett.test(yjPower(fdom_conc_norm, lambda = -186.9304) ~ treatment,data = fDOM_12PM_cobC) # homogeneity
 shapiro.test(yjPower(fDOM_12PM_cobC$fdom_conc_norm, lambda = -186.9304)) # normality
 ```
+
 ```{r}
 fDOM_12PM_cobC <- fDOM_12PM_cobC %>% 
   mutate(fdom_conc_trans= yjPower(fdom_conc_norm, lambda = -186.9304)) %>% 
   relocate(fdom_conc_trans, .after = fdom_conc_norm)
 ```
-
 
 ```{r}
 mod <- lmer(fdom_conc_trans ~ treatment + (1|tank_number), data = fDOM_12PM_cobC)
@@ -420,7 +407,6 @@ resid_panel(mod)
 anova(mod)
 ```
 
-
 ```{r}
 emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ```
@@ -431,6 +417,7 @@ cld_letters <- multcomp::cld(emm, Letters = letters)
 ```
 
 ##### Data Visualization
+
 ```{r, fig.width= 18, fig.height = 8}
 ggplot(fDOM_12PM_cobC, aes(x= treatment, fdom_conc_trans, fill = treatment)) +
   geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
@@ -451,12 +438,8 @@ ggplot(fDOM_12PM_cobC, aes(x= treatment, fdom_conc_trans, fill = treatment)) +
 #ggsave("CobC_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
 ```
 
-
-
-
-
-
 #### M:C SIGNIFICANT
+
 ```{r}
 fDOM_12PM_mtoc <- fDOM_12PM %>% filter(fdom == "m_to_c") 
 ```
@@ -484,8 +467,10 @@ fDOM_12PM_mtoc <- fDOM_12PM_mtoc %>%
 
 ```
 
-##### No data transformation 
+##### No data transformation
+
 ###### Normality and Homogeneity
+
 ```{r}
 bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_12PM_mtoc) # homogeneity
 shapiro.test(fDOM_12PM_mtoc$fdom_conc_norm) # normality
@@ -496,7 +481,7 @@ mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_mtoc)
 summary(mod)
 ```
 
-```{}
+```         
 ## Transforming the data with yjPower did not change the Q-Q plot 
 
 power_model <- powerTransform(fDOM_12PM_mtoc$fdom_conc_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
@@ -515,16 +500,16 @@ resid_panel(mod)
 anova(mod)
 ```
 
-
 ```{r}
 emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ```
+
 ```{r}
 emm <- emmeans(mod, ~ treatment)
 cld_letters <- multcomp::cld(emm, Letters = letters)
 ```
 
-##### Data Visualization 
+##### Data Visualization
 
 ```{r,fig.width = 18, fig.height = 8}
 
@@ -546,7 +531,6 @@ ggplot(fDOM_12PM_mtoc, aes(x= treatment, fdom_conc, fill = treatment)) +
 
 ggsave("MtoC_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
 ```
-
 
 ```{r, fig.width=18, fig.height=8}
 cobM_boxp <- ggplot(fDOM_12PM_cobM, aes(x= treatment, y = fdom_conc))+
@@ -597,8 +581,8 @@ cobM_boxp + cobC_boxp + plot_layout(axis_titles = "collect")
 ggsave("CobM_C_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
 ```
 
-
 #### FI
+
 ```{r}
 fDOM_12PM_fi <- fDOM_12PM %>% filter(fdom == "fi") 
 ```
@@ -635,13 +619,7 @@ summary(mod)
 anova(mod, type= "2")
 ```
 
-```{, fig_height = 10, fig.width = 10}
-plot_model(mod, type = "re")[[1]] +
-  plot_model(mod, type = "re")[[2]] +
-  plot_model(mod, type = "eff", terms = c('treatment')) +
-  plot_model(mod, type = "diag")[[1]]
-```
-
+`{, fig_height = 10, fig.width = 10} plot_model(mod, type = "re")[[1]] +   plot_model(mod, type = "re")[[2]] +   plot_model(mod, type = "eff", terms = c('treatment')) +   plot_model(mod, type = "diag")[[1]]`
 
 ```{r}
 resid_panel(mod)
@@ -662,6 +640,7 @@ ggplot(fDOM_12PM_fi, aes(x= treatment, y = fdom_conc, fill = fdom))+
 ```
 
 #### BIX
+
 ```{r}
 fDOM_12PM_bix <- fDOM_12PM %>% filter(fdom == "bix") 
 ```
@@ -694,19 +673,11 @@ mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM
 summary(mod)
 ```
 
-
 ```{r}
 anova(mod, type= "2")
 ```
 
-```{, fig_height = 10, fig.width = 10}
-plot_model(mod, type = "re")[[1]] +
-  plot_model(mod, type = "re")[[2]] +
-  plot_model(mod, type = "eff", terms = c('treatment')) +
-  plot_model(mod, type = "diag")[[1]]
-```
-
-
+`{, fig_height = 10, fig.width = 10} plot_model(mod, type = "re")[[1]] +   plot_model(mod, type = "re")[[2]] +   plot_model(mod, type = "eff", terms = c('treatment')) +   plot_model(mod, type = "diag")[[1]]`
 
 ```{r}
 resid_panel(mod)
@@ -726,8 +697,8 @@ ggplot(fDOM_12PM_bix, aes(x= treatment, y = fdom_conc, fill = fdom))+
   nunu_theme
 ```
 
-
 #### HIX
+
 ```{r}
 fDOM_12PM_hix <- fDOM_12PM %>% filter(fdom == "hix") 
 ```
@@ -764,8 +735,6 @@ summary(mod)
 anova(mod, type= "2")
 ```
 
-
-
 ```{r}
 resid_panel(mod)
 ```
@@ -784,14 +753,15 @@ ggplot(fDOM_12PM_hix, aes(x= treatment, y = fdom_conc, fill = fdom))+
   nunu_theme
 ```
 
-
 ### Proteinaceous
+
 ```{r}
 fDOM_12PM %>% filter(fdom_cat == "Proteinaceous") %>% 
   select(fdom) %>% distinct()
 ```
 
 #### CobleB
+
 ```{r}
 fDOM_12PM_cobB <- fDOM_12PM %>% filter(fdom == "coble_b") 
 ```
@@ -828,8 +798,6 @@ summary(mod)
 anova(mod, type= "2")
 ```
 
-
-
 ```{r}
 resid_panel(mod)
 ```
@@ -848,7 +816,6 @@ ggplot(fDOM_12PM_cobB, aes(x= treatment, y = fdom_conc, fill = fdom))+
   facet_grid(fdom_cat~date, scales = "free")+
   nunu_theme
 ```
-
 
 #### CobleT
 
@@ -887,8 +854,6 @@ summary(mod)
 ```{r}
 anova(mod, type= "2")
 ```
-
-
 
 ```{r}
 resid_panel(mod)
@@ -947,7 +912,6 @@ summary(mod)
 anova(mod, type= "2")
 ```
 
-
 ```{r}
 resid_panel(mod)
 ```
@@ -967,8 +931,7 @@ ggplot(fDOM_12PM_fpeak, aes(x= treatment, y = fdom_conc, fill = fdom))+
   nunu_theme
 ```
 
-
-## 24h 
+## 24h
 
 ```{r}
 fDOM_24h <- fDOM_norm %>% filter(treatment != "Inflow") %>% 
@@ -979,10 +942,9 @@ fDOM_24h <- fDOM_norm %>% filter(treatment != "Inflow") %>%
   filter(fdom_cat != "Other")
 ```
 
-
 ### Humics
-#### M:C 
 
+#### M:C
 
 ```{r}
 fDOM_24h_mtoc <- fDOM_24h %>% filter(fdom == "m_to_c") 
@@ -1009,8 +971,10 @@ fDOM_24h_mtoc <- fDOM_24h_mtoc %>%
 
 ```
 
-##### No data transformation 
+##### No data transformation
+
 ###### Normality and Homogeneity
+
 ```{r}
 bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_24h_mtoc) # homogeneity
 shapiro.test(fDOM_24h_mtoc$fdom_conc_norm) # normality
@@ -1038,7 +1002,7 @@ emm <- emmeans(mod, ~ treatment)
 cld_letters <- multcomp::cld(emm, Letters = letters)
 ```
 
-##### Data Visualization 
+##### Data Visualization
 
 ```{r,fig.width = 18, fig.height = 8}
 
@@ -1063,5 +1027,3 @@ fDOM_24h_mtoc %>% filter(time_fac != as.character("00:00:00")) %>%
 
 ggsave("MtoC_24h.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
 ```
-
-
