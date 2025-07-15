@@ -1,0 +1,570 @@
+---
+title: "DNA prelim"
+format: html
+editor: visual
+---
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+library(rlang)
+```
+
+## Data visualization theme
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+
+## Function
+```{r}
+nunu_plot <- function(data = DNA, OTU_filter, time = 12){
+  
+  
+  if(time == 12){
+    df <- DNA %>% filter({{OTU_filter}}) %>% 
+  filter(time == "12:00:00") 
+    
+    tax <- df %>% select(otu_number, class, family, genus) %>% distinct()
+    tax_name <- tax %>% paste(otu_number, ":", class, ",", family,",", genus)  
+    
+  MOBEAST_plot <- ggplot(df, aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  stat_summary(color = "yellow", alpha =0.5)+
+  facet_wrap(~date, scales = "free")+
+  labs(title = tax_name,
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+  }
+  
+  MOBEAST_plot
+}
+
+
+```
+
+```{r}
+nunu_plot(data = DNA, otu_number == "Otu0006" , time = 12)
+```
+
+
+
+
+## Load Data
+```{r}
+DNA <- read_csv(here("data", "MOBEAST_DNA_long.csv"))
+meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
+```
+## Data Clean Up
+```{r}
+DNA <- DNA %>% rename(id_number = SampleID)
+```
+
+```{r}
+DNA_raw <- left_join(DNA, meta)
+DNA_raw<- DNA_raw %>% clean_names() %>% 
+  mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
+               time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
+  # "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters
+  # "\\1:\\2", group1 + ":" + group2
+  mutate(time = paste0(time, ":00"),
+               date_time = paste(date, time),
+               date = mdy(date), 
+               date_time = mdy_hms(date_time),
+               time = factor(time))
+```
+
+```{r}
+DNA <- DNA_raw %>% 
+  filter(#treatment != "Inflow",
+         treatment != "Endmember",
+         treatment != "Rain") %>% 
+  mutate(treatment = ifelse(treatment == "C", "Control",
+                            ifelse(treatment == "K", "Coral",
+                                   ifelse(treatment == "R", "CCA", 
+                                          ifelse(treatment == "A", "Algae", treatment))))) %>% 
+  mutate(treatment = factor(treatment, levels = c("Inflow","Control", "Coral", "CCA", "Algae", "Endmember", "Rain")))
+```
+
+## OTU 006: Gammaproteobacteria (Class), Nitrincolaceae (Family)
+
+```{r, OTU_0006_all}
+DNA_raw %>% filter(otu_number == "Otu0006") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  #stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0006: Gammaproteobacteria, Nitrincolaceae", 
+       x= "Treatment",
+       y = "Relative Abundance") +
+  #scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       #values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+```{r, OTU_0006_12PM}
+DNA %>% filter(otu_number == "Otu0006") %>% 
+  filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  facet_wrap(~date, scales = "free")+
+  labs(title = "OTU 0006: Gammaproteobacteria, Nitrincolaceae",
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  #scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       #values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+
+```{r, OTU_0006_24h}
+DNA %>% filter(otu_number == "Otu0006") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>%
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0006: Gammaproteobacteria, Nitrincolaceae",
+       subtitle = "24h",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~date_time, scales = "free")+
+  nunu_theme+
+  theme(legend.position = "none")  
+
+```
+
+
+## OTU 002: Cyanobacteria, Prochlorococcus
+```{r, OTU_0002_all}
+DNA %>% filter(otu_number == "Otu0002") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0002: Cyanobacteria, Prochlorococcus", 
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+```{r, OTU_002_12PM}
+DNA %>% filter(otu_number == "Otu0002") %>% 
+  filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0002: Cyanobacteria, Prochlorococcus", 
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  facet_wrap(~date)+
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+
+```{r, OTU_0002_24h}
+DNA %>% filter(otu_number == "Otu0002") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>%
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0002: Cyanobacteria, Prochlorococcus", 
+       subtitle = "24h",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~date_time, scales = "free")+
+  nunu_theme+
+  theme(legend.position = "none")  
+
+```
+
+## OTU 004: Alphaproteobacteria, SAR11
+```{r, OTU_0004_all}
+DNA %>% filter(otu_number == "Otu0004") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0004: Alphaproteobacteria, SAR11", 
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+```{r, OTU_004_12PM}
+DNA %>% filter(otu_number == "Otu0004") %>% 
+  filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  facet_wrap(~date)+
+  labs(title = "OTU 0004: Alphaproteobacteria, SAR11",
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+
+```{r, OTU_0004_24h}
+DNA %>% filter(otu_number == "Otu0004") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>%
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0004: Alphaproteobacteria, SAR11",
+       subtitle = "24h",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~date_time, scales = "free")+
+  nunu_theme+
+  theme(legend.position = "none")  
+
+```
+
+
+## OTU 007: Gammaproteobacteria, SAR86
+```{r, OTU_0007_all}
+DNA %>% filter(otu_number == "Otu0007") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0007: Gammaproteobacteria, SAR86", 
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+```{r, OTU_007_12PM}
+DNA %>% filter(otu_number == "Otu0007") %>% 
+  filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  facet_wrap(~date)+
+  labs(title = "OTU 0007: Gammaproteobacteria, SAR86",
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+
+```{r, OTU_0007_24h}
+DNA %>% filter(otu_number == "Otu0007") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>%
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0007: Gammaproteobacteria, SAR86",
+       subtitle = "24h",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~date_time, scales = "free")+
+  nunu_theme+
+  theme(legend.position = "none")  
+
+```
+
+
+## OTU 008: Alphaproteobacteria, SAR116
+```{r, OTU_0008_all}
+DNA %>% filter(otu_number == "Otu0008") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0008: Alphaproteobacteria, SAR116", 
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+```{r, OTU_008_12PM}
+DNA %>% filter(otu_number == "Otu0008") %>% 
+  filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  facet_wrap(~date)+
+  labs(title = "OTU 0008: Alphaproteobacteria, SAR116",
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+
+```{r, OTU_0008_24h}
+DNA %>% filter(otu_number == "Otu0008") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>%
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0008: Alphaproteobacteria, SAR116",
+       subtitle = "24h",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~date_time, scales = "free")+
+  nunu_theme+
+  theme(legend.position = "none")  
+
+```
+
+
+
+## OTU 0031: Espilonbacteraeota, Arcobacter
+
+```{r, OTU_0031_all}
+DNA %>% filter(otu_number == "Otu0031") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow")+
+  coord_trans(y = "sqrt")+
+  labs(title = "OTU 0031: Espilonbacteraeota, Arcobacter", 
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+```{r, OTU_031_12PM}
+DNA %>% filter(otu_number == "Otu0031") %>% 
+  filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "orange")+
+  #coord_trans(y = "log10")+
+  facet_wrap(~date)+
+  labs(title = "OTU 0031: Espilonbacteraeota, Arcobacter",
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+
+```{r, OTU_0031_24h}
+DNA %>% filter(otu_number == "Otu0031") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>%
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "orange", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0031: Espilonbacteraeota, Arcobacter",
+       subtitle = "24h",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~date_time, scales = "free")+
+  nunu_theme+
+  theme(legend.position = "none")  
+
+```
+
+
+
+## OTU 0044: Espilonbacteraeota, Arcobacter
+
+```{r, OTU_0044_all}
+DNA %>% filter(otu_number == "Otu0044") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow")+
+  coord_trans(y = "sqrt")+
+  labs(title = "OTU 0044: Espilonbacteraeota, Arcobacter", 
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+```{r, OTU_044_12PM}
+DNA %>% filter(otu_number == "Otu0044") %>%
+  filter(time == "12:00:00") %>% 
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "orange")+
+  #coord_trans(y = "log10")+
+  facet_wrap(~date)+
+  labs(title = "OTU 0044: Espilonbacteraeota, Arcobacter",
+       subtitle = "12PM",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme+
+  theme(legend.position = "none")
+```
+
+
+```{r, OTU_0044_24h}
+DNA %>% filter(otu_number == "Otu0044") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>%
+  ggplot(aes(x= treatment, y= abund, fill = treatment))+
+  geom_violin()+
+  geom_point()+ 
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "orange", alpha =0.5)+
+  #coord_trans(y = "log10")+
+  labs(title = "OTU 0044: Espilonbacteraeota, Arcobacter",
+       subtitle = "24h",
+       x= "Treatment",
+       y = "Relative Abundance") +
+  scale_fill_manual(breaks = c("Inflow","Control", "Coral", "CCA", "Algae"), 
+                       values=c("#00838F","grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~date_time, scales = "free")+
+  nunu_theme+
+  theme(legend.position = "none")  
+
+```
+
+
+```{r}
+
+```
+
+
+
+
+

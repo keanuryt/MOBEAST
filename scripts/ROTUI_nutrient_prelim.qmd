@@ -1,0 +1,114 @@
+---
+title: "ROTUI - Nutrient Preliminary"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+```
+
+## Load data
+```{r}
+meta <- read_delim(here("data", "ROTUI_metadata.csv"))
+nutrient <- read_delim(here("data", "Nutrients", "ROTUI_nutrients.csv"))
+```
+
+## Data clean-up
+```{r}
+meta<-meta %>% clean_names() %>% select(-comments) %>% 
+  rename(salinity = salinity_m_s_cm, 
+         temp_sal = t_sal,
+         DO = do_mg_l,
+         temp_O2 = t_o2)
+nutrient <- nutrient %>% clean_names() %>% 
+  rename(tot_P = total_p_mmol_l,
+         tot_N = total_n_mmol_l,
+         PO4 = phosphate_mmol_l,
+         SiO4 = silicate_mmol_l,
+         N_N = n_n_mmol_l,
+         NH3 = ammonia_mmol_l)
+```
+
+
+```{r}
+nutrients <- left_join(meta, nutrient)
+
+nutrients<- nutrients %>% relocate(c(tot_P:NH3), .after = time)
+
+nutrients <- nutrients %>% 
+  mutate(date_time = ymd_hms(paste(as.character(date), as.character(time)))) %>% 
+  relocate(date_time, .after = time)
+```
+
+```{r}
+site <- nutrients %>% select(site) %>% distinct() %>% pull()
+site_meta <- tibble(site = site, 
+                    site_type = c("Stream Mouth", "Village", "Village", "Passe",
+                                  "Passe", "Bassin", "Bassin", "Bassin", "Stream Mouth", 
+                                  "Rahui","Rahui","Rahui","Rahui","Rahui","Rahui",
+                                  "Rahui","Rahui","Rahui", "River", "River", 
+                                  "Water Treatment Plant"),
+                    location = c("Shore", "Village", "Village", "Oceanward", "Oceanward",
+                                 "Backreef", "Lagoon","Shore", "Shore", 
+                                 "Backreef", "Lagoon","Shore",
+                                 "Backreef", "Lagoon","Shore",
+                                 "Backreef", "Lagoon","Shore", "River", "River", "WTP"))
+
+nutrients<- left_join(nutrients, site_meta)
+```
+
+```{r}
+nutrients <- nutrients %>% mutate(site_type = factor(site_type),
+                     location = factor(location))
+```
+
+## Preliminary 
+
+```{r}
+nutrients_long <- nutrients %>% filter(!is.na(id_number)) %>% 
+  mutate(NH3 = ifelse(NH3 == "<0.02", "0", NH3)) %>% 
+  mutate(NH3 = as.numeric(NH3)) %>% 
+  select(-weather, -air_temp, -tide, -pressure, -salinity, -temp_sal, -DO, -temp_O2) %>% 
+  pivot_longer(cols = c(tot_P:NH3), 
+               names_to = "nutrients", 
+               values_to = "conc") 
+```
+
+
+```{r, warning = FALSE}
+nutrients_long %>% 
+  ggplot(aes(x= location, y = log10(conc) ))+
+  geom_violin()+
+  geom_text_repel(aes(label = site)) +
+  geom_point(aes(size = conc),alpha = 0.5)+
+  facet_wrap(~nutrients, scales = "free")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

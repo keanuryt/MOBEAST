@@ -23,6 +23,7 @@ library(RColorBrewer)
 library(vegan)
 library(phyloseq)
 library(GUniFrac)
+library(viridis)
 ```
 
 ## Load Data
@@ -30,8 +31,10 @@ library(GUniFrac)
 otu <- read_csv(here("data", "DNA", "MOBEAST_OTU_culled.csv"))
 meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
 tax <- read_csv(here("data","DNA", "MOBEAST_tax_culled.csv"))
+OTU_ord <- read_csv(here("data","OTU_heatmap_ready.csv"))
 ```
 
+## Making a phyloseq object 
 ### Transform the dataframes into matrices 
 ```{r}
 ## Make an OTU matrix
@@ -48,7 +51,6 @@ tax_mat <- tax %>% mutate(OTUNumber = toupper(OTUNumber)) %>%
 
 ```
 
-
 ```{r}
 ## Clean the metadata 
 meta_mat <-meta %>% select(-long_name) %>% 
@@ -64,8 +66,36 @@ meta_mat <-meta %>% select(-long_name) %>%
     tibble::column_to_rownames("id_number") 
 ```
 
+```{r, meta data clean up}
+meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
+               time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
+  # "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters
+  # "\\1:\\2", group1 + ":" + group2
+  mutate(time = paste0(time, ":00"),
+               date_time = paste(date, time),
+               date = mdy(date), 
+               date_time = mdy_hms(date_time),
+               time = factor(time))
+  
+  
+```
+### Preparing the metadata to annotate the heatmap
 
-## Transform the data to phyloseq object
+```{r}
+# renaming some of treatment so that environmental data have a label: endmember or rain
+# Same for inflow table, environmental samples now have a label
+## Convert tibble to df for later
+meta <- meta %>% mutate(treatment = as.character(treatment)) %>% 
+  mutate(treatment = ifelse(id_number == "MOBEAST115", "Rain", 
+                            ifelse(is.na(treatment), "Endmember", treatment))) %>% 
+  mutate(inflow_table = ifelse(is.na(inflow_table), "Environmental data", inflow_table)) %>% 
+  mutate(date_string = as.character(date),
+                time_string = as.character(time),
+                date_time_string = paste(date_string, time_string)) %>% 
+  as.data.frame()
+```
+
+### Transform the data to phyloseq object
 ```{r}
 OTU <- otu_table(otu_mat, taxa_are_rows = TRUE)
 TAX <- tax_table(tax_mat)
@@ -76,6 +106,7 @@ samples <- sample_data(meta_mat)
 phy <- phyloseq(OTU, TAX, samples)
 ```
 
+### Unsure what this is for but relabeling my OTU IDs for ordinations? 
 ```{r}
 tax_concatonate <- data.frame(tax_mat)
 tax_concatonate<- tax_concatonate %>% mutate(OTU = rownames(tax_concatonate)) 
@@ -94,27 +125,48 @@ rownames(otu_w_tax) <- tax_id_df$tax_id
 
 ```
 
+## Ordinations with long format df
 
-## 
 ```{r}
-otu_tab <- t(otu_table(phy))
-treefile <- phy_tree(phy,errorIfNULL=TRUE)
-?phy_tree
+otu_ord <- OTU %>% t() %>% as.data.frame() 
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
 ```
 
 ```{r}
-unifracs <- GUniFrac(otu_tab, treefile, alpha = c(0, 0.5, 1))$unifracs
-```
-
-
-```{r}
-d5 <- unifracs[, , "d_0.5"]   # GUniFrac with alpha 0.5 
+meta_ord <-meta %>% select(id_number, treatment)
 ```
 
 ```{r}
-sample_data(otu)
+otu_ord <- left_join(otu_ord, meta_ord)
+```
+
+```{r}
+rownames(otu_ord) <- otu_ord$id_number
+otu_ord_mat <- otu_ord %>%  select(-id_number, -treatment) %>%  as.matrix()
 ```
 
 
+## Calculate distances 
 
+```{r}
+set.seed(2000)
+MOBEAST_dist <- vegdist(otu_ord_mat, method = "bray")
+nmds <- metaMDS(MOBEAST_dist, trymax = 10000)
+
+MOBEAST_nmds <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+```{r}
+MOBEAST_nmds <- left_join(MOBEAST_nmds, meta)
+```
+
+```{r}
+MOBEAST_nmds %>%  
+  ggplot(aes(x= NMDS1, y = NMDS2 ))+
+  geom_point(aes(colour = treatment), size = 4) +
+  geom_label_repel(aes(label = treatment))+
+  scale_color_viridis_d()
+```
 
