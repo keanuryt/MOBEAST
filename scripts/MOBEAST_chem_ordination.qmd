@@ -1,0 +1,203 @@
+---
+title: "MOBEAST Chem"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+library(vegan)
+library(phyloseq)
+library(GUniFrac)
+library(viridis)
+```
+
+## Data visualization
+
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=32, face = "bold"), 
+        plot.subtitle = element_text(size=30),
+        axis.title = element_text(size = 28, face = "bold"),
+        axis.text = element_text(size = 28),
+        strip.text.x = element_text(size = 28, face = "bold"),
+        legend.title=element_text(size=28, face = "bold"),
+        legend.text=element_text(size=28))
+```
+
+
+## Load Data
+```{r}
+chem <- read_csv(here("data", "chem.csv"))
+```
+
+```{r}
+meta <- chem %>% select(id_number, inflow_table, tank_number, treatment, date, time, date_time)
+```
+
+M# making df for ordination 
+```{r}
+chem_ord <- chem %>% select(-long_name, -inflow_table, -tank_number,
+                            -treatment, 
+                            -ph, -ph_inflow, -ta, -ta_inflow, -npoc_u_m)
+```
+
+
+## 24PM sampling 
+
+```{r}
+chem_ord_24h <- chem_ord%>% filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  select(-time, -date, -date_time)
+```
+
+
+```{r}
+# Make the sample ID the rownames of the data frame
+chem_ord_24h<- chem_ord_24h %>% as.data.frame() 
+rownames(chem_ord_24h) <- chem_ord_24h$id_number
+```
+
+
+```{r}
+# only keep the OTU numbers in the matrix and remove the id_number column
+## ID numbers are now rownames. then convert the df in a matrix.
+chem_ord_24h_mat <- chem_ord_24h %>%  
+  select(-id_number) %>%  
+  drop_na() %>% 
+  as.matrix()
+
+```
+### To avoid getting NaN values
+```{r}
+chem_ord_24h_mat <- chem_ord_24h_mat[rowSums(chem_ord_24h_mat) > 0, ]
+```
+
+### Calculate distances 
+```{r}
+# metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
+set.seed(2000)
+
+# calcultat the distance matrix with bray-curtis method
+MOBEAST_dist <- vegdist(chem_ord_24h_mat, method = "bray", na.rm = TRUE)
+
+#calculate the MDS scores such that it converges to a solutions. 
+## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
+nmds <- metaMDS(MOBEAST_dist, trymax = 10000)
+
+# save the NMDS scores in a tibble with the ID numbers. 
+MOBEAST_nmds_24h <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+
+```{r}
+# add the metadata to the NMDS tibble to make plots 
+MOBEAST_nmds_24h <- left_join(MOBEAST_nmds_24h, meta)
+
+MOBEAST_nmds_24h <- MOBEAST_nmds_24h %>% 
+  mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae")))
+```
+
+### Plotting NDMS 24h
+
+```{r, fig.width=10, fig.height= 6}
+# Plo
+MOBEAST_nmds_24h %>%   
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  stat_ellipse(
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  labs(title= "24h samples, ellipse by treatment")+
+  scale_color_manual(values=treatment_colors)+
+  scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+```{r, fig.width=10, fig.height= 6}
+
+MOBEAST_nmds_24h %>%  
+  mutate(time_string = as.character(time)) %>% 
+  mutate(time_string = factor(time_string, levels = c("12:00:00","18:00:00","00:00:00","06:00:00" ))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment))+
+  stat_ellipse(aes(colour = time_string, fill = time_string), 
+               alpha = 0.2, geom = "polygon", level = 0.95)+
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  labs(title= "24h samples, ellipse by time")+
+  scale_color_manual(values=treatment_colors)+
+  #scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+## 12PM sampling 
+
+```{r}
+chem_ord_12PM <- chem_ord%>% filter(time == hms("12:00:00")) %>% 
+  select(-time, -date, -date_time)
+```
+
+
+```{r}
+# Make the sample ID the rownames of the data frame
+chem_ord_12PM<- chem_ord_12PM %>% as.data.frame() 
+rownames(chem_ord_12PM) <- chem_ord_12PM$id_number
+```
+
+
+```{r}
+# only keep the OTU numbers in the matrix and remove the id_number column
+## ID numbers are now rownames. then convert the df in a matrix.
+chem_ord_12PM_mat <- chem_ord_12PM %>%  select(-id_number) %>%  as.matrix()
+
+```
+
+### Calculate distances 
+```{r}
+# metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
+set.seed(2000)
+
+# calcultat the distance matrix with bray-curtis method
+MOBEAST_dist <- vegdist(chem_ord_12PM_mat, method = "bray", na.rm = TRUE)
+
+#calculate the MDS scores such that it converges to a solutions. 
+## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
+nmds <- metaMDS(MOBEAST_dist, trymax = 10000)
+
+# save the NMDS scores in a tibble with the ID numbers. 
+MOBEAST_nmds <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+
+

@@ -265,10 +265,9 @@ carbonate %>%
 ## Combine with DOC data 
 
 ```{r}
-DOC_norm
-```
-```{r}
 carbonate
+
+#write_csv(carbonate, here("data", "carbonate.csv"))
 ```
 
 

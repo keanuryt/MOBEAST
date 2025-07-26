@@ -128,6 +128,8 @@ fDOM_norm <- fdom_long %>% filter(date > as.Date("2024-05-31")) %>% # Removes en
   
 
 head(fDOM_norm, 15)
+
+#write_csv(fDOM_norm, here("data", "fDOM", "fDOM_norm.csv"))
 ```
 
 ## Quick visulitation

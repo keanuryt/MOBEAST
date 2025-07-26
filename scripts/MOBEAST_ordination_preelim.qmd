@@ -537,7 +537,7 @@ MOBEAST_nmds_24h %>%
   #scale_fill_manual(values=treatment_colors) +
   #nunu_theme+
   theme_bw()
-ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))
+#ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
 
