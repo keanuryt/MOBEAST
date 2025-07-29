@@ -9,24 +9,23 @@ knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE)
 ```
 
-## Load Libraries
+# Load Libraries
 ```{r}
 library(tidyverse)
-library(lubridate)
+#library(lubridate)
 library(here)
 library(janitor)
-library(ggrepel)
-library(ghibli)
-library(gt)
+#library(ggrepel)
+#library(ghibli)
+#library(gt)
 library(patchwork)
 library(RColorBrewer)
 library(vegan)
 library(phyloseq)
 library(GUniFrac)
-library(viridis)
 ```
 
-## Data visualization
+# Data visualization
 
 ```{r}
 treatment_colors = c("Inflow"="#00838F",
@@ -49,7 +48,7 @@ nunu_theme <- theme_bw() +
         legend.text=element_text(size=28))
 ```
 
-## Load Data
+# Load Data
 ```{r}
 otu <- read_csv(here("data", "DNA", "MOBEAST_OTU_culled.csv"))
 meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
@@ -57,8 +56,8 @@ tax <- read_csv(here("data","DNA", "MOBEAST_tax_culled.csv"))
 OTU_ord <- read_csv(here("data","OTU_heatmap_ready.csv"))
 ```
 
-## Making a phyloseq object 
-### Transform the dataframes into matrices 
+# Making a phyloseq object 
+## Transform the dataframes into matrices 
 ```{r}
 ## Make an OTU matrix
 otu<- otu %>% mutate(ASV = toupper(ASV))
@@ -102,7 +101,7 @@ meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0")
   
   
 ```
-### Preparing the metadata to annotate the heatmap
+## Preparing the metadata to annotate the heatmap
 
 ```{r}
 # renaming some of treatment so that environmental data have a label: endmember or rain
@@ -118,7 +117,7 @@ meta <- meta %>% mutate(treatment = as.character(treatment)) %>%
   as.data.frame()
 ```
 
-### Transform the data to phyloseq object
+## Transform the data to phyloseq object
 ```{r}
 OTU <- otu_table(otu_mat, taxa_are_rows = TRUE)
 TAX <- tax_table(tax_mat)
@@ -129,7 +128,7 @@ samples <- sample_data(meta_mat)
 phy <- phyloseq(OTU, TAX, samples)
 ```
 
-### Unsure what this is for but relabeling my OTU IDs for ordinations? 
+## Unsure what this is for but relabeling my OTU IDs for ordinations? 
 ```{r}
 tax_concatonate <- data.frame(tax_mat)
 tax_concatonate<- tax_concatonate %>% mutate(OTU = rownames(tax_concatonate)) 
@@ -148,7 +147,7 @@ rownames(otu_w_tax) <- tax_id_df$tax_id
 
 ```
 
-## Ordinations with long format df
+# Ordinations with long format df
 
 ## Using all the samples 
 ```{r}
@@ -263,10 +262,39 @@ MOBEAST_nmds %>%
 ggsave("NMDS_all_location.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
+### Stats on all data 
+
+```{r}
+adonis2(MOBEAST_dist~MOBEAST_nmds$treatment, 
+        # formula to calculate p-value for treatments
+        strata = MOBEAST_nmds$tank_number) # accounts for repreated measures
+
+```
+
+#### Accounting for uneven variation in the data. 
+If the variation is uneven without the groups, adonis may come up with a significant result, although it's not. 
+We can control for that using betdisper() and permutest()
+
+```{r, betadipser}
+bd_all <- betadisper(MOBEAST_dist, MOBEAST_nmds$treatment)
+
+```
+
+```{r}
+anova(bd_all)
+permutest(bd_all)
+bd_all
+```
+
+
+
 ## 12PM samples
 ```{r}
 # make a data frame from the OTU matrix wth OTU numbers in the columns and sample names in rows 
-otu_ord <- OTU %>% t() %>% as.data.frame() 
+otu_ord <- OTU %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  select(-OTU0006) # Removing Nitrincolaceae as it's probably there due to a contamination
 
 # Make the sample ID the rownames of the data frame
 otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
@@ -319,6 +347,7 @@ MOBEAST_nmds_12 %>%
   geom_point(size = 4) +
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = treatment))+
+  #facet_wrap(~date_string)+
   labs(title= "12PM samples, ellipse by treatments")+
   scale_color_manual(values=treatment_colors)+
   scale_fill_manual(values=treatment_colors) +
@@ -363,9 +392,125 @@ MOBEAST_nmds_12 %>%
 ggsave("NMDS_12PM_day_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
+## 12PM Only using the treatment samples 
+
+```{r}
+# make a data frame from the OTU matrix wth OTU numbers in the columns and sample names in rows 
+otu_ord <- OTU %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  select(-OTU0006) # Removing Nitrincolaceae as it's probably there due to a contamination
+
+# Make the sample ID the rownames of the data frame
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
+# only select 12PM samples 
+id_number_12PM <- meta %>% filter(time == "12:00:00") %>%
+  filter(treatment != "Endmember"| treatment != "Rain") %>% 
+  filter(treatment != "Inflow") %>% 
+  pull(id_number)
+
+otu_ord_12PM <- otu_ord %>% filter(id_number %in% id_number_12PM)
+
+
+```
+
+
+```{r}
+# only keep the OTU numbers in the matrix and remove the id_number column
+## ID numbers are now rownames. then convert the df in a matrix.
+otu_ord_mat_12 <- otu_ord_12PM %>%  select(-id_number) %>%  as.matrix()
+
+```
+
+### Calculate distances 
+```{r}
+# metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
+set.seed(2000)
+
+# calcultat the distance matrix with bray-curtis method
+MOBEAST_dist_12 <- vegdist(otu_ord_mat_12, method = "bray")
+
+#calculate the MDS scores such that it converges to a solutions. 
+## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
+nmds <- metaMDS(MOBEAST_dist_12, trymax = 10000)
+
+# save the NMDS scores in a tibble with the ID numbers. 
+MOBEAST_nmds_12 <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+```{r}
+# add the metadata to the NMDS tibble to make plots 
+MOBEAST_nmds_12 <- left_join(MOBEAST_nmds_12, meta)
+```
+
+
+### Plotting NDMS 12PM with treatment only 
+```{r}
+centroid_12 <- MOBEAST_nmds_12 %>% 
+  group_by(treatment) %>% 
+  summarise(NMDS1 = mean(NMDS1),
+            NMDS2 = mean(NMDS2))
+```
+
+```{r, fig.width=16, fig.height= 10}
+# Ellipse by treatments
+MOBEAST_nmds_12 %>%  
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  #stat_ellipse(alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  ggforce::geom_mark_ellipse(aes(color = treatment, fill = treatment), alpha = 0.3,
+                             show.legend = FALSE)+
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  geom_point(data = centroid_12, aes(NMDS1, NMDS2, fill = treatment), 
+             color = "yellow", shape= 23, size = 8, show.legend = FALSE)+
+  #geom_label_repel(aes(label = treatment))+
+  #facet_wrap(~date_string)+
+  labs(title= "12PM treatment samples only, ellipse by treatments, OTU006 removed")+
+  scale_color_manual(values=treatment_colors)+
+  scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("NMDS_12PM_treatments.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+### Stats on treatment only 
+
+```{r}
+adonis2(MOBEAST_dist_12~MOBEAST_nmds_12$treatment, 
+        # formula to calculate p-value for treatments
+        strata = MOBEAST_nmds_12$tank_number) # accounts for repeated measures
+
+```
+
+#### Accounting for uneven variation in the data. 
+If the variation is uneven without the groups, adonis may come up with a significant result, although it's not. 
+We can control for that using betdisper() and permutest()
+
+```{r, betadipser}
+bd_12 <- betadisper(MOBEAST_dist_12, MOBEAST_nmds_12$treatment)
+
+```
+
+```{r}
+anova(bd_12)
+permutest(bd_12)
+bd_12
+```
+
+
 ## June 4 and June 6
 ```{r}
-# only select 12PM samples 
+otu_ord <- OTU %>% 
+  t() %>% 
+  as.data.frame() %>% 
+  select(-OTU0006) # Removing Nitrincolaceae as it's probably there due to a contamination
+
+# Make the sample ID the rownames of the data frame
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
+# only select dates of interest
 id_number_June4_6 <- meta %>% 
   filter(date_string == "2024-06-04"| date_string == "2024-06-06") %>% 
   pull(id_number)
@@ -462,6 +607,13 @@ ggsave("June4_6_treatment_day.png", width = 16, height = 10, path = here("output
 
 ## 24h Samples
 ```{r}
+otu_ord <- OTU %>% 
+  t() %>% 
+  as.data.frame() 
+
+# Make the sample ID the rownames of the data frame
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
 # only select 12PM samples 
 id_number_24h <- meta %>% 
   filter(date_string == "2024-06-02"| date_string == "2024-06-03") %>% 
@@ -504,15 +656,18 @@ MOBEAST_nmds_24h <- left_join(MOBEAST_nmds_24h, meta)
 
 ### Plotting NDMS 24h
 
-```{r, fig.width=10, fig.height= 6}
+```{r, fig.width=16, fig.height= 10}
 # Plo
 MOBEAST_nmds_24h %>%   
+  mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      "00:00:00", "06:00:00"))) %>% 
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
   stat_ellipse(
                alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
   geom_point(size = 4) +
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = date_string))+
+  facet_wrap(~time_string)+
   labs(title= "24h samples, ellipse by treatment")+
   scale_color_manual(values=treatment_colors)+
   scale_fill_manual(values=treatment_colors) +
