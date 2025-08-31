@@ -289,7 +289,7 @@ bd_all
 
 
 ## 12PM samples
-```{r}
+```{}
 # make a data frame from the OTU matrix wth OTU numbers in the columns and sample names in rows 
 otu_ord <- OTU %>% 
   t() %>% 
@@ -305,10 +305,6 @@ id_number_12PM <- meta %>% filter(time == "12:00:00") %>% pull(id_number)
 otu_ord_12PM <- otu_ord %>% filter(id_number %in% id_number_12PM)
 
 
-```
-
-
-```{r}
 # only keep the OTU numbers in the matrix and remove the id_number column
 ## ID numbers are now rownames. then convert the df in a matrix.
 otu_ord_mat_12 <- otu_ord_12PM %>%  select(-id_number) %>%  as.matrix()
@@ -316,7 +312,7 @@ otu_ord_mat_12 <- otu_ord_12PM %>%  select(-id_number) %>%  as.matrix()
 ```
 
 ### Calculate distances 
-```{r}
+```{}
 # metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
 set.seed(2000)
 
@@ -332,14 +328,14 @@ MOBEAST_nmds_12 <- scores(nmds) %>% as_tibble(rownames = "id_number")
   
 ```
 
-```{r}
+```{}
 # add the metadata to the NMDS tibble to make plots 
 MOBEAST_nmds_12 <- left_join(MOBEAST_nmds_12, meta)
 ```
 
 ### Plotting NDMS 12PM
 
-```{r, fig.width=10, fig.height= 6}
+```{, fig.width=10, fig.height= 6}
 # Ellipse by treatments
 MOBEAST_nmds_12 %>%  
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
@@ -356,7 +352,7 @@ MOBEAST_nmds_12 %>%
 #ggsave("NMDS_12PM_treatments.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
-```{r, fig.width=10, fig.height= 6}
+```{, fig.width=10, fig.height= 6}
 # Ellipse by dates
 MOBEAST_nmds_12 %>%  
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment))+
@@ -373,7 +369,7 @@ MOBEAST_nmds_12 %>%
 #ggsave("NMDS_12PM_day.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
-```{r, fig.width=10, fig.height= 6}
+```{, fig.width=10, fig.height= 6}
 # Ellipse by dates
 MOBEAST_nmds_12 %>%  
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment))+
@@ -394,7 +390,7 @@ ggsave("NMDS_12PM_day_treatment.png", width = 16, height = 10, path = here("outp
 
 ## 12PM Only using the treatment samples 
 
-```{r}
+```{}
 # make a data frame from the OTU matrix wth OTU numbers in the columns and sample names in rows 
 otu_ord <- OTU %>% 
   t() %>% 
@@ -416,7 +412,7 @@ otu_ord_12PM <- otu_ord %>% filter(id_number %in% id_number_12PM)
 ```
 
 
-```{r}
+```{}
 # only keep the OTU numbers in the matrix and remove the id_number column
 ## ID numbers are now rownames. then convert the df in a matrix.
 otu_ord_mat_12 <- otu_ord_12PM %>%  select(-id_number) %>%  as.matrix()
@@ -424,7 +420,7 @@ otu_ord_mat_12 <- otu_ord_12PM %>%  select(-id_number) %>%  as.matrix()
 ```
 
 ### Calculate distances 
-```{r}
+```{}
 # metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
 set.seed(2000)
 
@@ -440,21 +436,21 @@ MOBEAST_nmds_12 <- scores(nmds) %>% as_tibble(rownames = "id_number")
   
 ```
 
-```{r}
+```{}
 # add the metadata to the NMDS tibble to make plots 
 MOBEAST_nmds_12 <- left_join(MOBEAST_nmds_12, meta)
 ```
 
 
 ### Plotting NDMS 12PM with treatment only 
-```{r}
+```{}
 centroid_12 <- MOBEAST_nmds_12 %>% 
   group_by(treatment) %>% 
   summarise(NMDS1 = mean(NMDS1),
             NMDS2 = mean(NMDS2))
 ```
 
-```{r, fig.width=16, fig.height= 10}
+```{, fig.width=16, fig.height= 10}
 # Ellipse by treatments
 MOBEAST_nmds_12 %>%  
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
@@ -477,7 +473,7 @@ MOBEAST_nmds_12 %>%
 
 ### Stats on treatment only 
 
-```{r}
+```{}
 adonis2(MOBEAST_dist_12~MOBEAST_nmds_12$treatment, 
         # formula to calculate p-value for treatments
         strata = MOBEAST_nmds_12$tank_number) # accounts for repeated measures
@@ -488,12 +484,9 @@ adonis2(MOBEAST_dist_12~MOBEAST_nmds_12$treatment,
 If the variation is uneven without the groups, adonis may come up with a significant result, although it's not. 
 We can control for that using betdisper() and permutest()
 
-```{r, betadipser}
+```{, betadipser}
 bd_12 <- betadisper(MOBEAST_dist_12, MOBEAST_nmds_12$treatment)
 
-```
-
-```{r}
 anova(bd_12)
 permutest(bd_12)
 bd_12
@@ -501,7 +494,7 @@ bd_12
 
 
 ## June 4 and June 6
-```{r}
+```{}
 otu_ord <- OTU %>% 
   t() %>% 
   as.data.frame() %>% 
@@ -517,11 +510,6 @@ id_number_June4_6 <- meta %>%
 
 otu_ord_June4_6 <- otu_ord %>% filter(id_number %in% id_number_June4_6)
 
-
-```
-
-
-```{r}
 # only keep the OTU numbers in the matrix and remove the id_number column
 ## ID numbers are now rownames. then convert the df in a matrix.
 otu_ord_mat_June4_6 <- otu_ord_June4_6 %>%  select(-id_number) %>%  as.matrix()
@@ -529,7 +517,7 @@ otu_ord_mat_June4_6 <- otu_ord_June4_6 %>%  select(-id_number) %>%  as.matrix()
 ```
 
 ### Calculate distances 
-```{r}
+```{}
 # metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
 set.seed(2000)
 
@@ -545,14 +533,14 @@ MOBEAST_nmds_June4_6 <- scores(nmds) %>% as_tibble(rownames = "id_number")
   
 ```
 
-```{r}
+```{}
 # add the metadata to the NMDS tibble to make plots 
 MOBEAST_nmds_June4_6 <- left_join(MOBEAST_nmds_June4_6, meta)
 ```
 
-### Plotting NDMS 12PM
+### Plotting NDMS June 4 and 6
 
-```{r, fig.width=10, fig.height= 6}
+```{, fig.width=10, fig.height= 6}
 # raw NMDS plot with all the samples
 MOBEAST_nmds_June4_6 %>%  
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
@@ -569,7 +557,7 @@ MOBEAST_nmds_June4_6 %>%
 #ggsave("June4_6.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
-```{r, fig.width=10, fig.height= 6}
+```{, fig.width=10, fig.height= 6}
 # raw NMDS plot with all the samples
 MOBEAST_nmds_June4_6 %>%  
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
@@ -586,7 +574,7 @@ MOBEAST_nmds_June4_6 %>%
 #ggsave("June4_6_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
-```{r, fig.width=10, fig.height= 6}
+```{, fig.width=10, fig.height= 6}
 # raw NMDS plot with all the samples
 MOBEAST_nmds_June4_6 %>%  
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
@@ -656,8 +644,8 @@ MOBEAST_nmds_24h <- left_join(MOBEAST_nmds_24h, meta)
 
 ### Plotting NDMS 24h
 
-```{r, fig.width=16, fig.height= 10}
-# Plo
+```{r, fig.width=10, fig.height= 16}
+# Plot
 MOBEAST_nmds_24h %>%   
   mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
                                                       "00:00:00", "06:00:00"))) %>% 
@@ -667,7 +655,7 @@ MOBEAST_nmds_24h %>%
   geom_point(size = 4) +
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = date_string))+
-  facet_wrap(~time_string)+
+  facet_wrap(~time_string, ncol = 1)+
   labs(title= "24h samples, ellipse by treatment")+
   scale_color_manual(values=treatment_colors)+
   scale_fill_manual(values=treatment_colors) +
