@@ -144,48 +144,17 @@ treatment_colors = c(
 
 ```
 
-## Creating metadata file
-```{}
-meta <- read_csv(here("data", "MOBEAST_metadata.csv"))
-meta <-meta %>% clean_names()
-table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
-
-table_id <- clean_names(table_id)
-
-table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
-  mutate(tank_number = paste0("T", tank_number)) %>% 
-  mutate(inflow_table = paste("Table", inflow_table))
-
-inflow_id <- tibble(tank_number = c("F1", "F2"),
-       inflow_table = c("Table 1", "Table 2"))
-table_id <- rbind(table_id, inflow_id)
-
-meta <- left_join(meta, table_id)
-
-meta %>% relocate(inflow_table, .before = tank_number)
-
-treat_code <- tibble(
-  treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
-  full_name = c("Algae", "Coral", "Control", "CCA", "Inflow", "Endmember", "Rain")
-)
-treat_code
-
-meta<- left_join(meta, treat_code)
-
-meta <- meta %>% relocate(full_name, .before = treatment) %>% 
-  select(-treatment) %>% 
-  rename(treatment = full_name) %>% 
-  filter(id_number != is.na(id_number),
-         id_number == ifelse(str_detect(meta$id_number,"[ABC]"), id_number, "NA")) 
-#write_csv(meta, here("data","MOBEAST_metadata_V2.csv"))
-```
 
 ## Load Data 
 ```{r}
 OTU <- read_csv(here("data", "DNA","MOBEAST_OTU_culled.csv"))
-meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
+meta <- read_csv(here("data","MOBEAST_metadata_heatmaps.csv"))
 tax <- read_csv(here("data","DNA", "MOBEAST_tax_culled.csv"))
 OTU_long <- read_csv(here("data","MOBEAST_DNA_long.csv"))
+
+# Note: DO NOT DELETE METADATA_HEATMAP.CSV !
+# Somehow if we use a clean-up version of the metadata, 
+# heatmap annotations don't work!
 
 ```
 
@@ -296,6 +265,8 @@ inflow_table <- meta[match(colnames(zscore.data.otu.matrix),
 date_time <- meta[match(colnames(zscore.data.otu.matrix),
                            meta$id_number),
                   "date_time_string"]
+
+
 ```
 
 ```{r}
@@ -608,7 +579,7 @@ ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "wh
         row_names_gp = gpar(fontsize = 10),
         column_names_gp = gpar(fontsize = 10),
         row_km = 10, #number of forced segregation in rows 
-        column_km = 6,#number of forced segregation in columns 
+        column_km = 4,#number of forced segregation in columns 
         top_annotation = ha
         )
 
@@ -627,9 +598,6 @@ draw(ht)
 OTU_htm_24h <- OTU_htm %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) 
 OTU_htm_24h <- OTU_htm_24h %>% filter(family != "Bradymonadales_fa")
-```
-```{r}
-OTU_htm_24h %>% select(id_number, date) %>% distinct()
 ```
 
 
@@ -808,7 +776,6 @@ analyte_clust_df = data.frame(id_number = names(analyte_clusts), cluster = analy
 
 ```{r, fig.width= 16, fig.height= 4}
 par(mfrow = c(2,1))
-plot(row_dend)
 plot(col_dend)
 ```
 
@@ -1002,188 +969,4 @@ draw(ht)
 #dev.off()
 
 ```
-
-### Preparing the OTU matrix for heatmap
-
-```{r}
-OTU_htm_24h <- OTU_htm %>% 
-  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) 
-OTU_htm_24h <- OTU_htm_24h %>% filter(family != "Bradymonadales_fa")
-```
-
-
-```{r, echo=TRUE, collapse=TRUE}
-#Make a heatmap of z-scored relative abundance data after it was summed by family
-#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
-
-# some the abundance of bacteria by family
-family.culled.long.table <- OTU_htm_24h %>%
-  group_by(id_number, family) %>%
-  summarize(abund = sum(abund, na.rm = TRUE))
-
-# Make wide format table to make a matrix later
-family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family, values_from = abund)
-
-# Remove ID number from the data frame
-## Z-score function only works on df that has a matrix format
-culled.abund.OTU <- family.culled.abund %>% ungroup() %>% tibble() %>%  select(-id_number)
-
-# Calculate Z-score on df/matrix
-z.zscore.data.otu.subset <- as.data.frame(apply(culled.abund.OTU, 2, FUN=zscore.calculation))
-
-# bring back the sample ID number in the df 
-z.zscore.data.otu.subset$id_number = family.culled.abund$id_number
-
-
-# Set the ID numbers as the rownames (to make a matrix)
-rownames(z.zscore.data.otu.subset) = z.zscore.data.otu.subset$id_number
-
-# Remove the ID number column, convert the df to a matrix and transpose to make the final matrix.
-zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>% 
-  as.matrix() %>% t()
-```
-
-### Generate Heatmap
-#### Annotation
-```{r}
-## Create a vector that will have information of a variable and its associate sample 
-treatment <- meta[match(colnames(zscore.data.otu.matrix),
-                           meta$id_number), 
-                 "treatment"]
-
-date_time <- meta[match(colnames(zscore.data.otu.matrix),
-                           meta$id_number),
-                  "date_time_string"]
-```
-
-```{r}
-## 12PM Samples
-ha = HeatmapAnnotation(
-  treatment = treatment,
-  date_time = date_time,
-  col = list(treatment = c("Inflow"="#00838F","Control"="grey", "Coral"="#03A9F4", 
-                           "CCA"="#EF5350", "Algae"="#4CAF50","Endmember" = "black", "Rain"= "yellow"),
-             date_time = c("2024-06-02 12:00:00" = "red",
-                           "2024-06-02 18:00:00" = "yellow", 
-                           "2024-06-03 00:00:00" = "green",
-                           "2024-06-03 06:00:00" = "blue"
-                           ))
-)
-
-
-```
-
-#### Printing heatmap
-```{r, fig.height = 10, fig.width = 16}
-#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
-
-ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "white", lwd = 0.1),
-        column_title = "id_number", column_title_side = "bottom",
-        row_title = "family",
-        row_names_gp = gpar(fontsize = 10),
-        column_names_gp = gpar(fontsize = 10),
-        row_km = 10, #number of forced segregation in rows 
-        column_km = 6,#number of forced segregation in columns 
-        top_annotation = ha
-        )
-
-draw(ht)
-
-#dev.off()
-
-```
-
-### Preparing the OTU matrix for heatmap
-
-```{r}
-OTU_htm_24h <- OTU_htm %>% 
-  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) 
-OTU_htm_24h <- OTU_htm_24h %>% filter(family != "Bradymonadales_fa")
-```
-
-
-```{r, echo=TRUE, collapse=TRUE}
-#Make a heatmap of z-scored relative abundance data after it was summed by family
-#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
-
-# some the abundance of bacteria by family
-family.culled.long.table <- OTU_htm_24h %>%
-  group_by(id_number, family) %>%
-  summarize(abund = sum(abund, na.rm = TRUE))
-
-# Make wide format table to make a matrix later
-family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family, values_from = abund)
-
-# Remove ID number from the data frame
-## Z-score function only works on df that has a matrix format
-culled.abund.OTU <- family.culled.abund %>% ungroup() %>% tibble() %>%  select(-id_number)
-
-# Calculate Z-score on df/matrix
-z.zscore.data.otu.subset <- as.data.frame(apply(culled.abund.OTU, 2, FUN=zscore.calculation))
-
-# bring back the sample ID number in the df 
-z.zscore.data.otu.subset$id_number = family.culled.abund$id_number
-
-
-# Set the ID numbers as the rownames (to make a matrix)
-rownames(z.zscore.data.otu.subset) = z.zscore.data.otu.subset$id_number
-
-# Remove the ID number column, convert the df to a matrix and transpose to make the final matrix.
-zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>% 
-  as.matrix() %>% t()
-```
-
-### Generate Heatmap
-#### Annotation
-```{r}
-## Create a vector that will have information of a variable and its associate sample 
-treatment <- meta[match(colnames(zscore.data.otu.matrix),
-                           meta$id_number), 
-                 "treatment"]
-
-date_time <- meta[match(colnames(zscore.data.otu.matrix),
-                           meta$id_number),
-                  "date_time_string"]
-```
-
-```{r}
-## 12PM Samples
-ha = HeatmapAnnotation(
-  treatment = treatment,
-  date_time = date_time,
-  col = list(treatment = c("Inflow"="#00838F","Control"="grey", "Coral"="#03A9F4", 
-                           "CCA"="#EF5350", "Algae"="#4CAF50","Endmember" = "black", "Rain"= "yellow"),
-             date_time = c("2024-06-02 12:00:00" = "red",
-                           "2024-06-02 18:00:00" = "yellow", 
-                           "2024-06-03 00:00:00" = "green",
-                           "2024-06-03 06:00:00" = "blue"
-                           ))
-)
-
-
-```
-
-#### Printing heatmap
-```{r, fig.height = 10, fig.width = 16}
-#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
-
-ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "white", lwd = 0.1),
-        column_title = "id_number", column_title_side = "bottom",
-        row_title = "family",
-        row_names_gp = gpar(fontsize = 10),
-        column_names_gp = gpar(fontsize = 10),
-        row_km = 10, #number of forced segregation in rows 
-        column_km = 6,#number of forced segregation in columns 
-        top_annotation = ha
-        )
-
-draw(ht)
-
-#dev.off()
-
-```
-
-
-## Craig comments 
-
 

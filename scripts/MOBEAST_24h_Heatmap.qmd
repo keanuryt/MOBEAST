@@ -1,0 +1,522 @@
+---
+title: "MOBEAST - 24h Heatmap"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(ComplexHeatmap)
+library(data.table)
+library(dendextend)
+
+# Rayna library
+library(dendsort)
+library(ggsci)
+library(randomForest)
+library(vegan)
+library(ape)
+library(devtools)
+library(ggpubr)
+library(viridis)
+library(colorspace)
+library(readr)
+library(circlize)
+
+```
+
+Heatmap info and tutorial: https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html
+
+## Functions
+
+```{r}
+source(here("scripts", "reference_scripts", "heatmap_zscore_function.R"))
+```
+
+## Data visualization theme
+
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+### Color palette
+
+```{r}
+treatment_colors = c(
+  #Treatments
+  "Control" = "grey",
+  "Coral" = "#03A9F4",
+  "CCA" = "#EF5350",
+  "Algae" = "#4CAF50"
+)
+
+```
+
+## Load Data
+
+```{r}
+#OTU <- read_csv(here("data", "DNA","MOBEAST_OTU_culled.csv"))
+meta <- read_csv(here("data","MOBEAST_metadata_heatmaps.csv"))
+#tax <- read_csv(here("data","DNA", "MOBEAST_tax_culled.csv"))
+OTU_long <- read_csv(here("data","MOBEAST_DNA_long.csv"))
+
+# Note: DO NOT DELETE METADATA_HEATMAP.CSV !
+# Somehow if we use a clean-up version of the metadata, 
+# heatmap annotations don't work!
+
+```
+
+## Data Clean Up
+Reformating the date, time and date-time in the metadata file 
+```{r, meta data clean up}
+meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
+               time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
+  # "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters
+  # "\\1:\\2", group1 + ":" + group2
+  mutate(time = paste0(time, ":00"),
+               date_time = paste(date, time),
+               date = mdy(date), 
+               date_time = mdy_hms(date_time),
+               time = factor(time))
+  
+  
+```
+### Preparing the metadata to annotate the heatmap
+
+```{r}
+# renaming some of treatment so that environmental data have a label: endmember or rain
+# Same for inflow table, environmental samples now have a label
+## Convert tibble to df for later
+meta <- meta %>% mutate(treatment = as.character(treatment)) %>% 
+  mutate(treatment = ifelse(id_number == "MOBEAST115", "Rain", 
+                            ifelse(is.na(treatment), "Endmember", treatment))) %>% 
+  mutate(inflow_table = ifelse(is.na(inflow_table), "Environmental data", inflow_table)) %>% 
+  mutate(date_string = as.character(date),
+                time_string = as.character(time),
+                date_time_string = paste(date_string, time_string)) %>% 
+  as.data.frame()
+```
+
+Clean up the long format data to make it easier to merge with the meta data file
+
+```{r}
+OTU_long<- OTU_long %>% clean_names() %>% 
+  mutate(id_number = sample_id) %>% 
+  relocate(id_number, .before= otu_number) %>% 
+  select(-sample_id, -date, -treatment, -time)
+```
+
+Fusion!
+
+```{r}
+OTU_htm <- left_join(OTU_long, meta)
+#write_csv(OTU_htm, "OTU_heatmap_ready.csv", path = here("data", "OTU_heatmap_ready.csv"))
+```
+
+## 24h Z-Scored Heatmap
+
+### Preparing the OTU matrix for heatmap
+
+```{r}
+OTU_htm_24h <- OTU_htm %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) 
+OTU_htm_24h <- OTU_htm_24h %>% filter(family != "Bradymonadales_fa")
+```
+
+```{r, echo=TRUE, collapse=TRUE}
+#Make a heatmap of z-scored relative abundance data after it was summed by family
+#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
+
+# some the abundance of bacteria by family
+family.culled.long.table <- OTU_htm_24h %>%
+  group_by(id_number, family) %>%
+  summarize(abund = sum(abund, na.rm = TRUE))
+
+# Make wide format table to make a matrix later
+family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family, values_from = abund)
+
+# Remove ID number from the data frame
+## Z-score function only works on df that has a matrix format
+culled.abund.OTU <- family.culled.abund %>% ungroup() %>% tibble() %>%  select(-id_number)
+
+# Calculate Z-score on df/matrix
+z.zscore.data.otu.subset <- as.data.frame(apply(culled.abund.OTU, 2, FUN=zscore.calculation))
+
+# bring back the sample ID number in the df 
+z.zscore.data.otu.subset$id_number = family.culled.abund$id_number
+
+
+# Set the ID numbers as the rownames (to make a matrix)
+rownames(z.zscore.data.otu.subset) = z.zscore.data.otu.subset$id_number
+
+# Remove the ID number column, convert the df to a matrix and transpose to make the final matrix.
+zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>% 
+  as.matrix() %>% t()
+```
+
+### Generate Heatmap
+
+#### Annotation
+
+```{r}
+## Create a vector that will have information of a variable and its associate sample 
+treatment <- meta[match(colnames(zscore.data.otu.matrix),
+                           meta$id_number), 
+                 "treatment"]
+
+date_time <- meta[match(colnames(zscore.data.otu.matrix),
+                           meta$id_number),
+                  "date_time_string"]
+
+```
+
+```{r}
+## 12PM Samples
+ha = HeatmapAnnotation(
+  treatment = treatment,
+  date_time = date_time,
+  col = list(treatment = c("Inflow"="#00838F","Control"="grey", "Coral"="#03A9F4", 
+                           "CCA"="#EF5350", "Algae"="#4CAF50",
+                           "Endmember" = "black", "Rain"= "yellow"),
+             date_time = c("2024-06-02 12:00:00" = "red",
+                           "2024-06-02 18:00:00" = "yellow", 
+                           "2024-06-03 00:00:00" = "green",
+                           "2024-06-03 06:00:00" = "blue"
+                           ))
+)
+
+
+```
+
+#### Printing heatmap
+
+```{r, fig.height = 10, fig.width = 16}
+#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
+
+ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", 
+             #rect_gp = gpar(col = "white", lwd = 0.1),
+        
+        column_title = "24h Sampling - All samples", 
+        column_title_gp = gpar(fontsize = 16, fontface = "bold"),
+        #column_title_side = "bottom",
+        row_title = "Family",
+        row_names_gp = gpar(fontsize = 10),
+        column_names_gp = gpar(fontsize = 10),
+        row_km = 8, #number of forced segregation in rows 
+        column_km = 4,#number of forced segregation in columns 
+        top_annotation = ha
+        )
+set.seed(1999)
+ht_drawn <- draw(ht)
+
+#dev.off()
+
+```
+
+### Cluster membership
+
+```{r}
+col_orders<- column_order(ht_drawn)
+
+cluster_df <- data.frame(
+  id_number = unlist(col_orders),
+  cluster  = rep(seq_along(col_orders), lengths(col_orders))
+)
+
+rownames(cluster_df)<- NULL
+
+```
+
+```{r}
+cluster_df<- cluster_df %>% 
+  mutate(id_number = ifelse(id_number<10,
+                            paste0("MOBEAST00",id_number), 
+                            paste0("MOBEAST0",id_number)))
+#write_csv(cluster_df, here("data", "DNA", "24h_clusters.csv"))
+```
+```{r}
+OTU_htm_24h %>% left_join(cluster_df) %>% 
+  select(-kingdom, -class, -order, -genus, -long_name, -date_time, -date, -time) %>% 
+  select(id_number, tank_number, treatment, date_time_string,cluster) %>% 
+  distinct() %>% 
+  arrange(cluster) %>% 
+  mutate(cluster = factor(cluster, levels = c("1", "2", "3", "4"))) %>% 
+  group_by(cluster, treatment) %>% 
+  gt() %>% 
+  cols_label(id_number = "ID Number",
+             tank_number = "Tank Number", 
+             date_time_string = " Date-Time") #%>% 
+  rgtsave("24H_cluster_table.png")
+```
+
+
+
+
+
+### Cluster membership - code by Sean
+
+Not useful for cluster membership but to see the dendrograms, it's useful!
+```{r}
+# choose a distance metric
+# note: you could use vegdist to do something like Bray curtis distances instead
+# by default Heatmap uses 'euclidean' distances
+our_dist_method = "euclidean"
+
+# choose a method for clustering
+# note: by default Heatmap uses 'complete' clustering
+#our_clust_method = "ward.D"
+our_clust_method = "complete"
+
+# cluster rows and columns
+# note: dist generates a distance matrix and hclust does the clustering
+row_dend = as.dendrogram(hclust(dist(zscore.data.otu.matrix, 
+                                     method = our_dist_method),
+                                method = our_clust_method))
+
+col_dend = as.dendrogram(hclust(dist(t(zscore.data.otu.matrix), 
+                                     method = our_dist_method),
+                                method = our_clust_method))
+
+# pick an appropriate number of groups for splitting rows and columns
+row_k = 8
+col_k = 4
+
+# split into clusters
+#note: sample clusts and analyte clusts will tell you which cluster each sample/analyte is in!
+sample_clusts = cutree(row_dend,
+                       row_k,
+                       order_clusters_as_data = F)
+
+analyte_clusts = cutree(col_dend,
+                        col_k,
+                        order_clusters_as_data = Fplot(analyte_clusts))
+
+plot(col_dend)
+
+# store sample clusters as a dataframe which can be merged with your other sample metadata
+#analyte_clust_df = data.frame(id_number = names(analyte_clusts), cluster = analyte_clusts)
+
+```
+
+
+
+## 24h separated maps
+
+### Preparing the OTU matrix for heatmap
+
+```{r}
+OTU_htm_24_12 <- OTU_htm %>% 
+  filter(date == ymd("2024-06-02") & time_string == "12:00:00") %>% 
+  filter(family != "Bradymonadales_fa")
+
+OTU_htm_24_18 <- OTU_htm %>% 
+  filter(time_string == "18:00:00") %>% 
+  filter(family != "Bradymonadales_fa")
+
+OTU_htm_24_00 <- OTU_htm %>% 
+  filter(time_string == "00:00:00") %>% 
+  filter(family != "Bradymonadales_fa")
+
+OTU_htm_24_06 <- OTU_htm %>% 
+  filter(time_string == "06:00:00") %>% 
+  filter(family != "Bradymonadales_fa")
+
+```
+
+### 24h - 12:00 map
+
+```{r, echo=TRUE, collapse=TRUE}
+#Make a heatmap of z-scored relative abundance data after it was summed by family
+#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
+
+# some the abundance of bacteria by family
+family.culled.long.table <- OTU_htm_24_12 %>%
+  group_by(id_number, family) %>%
+  summarize(abund = sum(abund, na.rm = TRUE))
+
+# Make wide format table to make a matrix later
+family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family, values_from = abund)
+
+# Remove ID number from the data frame
+## Z-score function only works on df that has a matrix format
+culled.abund.OTU <- family.culled.abund %>% ungroup() %>% tibble() %>%  select(-id_number)
+
+# Calculate Z-score on df/matrix
+z.zscore.data.otu.subset <- as.data.frame(apply(culled.abund.OTU, 2, FUN=zscore.calculation))
+
+# bring back the sample ID number in the df 
+z.zscore.data.otu.subset$id_number = family.culled.abund$id_number
+
+
+# Set the ID numbers as the rownames (to make a matrix)
+rownames(z.zscore.data.otu.subset) = z.zscore.data.otu.subset$id_number
+
+# Remove the ID number column, convert the df to a matrix and transpose to make the final matrix.
+zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>% 
+  as.matrix() %>% t()
+```
+
+### Generate Heatmap
+
+#### Annotation
+
+```{r}
+## Create a vector that will have information of a variable and its associate sample 
+treatment <- meta[match(colnames(zscore.data.otu.matrix),
+                           meta$id_number), 
+                 "treatment"]
+
+#date_time <- meta[match(colnames(zscore.data.otu.matrix),
+                  #         meta$id_number),
+                 # "date_time_string"]
+```
+
+```{r}
+## 12PM Samples
+ha = HeatmapAnnotation(
+  treatment = treatment,
+  #date_time = date_time,
+  col = list(treatment = c("Inflow"="#00838F","Control"="grey", "Coral"="#03A9F4", 
+                           "CCA"="#EF5350", "Algae"="#4CAF50","Endmember" = "black", "Rain"= "yellow"),
+             date_time = c("2024-06-02 12:00:00" = "red"#,
+                           #"2024-06-02 18:00:00" = "yellow", 
+                           #"2024-06-03 00:00:00" = "green",
+                           #"2024-06-03 06:00:00" = "blue"
+                           ))
+)
+
+
+```
+
+#### Printing heatmap
+
+```{r, fig.height = 10, fig.width = 16}
+#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
+
+ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "white", lwd = 0.1),
+        column_title = "id_number", column_title_side = "bottom",
+        row_title = "family",
+        row_names_gp = gpar(fontsize = 10),
+        column_names_gp = gpar(fontsize = 10),
+        row_km = 10, #number of forced segregation in rows 
+        column_km = 4,#number of forced segregation in columns 
+        top_annotation = ha
+        )
+
+draw(ht)
+
+#dev.off()
+
+```
+
+### 24h - 06:00 map
+
+```{r, echo=TRUE, collapse=TRUE}
+#Make a heatmap of z-scored relative abundance data after it was summed by family
+#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
+
+# some the abundance of bacteria by family
+family.culled.long.table <- OTU_htm_24_06 %>%
+  group_by(id_number, family) %>%
+  summarize(abund = sum(abund, na.rm = TRUE))
+
+# Make wide format table to make a matrix later
+family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family, values_from = abund)
+
+# Remove ID number from the data frame
+## Z-score function only works on df that has a matrix format
+culled.abund.OTU <- family.culled.abund %>% ungroup() %>% tibble() %>%  select(-id_number)
+
+# Calculate Z-score on df/matrix
+z.zscore.data.otu.subset <- as.data.frame(apply(culled.abund.OTU, 2, FUN=zscore.calculation))
+
+# bring back the sample ID number in the df 
+z.zscore.data.otu.subset$id_number = family.culled.abund$id_number
+
+
+# Set the ID numbers as the rownames (to make a matrix)
+rownames(z.zscore.data.otu.subset) = z.zscore.data.otu.subset$id_number
+
+# Remove the ID number column, convert the df to a matrix and transpose to make the final matrix.
+zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% 
+  select(-id_number, - Moraxellaceae, -Idiomarinaceae ) %>% # removing NaN columns
+  as.matrix() %>% t()
+```
+
+### Generate Heatmap
+
+#### Annotation
+
+```{r}
+## Create a vector that will have information of a variable and its associate sample 
+treatment <- meta[match(colnames(zscore.data.otu.matrix),
+                           meta$id_number), 
+                 "treatment"]
+
+#date_time <- meta[match(colnames(zscore.data.otu.matrix),
+                  #         meta$id_number),
+                  #"date_time_string"]
+```
+
+```{r}
+## 12PM Samples
+ha = HeatmapAnnotation(
+  treatment = treatment,
+  #date_time = date_time,
+  col = list(treatment = c("Inflow"="#00838F","Control"="grey", "Coral"="#03A9F4", 
+                           "CCA"="#EF5350", "Algae"="#4CAF50","Endmember" = "black", "Rain"= "yellow"),
+             date_time = c(#"2024-06-02 12:00:00" = "red",
+                           #"2024-06-02 18:00:00" = "yellow", 
+                           #"2024-06-03 00:00:00" = "green",
+                           "2024-06-03 06:00:00" = "blue"
+                           ))
+)
+
+
+```
+
+#### Printing heatmap
+
+```{r, fig.height = 10, fig.width = 16}
+#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
+
+ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "white", lwd = 0.1),
+        column_title = "id_number", column_title_side = "bottom",
+        row_title = "family",
+        row_names_gp = gpar(fontsize = 10),
+        column_names_gp = gpar(fontsize = 10),
+        row_km = 10, #number of forced segregation in rows 
+        column_km = 6,#number of forced segregation in columns 
+        top_annotation = ha
+        )
+
+draw(ht)
+
+#dev.off()
+
+```
