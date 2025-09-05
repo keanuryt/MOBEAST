@@ -61,7 +61,7 @@ cluster <- read_csv(here("data","DNA", "24h_clusters.csv"))
 
 # Data Clean Up
 
-```{r, meta data clean up}
+```{, meta data clean up}
 meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
                time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
   # "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters
@@ -77,7 +77,7 @@ meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0")
 
 ## Preparing the metadata to annotate the heatmap
 
-```{r}
+```{}
 # renaming some of treatment so that environmental data have a label: endmember or rain
 # Same for inflow table, environmental samples now have a label
 ## Convert tibble to df for later
@@ -250,7 +250,7 @@ adonis2(MOBEAST_dist_12~MOBEAST_nmds_12$treatment,
 
 If the variation is uneven without the groups, adonis may come up with a significant result, although it's not. We can control for that using betdisper() and permutest()
 
-```{r}
+```{}
 # beta dispertion
 bd_12 <- betadisper(MOBEAST_dist_12, MOBEAST_nmds_12$treatment)
 

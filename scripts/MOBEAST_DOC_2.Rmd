@@ -59,6 +59,16 @@ nunu_theme <- theme_bw() +
         legend.text=element_text(size=28))
 ```
 
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
 ## Data Clean Up
 
 ```{r}
@@ -178,11 +188,6 @@ ggplot(DOC_verif, aes(x= tank_number, npoc_u_m, fill = treatment)) +
   theme(legend.position = "none",
         axis.text.x = element_text(angle= 0, hjust= 0.5))
 ```
-
-
-
-
-
 
 
 -->

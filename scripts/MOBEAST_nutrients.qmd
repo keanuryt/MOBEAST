@@ -1,0 +1,289 @@
+---
+author: 'Keanu Rochette '
+created: '18 April 2025'
+updated: '`r format(Sys.Date())`'
+title: "MOBEAST - Nutrients"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+#library(GGally)
+library(emmeans)
+library(performance)
+library(multcompView)
+
+```
+
+
+## Load Data 
+```{r}
+nutrients <- read_delim(here("data", "Nutrients", "MOBEAST_nutrients.csv"))
+meta <- read_csv(here("data", "MOBEAST_metadata_V2.csv"))
+```
+
+## Data visualization theme
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=32, face = "bold"), 
+        plot.subtitle = element_text(size=30),
+        axis.title = element_text(size = 28, face = "bold"),
+        axis.text = element_text(size = 28),
+        strip.text.x = element_text(size = 28, face = "bold"),
+        legend.title=element_text(size=28, face = "bold"),
+        legend.text=element_text(size=28))
+```
+
+
+## Data Clean Up
+
+```{r}
+# nutrients are in umol/L 
+nutrients<- nutrients %>% clean_names() %>% 
+  rename(N_N = no3_no2_umol_l,
+         NO2 = no2_umol_l,
+         PO4 = po4_umol_l,
+         SiO2 = si_o2_umol_l,
+         NH3 = nh3_umol_l) %>% 
+  mutate(across(N_N:NH3, ~ str_remove_all(.x, "[<>]"))) %>% 
+  mutate(across(N_N:NH3, ~ as.numeric(.x))) %>% 
+  mutate(NO3 = N_N - NO2)
+```
+
+```{r}
+nutrients <- meta %>% left_join(nutrients) %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow", "Endmember")))
+```
+
+```{r}
+nutrients %>% 
+  filter(treatment == "Inflow") %>%
+  mutate(time_string = as.character(time_string),
+         date_string = as.character(date_string)) %>% 
+  pivot_longer(cols = N_N:NO3,
+               names_to = "nutrient",
+               values_to = "conc") %>% 
+  #mutate(inflow_color = ifelse(treatment == "Inflow", "Inflow", "Treatment")) %>% 
+  ggplot(aes(x= tank_number, y = conc, fill = tank_number))+
+  geom_boxplot()+
+  geom_jitter()+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(time_string~date_string)+
+  nunu_theme
+  
+  
+```
+
+```{r}
+nutrients %>% 
+  filter(treatment != "Endmember") %>%
+  mutate(time_string = as.character(time_string),
+         date_string = as.character(date_string),
+         date_time_string = as.character(date_time_string)) %>% 
+  select(-run_number) %>% 
+  pivot_longer(cols = N_N:NO3,
+               names_to = "nutrient",
+               values_to = "conc") %>% 
+  #mutate(inflow_color = ifelse(treatment == "Inflow", "Inflow", "Treatment")) %>% 
+  #filter(conc <5) %>% 
+  #filter(time_string == "06:00:00")%>% 
+  ggplot(aes(x= treatment, y = conc, fill =treatment))+
+  geom_violin()+
+  geom_jitter()+
+  stat_summary(color = "yellow", alpha =0.5)+
+  labs(title = "Nutrient Concentration by Treatment",
+       subtitle = "Trying to identify values that look off",
+       x = "Treatment", 
+       y = "Concentration (umol/L)")+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_wrap(~nutrient)+
+  nunu_theme+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA","Algae", "Inflow"), values=c("grey", "#03A9F4", "#EF5350", "#4CAF50","#00838F"))+
+  theme(legend.position = "none") 
+
+
+```
+
+```{r}
+## Table of high concentration nutrient, maybe should be remeasured
+nutrients %>% 
+  filter(treatment != "Endmember") %>%
+  mutate(time_string = as.character(time_string),
+         date_string = as.character(date_string),
+         date_time_string = as.character(date_time_string)) %>% 
+  select(-run_number) %>% 
+  pivot_longer(cols = N_N:NO3,
+               names_to = "nutrient",
+               values_to = "conc") %>% 
+  filter(conc > 5) %>% 
+  select(-time_string,-date_string, -date_time_string, -date, -time, - inflow_table,
+         -tank_number) %>% 
+  gt() %>% 
+  cols_label(id_number = "ID Number",
+             long_name = "Long Name", 
+             treatment = "Treatment",
+             date_time = "Date Time",
+             nutrient = "Nutrient",
+             conc = "Concentration umol/L") #%>% 
+  #gtsave("nutrient_outliers.png")
+         
+```
+
+
+```{r}
+## Normalization of the data to the inflow 
+nutrients_norm <- nutrients %>% 
+  filter(treatment != "Endmember") %>%
+  mutate(time_string = as.character(time_string),
+         date_string = as.character(date_string),
+         date_time_string = as.character(date_time_string)) %>% 
+  select(-run_number) %>% 
+  pivot_longer(cols = N_N:NO3,
+               names_to = "nutrient",
+               values_to = "conc") %>% 
+  
+  # Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table, nutrient) %>%
+  mutate(inflow= conc[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # get the other table's value for that date
+  group_by(date_time) %>% 
+  mutate(inflow = ifelse(is.na(inflow),
+      inflow[!is.na(inflow)][1],  
+      inflow)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = conc - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+  
+
+#write_csv(DOC_norm, here("data", "DOC", "DOC_norm.csv"))
+```
+
+
+## 12PM Nutrient analysis 
+```{r}
+## removing outliers from the data set
+nutrient_12PM <- nutrients_norm %>%
+  filter(time_string == "12:00:00") %>% 
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment, nutrient) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(conc_norm, probs = 0.25, na.rm = T),
+         quant3 = quantile(conc_norm, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( conc_norm > quant3 + (IQR*1.5) | conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") 
+
+
+
+```
+
+```{r}
+nutrient_12PM %>% 
+  filter(treatment != "Inflow") %>% 
+  ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+  geom_violin()+
+  geom_point()+
+  geom_hline(yintercept=0, linetype='dashed')+
+  stat_summary(color = "yellow", alpha =0.5)+
+  facet_wrap(~nutrient, scales = "free")+
+  labs(title = "12PM Nutrient concentrations",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Concentration  (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  #ylim(-20,120)+
+  nunu_theme +
+  theme(legend.position = "none") 
+```
+
+
+
+
+## 24h Nutrient Analysis 
+
+```{r}
+## removing outliers from the data set
+nutrient_24h <- nutrients_norm %>%
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment, nutrient) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(conc_norm, probs = 0.25, na.rm = T),
+         quant3 = quantile(conc_norm, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( conc_norm > quant3 + (IQR*1.5) | conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") 
+
+
+
+```
+
+```{r}
+nutrient_24h %>% 
+  filter(treatment != "Inflow") %>% 
+  mutate(time_string = factor(time_string, 
+                              levels = c("12:00:00","18:00:00","00:00:00","06:00:00"))) %>% 
+  ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+  geom_violin()+
+  geom_point()+
+  geom_hline(yintercept=0, linetype='dashed')+
+  stat_summary(color = "yellow", alpha =0.5)+
+  facet_wrap(~nutrient+time_string, scales = "free", ncol = 4)+
+  labs(title = "24h Nutrient concentration",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Concentration (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  #ylim(-20,120)+
+  #nunu_theme +
+  theme(legend.position = "none") 
+```
+
+
+
+
+
