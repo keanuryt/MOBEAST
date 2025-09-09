@@ -56,6 +56,15 @@ nunu_theme <- theme_bw() +
         legend.text=element_text(size=28))
 ```
 
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
 
 ## Data Clean Up
 
@@ -151,6 +160,18 @@ nutrients %>%
          
 ```
 
+```{r}
+## Create a non normalized df for nutrients 
+nutrients_long <- nutrients %>% 
+  filter(treatment != "Endmember") %>%
+  mutate(time_string = as.character(time_string),
+         date_string = as.character(date_string),
+         date_time_string = as.character(date_time_string)) %>% 
+  select(-run_number) %>% 
+  pivot_longer(cols = N_N:NO3,
+               names_to = "nutrient",
+               values_to = "conc")
+```
 
 ```{r}
 ## Normalization of the data to the inflow 
@@ -183,10 +204,59 @@ nutrients_norm <- nutrients %>%
   
   #organize the treatment levels
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
-  
 
 #write_csv(DOC_norm, here("data", "DOC", "DOC_norm.csv"))
 ```
+
+## Understanding the inflows 
+```{r}
+## Initial graph of the data distribution
+nutrients_long %>% 
+  #filter(time_string == "12:00:00") %>% 
+  #filter(treatment != "Inflow") %>% 
+  ggplot(aes(x= treatment, y= conc, fill = treatment))+
+  geom_violin()+
+  geom_point()+
+  geom_hline(yintercept=0, linetype='dashed')+
+  stat_summary(color = "yellow", alpha =0.5)+
+  facet_wrap(~nutrient, scales = "free")+
+  labs(title = "12PM Nutrient concentrations",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Concentration  (µmol/L)")+
+  scale_fill_manual(values=treatment_colors) +
+  #scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       #values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  #ylim(-20,120)+
+  nunu_theme +
+  theme(legend.position = "none") 
+```
+
+```{r}
+## Initial graph of the data distribution
+nutrients_long %>% 
+  #filter(time_string == "12:00:00") %>% 
+  filter(nutrient == "N_N") %>% 
+  ggplot(aes(x= treatment, y= conc, fill = treatment))+
+  geom_violin()+
+  geom_point()+
+  geom_hline(yintercept=0, linetype='dashed')+
+  stat_summary(color = "yellow", alpha =0.5)+
+  facet_wrap(~date_string)+
+  labs(title = "12PM Nutrient concentrations",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Concentration  (µmol/L)")+
+  scale_fill_manual(values=treatment_colors) +
+  #scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       #values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  #ylim(-20,120)+
+  nunu_theme +
+  theme(legend.position = "none") 
+```
+
+
+
 
 
 ## 12PM Nutrient analysis 
@@ -209,12 +279,12 @@ nutrient_12PM <- nutrients_norm %>%
   ## remove the outliers 
   filter(outlier == "not outlier") 
 
-
-
 ```
 
 ```{r}
-nutrient_12PM %>% 
+## Initial graph of the data distribution
+nutrients_norm %>% 
+  filter(time_string == "12:00:00") %>% 
   filter(treatment != "Inflow") %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
   geom_violin()+
@@ -234,6 +304,126 @@ nutrient_12PM %>%
 ```
 
 
+### Iterative statistical modeling
+
+```{}
+# Using not normalized data
+
+nutrient_12PM <- nutrients_long %>% 
+  filter(time_string == "12:00:00") %>% 
+  #filter(conc <20) %>% 
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment, nutrient) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(conc, probs = 0.25, na.rm = T),
+         quant3 = quantile(conc, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( conc > quant3 + (IQR*1.5) | conc < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier")
+```
+
+
+```{r}
+# Suppose your dataframe is df with columns: date, time, resp, var1, var2, var3
+# Independent variables:
+nutrient_loop <- nutrient_12PM %>% select(nutrient) %>% distinct() %>% pull()
+
+models_12PM <- vector(mode = "list", length = length(nutrient_loop))
+names(models_12PM) <- nutrient_loop
+
+for (var in nutrient_loop) {
+  df <- nutrient_12PM %>% filter(nutrient == var)
+  models_12PM[[var]] <- lmer(conc_norm ~ treatment + (1|tank_number), data = df)
+}
+
+```
+
+#### Nitrate-Nitrite
+```{r}
+summary(models_12PM[[1]])
+anova(models_12PM[[1]], type = 2)
+
+resid_panel(models_12PM[[1]])
+
+emmeans(models_12PM[[1]], specs = trt.vs.ctrl ~ treatment)
+emmeans(models_12PM[[1]], ~ treatment)
+
+```
+
+```{r}
+emm <- emmeans(models_12PM[[1]], ~ treatment)
+#cld_letters <- cld(models_12PM[[1]], Letters = letters)
+```
+
+#### Nitrite
+```{r}
+## Significant difference with algae !
+summary(models_12PM[[2]])
+anova(models_12PM[[2]], type = 2)
+
+resid_panel(models_12PM[[2]])
+
+emmeans(models_12PM[[2]], specs = trt.vs.ctrl ~ treatment)
+emmeans(models_12PM[[2]], ~ treatment)
+
+```
+
+#### Nitrate
+```{r}
+## Significant difference with algae !
+summary(models_12PM[[6]])
+anova(models_12PM[[6]], type = 2)
+
+resid_panel(models_12PM[[6]])
+
+emmeans(models_12PM[[6]], specs = trt.vs.ctrl ~ treatment)
+emmeans(models_12PM[[6]], ~ treatment)
+
+```
+
+#### Ammonium
+```{r}
+
+summary(models_12PM[[5]])
+anova(models_12PM[[5]], type = 2)
+
+resid_panel(models_12PM[[5]])
+
+emmeans(models_12PM[[5]], specs = trt.vs.ctrl ~ treatment)
+emmeans(models_12PM[[5]], ~ treatment)
+
+```
+
+#### Phosphate
+```{r}
+
+summary(models_12PM[[3]])
+anova(models_12PM[[3]], type = 2)
+
+resid_panel(models_12PM[[3]])
+
+emmeans(models_12PM[[3]], specs = trt.vs.ctrl ~ treatment)
+emmeans(models_12PM[[3]], ~ treatment)
+
+```
+
+#### Silicate
+```{r}
+
+summary(models_12PM[[4]])
+anova(models_12PM[[4]], type = 2)
+
+resid_panel(models_12PM[[4]])
+
+emmeans(models_12PM[[4]], specs = trt.vs.ctrl ~ treatment)
+emmeans(models_12PM[[4]], ~ treatment)
+
+```
 
 
 ## 24h Nutrient Analysis 

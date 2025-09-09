@@ -227,7 +227,7 @@ ht = Heatmap(zscore.data.otu.matrix, name = "z-scored",
         row_title = "Family",
         row_names_gp = gpar(fontsize = 10),
         column_names_gp = gpar(fontsize = 10),
-        row_km = 8, #number of forced segregation in rows 
+        row_km = 5, #number of forced segregation in rows 
         column_km = 4,#number of forced segregation in columns 
         top_annotation = ha
         )
@@ -259,6 +259,7 @@ cluster_df<- cluster_df %>%
                             paste0("MOBEAST0",id_number)))
 #write_csv(cluster_df, here("data", "DNA", "24h_clusters.csv"))
 ```
+
 ```{r}
 OTU_htm_24h %>% left_join(cluster_df) %>% 
   select(-kingdom, -class, -order, -genus, -long_name, -date_time, -date, -time) %>% 
@@ -271,10 +272,8 @@ OTU_htm_24h %>% left_join(cluster_df) %>%
   cols_label(id_number = "ID Number",
              tank_number = "Tank Number", 
              date_time_string = " Date-Time") #%>% 
-  rgtsave("24H_cluster_table.png")
+  #gtsave("24H_cluster_table.png")
 ```
-
-
 
 
 
@@ -416,14 +415,14 @@ ha = HeatmapAnnotation(
 #### Printing heatmap
 
 ```{r, fig.height = 10, fig.width = 16}
-#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
+#png(width=1800, height=1000, file= here("outputs", "12PM_24hdata.png"))
 
 ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "white", lwd = 0.1),
         column_title = "id_number", column_title_side = "bottom",
         row_title = "family",
         row_names_gp = gpar(fontsize = 10),
         column_names_gp = gpar(fontsize = 10),
-        row_km = 10, #number of forced segregation in rows 
+        row_km = 4, #number of forced segregation in rows 
         column_km = 4,#number of forced segregation in columns 
         top_annotation = ha
         )
@@ -503,15 +502,15 @@ ha = HeatmapAnnotation(
 #### Printing heatmap
 
 ```{r, fig.height = 10, fig.width = 16}
-#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
+#png(width=1800, height=1000, file= here("outputs", "6AM_24hdata.png"))
 
 ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", rect_gp = gpar(col = "white", lwd = 0.1),
         column_title = "id_number", column_title_side = "bottom",
         row_title = "family",
         row_names_gp = gpar(fontsize = 10),
         column_names_gp = gpar(fontsize = 10),
-        row_km = 10, #number of forced segregation in rows 
-        column_km = 6,#number of forced segregation in columns 
+        row_km = 4, #number of forced segregation in rows 
+        column_km = 2,#number of forced segregation in columns 
         top_annotation = ha
         )
 
