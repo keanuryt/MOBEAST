@@ -3,17 +3,29 @@ author: 'Keanu Rochette '
 created: '18 April 2025'
 updated: '`r format(Sys.Date())`'
 title: "MOBEAST - Nutrients"
-format: html
+format: pptx
+execute:
+  echo: false
+  message: false
+fig-width: 8
+fig-height: 4
+fig-align: center
+knitr:
+  opts_chunk:
+    out.width: "20%"
 editor: visual
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE,
-                      message = FALSE)
+knitr::opts_chunk$set(message = FALSE)
 ```
 
-## Load Libraries
+
+## Load Libraries {.hidden}
+
 ```{r}
+#| output: false
+
 library(tidyverse)
 library(here)
 library(janitor)
@@ -38,14 +50,18 @@ library(multcompView)
 ```
 
 
-## Load Data 
+## Load Data {.hidden}
+
 ```{r}
+#| output: false
 nutrients <- read_delim(here("data", "Nutrients", "MOBEAST_nutrients.csv"))
 meta <- read_csv(here("data", "MOBEAST_metadata_V2.csv"))
 ```
 
-## Data visualization theme
+## Data visualization theme {.hidden}
+
 ```{r}
+#| output: false
 nunu_theme <- theme_bw() + 
   theme(plot.title = element_text(size=32, face = "bold"), 
         plot.subtitle = element_text(size=30),
@@ -57,6 +73,7 @@ nunu_theme <- theme_bw() +
 ```
 
 ```{r}
+#| output: false
 treatment_colors = c("Inflow"="#00838F",
                      "Control"="grey", 
                      "Coral"="#03A9F4", 
@@ -66,9 +83,11 @@ treatment_colors = c("Inflow"="#00838F",
                      "Rain"= "yellow")
 ```
 
-## Data Clean Up
+## Data Clean Up {.hidden}
 
 ```{r}
+#| output: false
+
 # nutrients are in umol/L 
 nutrients<- nutrients %>% clean_names() %>% 
   rename(N_N = no3_no2_umol_l,
@@ -82,11 +101,15 @@ nutrients<- nutrients %>% clean_names() %>%
 ```
 
 ```{r}
+#| output: false
+
 nutrients <- meta %>% left_join(nutrients) %>% 
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow", "Endmember")))
 ```
 
 ```{r}
+#| output: false
+
 nutrients %>% 
   filter(treatment == "Inflow") %>%
   mutate(time_string = as.character(time_string),
@@ -106,6 +129,7 @@ nutrients %>%
 ```
 
 ```{r}
+#| output: false
 nutrients %>% 
   filter(treatment != "Endmember") %>%
   mutate(time_string = as.character(time_string),
@@ -136,6 +160,7 @@ nutrients %>%
 ```
 
 ```{r}
+#| output: false
 ## Table of high concentration nutrient, maybe should be remeasured
 nutrients %>% 
   filter(treatment != "Endmember") %>%
@@ -161,19 +186,8 @@ nutrients %>%
 ```
 
 ```{r}
-## Create a non normalized df for nutrients 
-nutrients_long <- nutrients %>% 
-  filter(treatment != "Endmember") %>%
-  mutate(time_string = as.character(time_string),
-         date_string = as.character(date_string),
-         date_time_string = as.character(date_time_string)) %>% 
-  select(-run_number) %>% 
-  pivot_longer(cols = N_N:NO3,
-               names_to = "nutrient",
-               values_to = "conc")
-```
+#| output: false
 
-```{r}
 ## Normalization of the data to the inflow 
 nutrients_norm <- nutrients %>% 
   filter(treatment != "Endmember") %>%
@@ -208,62 +222,15 @@ nutrients_norm <- nutrients %>%
 #write_csv(DOC_norm, here("data", "DOC", "DOC_norm.csv"))
 ```
 
-## Understanding the inflows 
-```{r}
-## Initial graph of the data distribution
-nutrients_long %>% 
-  #filter(time_string == "12:00:00") %>% 
-  #filter(treatment != "Inflow") %>% 
-  ggplot(aes(x= treatment, y= conc, fill = treatment))+
-  geom_violin()+
-  geom_point()+
-  geom_hline(yintercept=0, linetype='dashed')+
-  stat_summary(color = "yellow", alpha =0.5)+
-  facet_wrap(~nutrient, scales = "free")+
-  labs(title = "12PM Nutrient concentrations",
-       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
-       x= "Treatment",
-       y = "Concentration  (µmol/L)")+
-  scale_fill_manual(values=treatment_colors) +
-  #scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
-                       #values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-  #ylim(-20,120)+
-  nunu_theme +
-  theme(legend.position = "none") 
-```
-
-```{r}
-## Initial graph of the data distribution
-nutrients_long %>% 
-  #filter(time_string == "12:00:00") %>% 
-  filter(nutrient == "N_N") %>% 
-  ggplot(aes(x= treatment, y= conc, fill = treatment))+
-  geom_violin()+
-  geom_point()+
-  geom_hline(yintercept=0, linetype='dashed')+
-  stat_summary(color = "yellow", alpha =0.5)+
-  facet_wrap(~date_string)+
-  labs(title = "12PM Nutrient concentrations",
-       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
-       x= "Treatment",
-       y = "Concentration  (µmol/L)")+
-  scale_fill_manual(values=treatment_colors) +
-  #scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
-                       #values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-  #ylim(-20,120)+
-  nunu_theme +
-  theme(legend.position = "none") 
-```
-
-
-
-
 
 ## 12PM Nutrient analysis 
 ```{r}
+#| output: false
+
 ## removing outliers from the data set
 nutrient_12PM <- nutrients_norm %>%
   filter(time_string == "12:00:00") %>% 
+  filter(treatment != "Inflow") %>% 
   
   # removing outliers
   ## grouping by date, time and treatment
@@ -281,18 +248,22 @@ nutrient_12PM <- nutrients_norm %>%
 
 ```
 
-```{r}
+
+```{r, fig.width=16, fig.height = 8}
+#| output: false 
+
 ## Initial graph of the data distribution
 nutrients_norm %>% 
   filter(time_string == "12:00:00") %>% 
   filter(treatment != "Inflow") %>% 
+  filter(nutrient == "SiO2") %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
   geom_violin()+
   geom_point()+
   geom_hline(yintercept=0, linetype='dashed')+
   stat_summary(color = "yellow", alpha =0.5)+
-  facet_wrap(~nutrient, scales = "free")+
-  labs(title = "12PM Nutrient concentrations",
+  #facet_wrap(~nutrient, scales = "free")+
+  labs(title = "12PM Silicate concentrations",
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
        y = "Concentration  (µmol/L)")+
@@ -304,29 +275,7 @@ nutrients_norm %>%
 ```
 
 
-### Iterative statistical modeling
-
-```{}
-# Using not normalized data
-
-nutrient_12PM <- nutrients_long %>% 
-  filter(time_string == "12:00:00") %>% 
-  #filter(conc <20) %>% 
-  # removing outliers
-  ## grouping by date, time and treatment
-  group_by(date, time, treatment, nutrient) %>% 
-  ## caluculating the Interquantile range and of the raw data
-  mutate(quant1 = quantile(conc, probs = 0.25, na.rm = T),
-         quant3 = quantile(conc, probs = 0.75, na.rm = T),
-         IQR = quant3-quant1) %>% 
-  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
-  ## Important to filter later to understand why they are outliers. 
-  mutate(outlier = ifelse( conc > quant3 + (IQR*1.5) | conc < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
-  ungroup() %>% 
-  ## remove the outliers 
-  filter(outlier == "not outlier")
-```
-
+### Iterative statistical modeling {.hidden}
 
 ```{r}
 # Suppose your dataframe is df with columns: date, time, resp, var1, var2, var3
@@ -343,87 +292,143 @@ for (var in nutrient_loop) {
 
 ```
 
+### Iterative graphing {.hidden}
+
+```{r}
+
+nutrient_loop <- nutrient_12PM %>% select(nutrient) %>% distinct() %>% pull()
+
+graphs_12PM <- vector(mode = "list", length = length(nutrient_loop))
+names(graphs_12PM) <- nutrient_loop
+
+for (var in nutrient_loop) {
+  
+  df <- nutrient_12PM %>% filter(nutrient == var)
+  
+  graphs_12PM[[var]] <- df %>%  
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("12PM", var, "concentrations"),
+       #subtitle = "ANOVA: F = 0.01, Dunnett: p<0.05 (Algae)",
+       x= "Treatment",
+       y = "Concentration (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+}
+
+```
+
+
 #### Nitrate-Nitrite
+
 ```{r}
 summary(models_12PM[[1]])
 anova(models_12PM[[1]], type = 2)
-
-resid_panel(models_12PM[[1]])
-
 emmeans(models_12PM[[1]], specs = trt.vs.ctrl ~ treatment)
-emmeans(models_12PM[[1]], ~ treatment)
+#emmeans(models_12PM[[1]], ~ treatment)
+```
+
+```{r}
+resid_panel(models_12PM[[1]])
 
 ```
 
 ```{r}
-emm <- emmeans(models_12PM[[1]], ~ treatment)
+graphs_12PM[[1]]
+```
+
+
+
+```{r}
+#emm <- emmeans(models_12PM[[1]], ~ treatment)
 #cld_letters <- cld(models_12PM[[1]], Letters = letters)
 ```
 
-#### Nitrite
+#### Nitrite - Significant !
+
+
 ```{r}
-## Significant difference with algae !
 summary(models_12PM[[2]])
 anova(models_12PM[[2]], type = 2)
-
-resid_panel(models_12PM[[2]])
-
 emmeans(models_12PM[[2]], specs = trt.vs.ctrl ~ treatment)
-emmeans(models_12PM[[2]], ~ treatment)
-
+#emmeans(models_12PM[[2]], ~ treatment)
 ```
 
-#### Nitrate
 ```{r}
-## Significant difference with algae !
-summary(models_12PM[[6]])
-anova(models_12PM[[6]], type = 2)
-
-resid_panel(models_12PM[[6]])
-
-emmeans(models_12PM[[6]], specs = trt.vs.ctrl ~ treatment)
-emmeans(models_12PM[[6]], ~ treatment)
-
+resid_panel(models_12PM[[2]])
+graphs_12PM[[2]]
 ```
+
+
+
+#### Nitrate - need to log the data
+
+```{r}
+summary(models_12PM[["NO3"]])
+anova(models_12PM[["NO3"]], type = 2)
+emmeans(models_12PM[["NO3"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_12PM[["NO3"]], ~ treatment)
+```
+
+```{r}
+resid_panel(models_12PM[["NO3"]])
+graphs_12PM[["NO3"]]
+```
+
 
 #### Ammonium
+
 ```{r}
-
-summary(models_12PM[[5]])
-anova(models_12PM[[5]], type = 2)
-
-resid_panel(models_12PM[[5]])
-
-emmeans(models_12PM[[5]], specs = trt.vs.ctrl ~ treatment)
-emmeans(models_12PM[[5]], ~ treatment)
-
+summary(models_12PM[["NH3"]])
+anova(models_12PM[["NH3"]], type = 2)
+emmeans(models_12PM[["NH3"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_12PM[["NH3]], ~ treatment)
 ```
+
+```{r}
+resid_panel(models_12PM[["NH3"]])
+graphs_12PM[["NH3"]]
+```
+
 
 #### Phosphate
+
 ```{r}
-
-summary(models_12PM[[3]])
-anova(models_12PM[[3]], type = 2)
-
-resid_panel(models_12PM[[3]])
-
-emmeans(models_12PM[[3]], specs = trt.vs.ctrl ~ treatment)
-emmeans(models_12PM[[3]], ~ treatment)
-
+summary(models_12PM[["PO4"]])
+anova(models_12PM[["PO4"]], type = 2)
+emmeans(models_12PM[["PO4"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_12PM[["PO4]], ~ treatment)
 ```
+
+
+```{r}
+resid_panel(models_12PM[["PO4"]])
+graphs_12PM[["PO4"]]
+```
+
 
 #### Silicate
+
 ```{r}
-
-summary(models_12PM[[4]])
-anova(models_12PM[[4]], type = 2)
-
-resid_panel(models_12PM[[4]])
-
-emmeans(models_12PM[[4]], specs = trt.vs.ctrl ~ treatment)
-emmeans(models_12PM[[4]], ~ treatment)
-
+summary(models_12PM[["SiO2"]])
+anova(models_12PM[["SiO2"]], type = 2)
+emmeans(models_12PM[["SiO2"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_12PM[["SiO2]], ~ treatment)
 ```
+
+
+```{r}
+resid_panel(models_12PM[["SiO2"]])
+graphs_12PM[["SiO2"]]
+```
+
 
 
 ## 24h Nutrient Analysis 
@@ -432,7 +437,7 @@ emmeans(models_12PM[[4]], ~ treatment)
 ## removing outliers from the data set
 nutrient_24h <- nutrients_norm %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  
+  filter(treatment != "Inflow") %>% 
   # removing outliers
   ## grouping by date, time and treatment
   group_by(date, time, treatment, nutrient) %>% 
@@ -445,33 +450,218 @@ nutrient_24h <- nutrients_norm %>%
   mutate(outlier = ifelse( conc_norm > quant3 + (IQR*1.5) | conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
   ungroup() %>% 
   ## remove the outliers 
-  filter(outlier == "not outlier") 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                   "00:00:00","06:00:00")))
 
 
 
 ```
 
-```{r}
+
+```{r, fig.width=16, fig.height = 8}
+## Initial graph of the data distribution
 nutrient_24h %>% 
-  filter(treatment != "Inflow") %>% 
-  mutate(time_string = factor(time_string, 
-                              levels = c("12:00:00","18:00:00","00:00:00","06:00:00"))) %>% 
+  filter(nutrient == "SiO2") %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
   geom_violin()+
   geom_point()+
   geom_hline(yintercept=0, linetype='dashed')+
   stat_summary(color = "yellow", alpha =0.5)+
-  facet_wrap(~nutrient+time_string, scales = "free", ncol = 4)+
-  labs(title = "24h Nutrient concentration",
+  facet_wrap(~time_fac, ncol = 4 )+
+  labs(title = "24h Silicate concentrations",
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
-       y = "Concentration (µmol/L)")+
+       y = "Concentration  (µmol/L)")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   #ylim(-20,120)+
-  #nunu_theme +
-  theme(legend.position = "none") 
+  nunu_theme +
+  theme(axis.text = element_text(size = 18),
+        legend.position = "none") 
 ```
+
+
+
+##### Data viz
+```{r}
+## Initial graph of the data distribution
+nutrient_24h%>% 
+  filter(nutrient == "NO3") %>% 
+  ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+  geom_violin()+
+  geom_point()+
+  geom_hline(yintercept=0, linetype='dashed')+
+  stat_summary(color = "yellow", alpha =0.5)+
+  facet_wrap(~nutrient+time_fac, scales = "free", ncol = 4)+
+  labs(#title = "12PM NO2 concentrations",
+       #subtitle = "ANOVA: F <0.05 (treatment & time), Dunnett: p<0.05 (Algae) ",
+       x= "Treatment",
+       y = "Concentration (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))#+
+  #ylim(-20,120)+
+  #nunu_theme +
+  #theme(axis.text = element_text(size = 18),
+        #legend.position = "none") 
+
+#ggsave(here("outputs","24H_NO2.png"), width = 16, height = 8)
+```
+
+### Iterative stats 
+
+```{r}
+# Suppose your dataframe is df with columns: date, time, resp, var1, var2, var3
+# Independent variables:
+nutrient_loop <- nutrient_24h %>% select(nutrient) %>% distinct() %>% pull()
+
+models_24h <- vector(mode = "list", length = length(nutrient_loop))
+names(models_24h) <- nutrient_loop
+
+
+for (var in nutrient_loop) {
+  df <- nutrient_24h %>% filter(nutrient == var)
+  models_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + (1|tank_number), data = df)
+}
+
+```
+
+### Iterative graphing
+```{r}
+
+nutrient_loop <- nutrient_24h %>% select(nutrient) %>% distinct() %>% pull()
+
+graphs_24h <- vector(mode = "list", length = length(nutrient_loop))
+names(graphs_24h) <- nutrient_loop
+
+
+for (var in nutrient_loop) {
+  
+  graphs_24h[[var]] <- nutrient_24h %>% 
+    filter(nutrient == var) %>% 
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap(~time_fac, ncol = 4 )+
+    labs(title = paste("24h", var, "concentrations"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Concentration  (µmol/L)")+
+    scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+    nunu_theme +
+    theme(axis.text = element_text(size = 18),
+        legend.position = "none")
+}
+
+```
+
+
+#### Nitrate-Nitrite
+
+```{r}
+summary(models_24h[["N_N"]])
+anova(models_24h[["N_N"]], type = 2)
+emmeans(models_24h[["N_N"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_24h[["N _N]], ~ treatment)
+```
+
+
+```{r}
+resid_panel(models_24h[["N_N"]])
+graphs_24h[["N_N"]]
+```
+
+
+#### Nitrite - Significant !
+
+```{r}
+summary(models_24h[["NO2"]])
+anova(models_24h[["NO2"]], type = 2)
+emmeans(models_24h[["NO2"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_24h[["NO2]], ~ treatment)
+```
+
+
+
+```{r}
+resid_panel(models_24h[["NO2"]])
+graphs_24h[["NO2"]]
+```
+
+
+ 
+#### Nitrate - Significant different in the CCA
+
+```{r}
+summary(models_24h[["NO3"]])
+anova(models_24h[["NO3"]], type = 2)
+emmeans(models_24h[["NO3"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_24h[["NO3]], ~ treatment)
+```
+
+
+
+```{r}
+resid_panel(models_24h[["NO3"]])
+graphs_24h[["NO3"]]
+```
+
+
+
+#### Ammonium
+
+```{r}
+summary(models_24h[["NH3"]])
+anova(models_24h[["NH3"]], type = 2)
+emmeans(models_24h[["NH3"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_24h[["NH3]], ~ treatment)
+```
+
+
+```{r}
+resid_panel(models_24h[["NH3"]])
+graphs_24h[["NH3"]]
+```
+:::
+::::
+
+
+#### Phosphate
+
+```{r}
+summary(models_24h[["PO4"]])
+anova(models_24h[["PO4"]], type = 2)
+emmeans(models_24h[["PO4"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_24h[["PO4]], ~ treatment)
+```
+
+```{r}
+resid_panel(models_24h[["PO4"]])
+graphs_24h[["PO4"]]
+```
+
+
+#### Silicate - May need to log transform 
+
+```{r}
+summary(models_24h[["SiO2"]])
+anova(models_24h[["SiO2"]], type = 2)
+emmeans(models_24h[["SiO2"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_24h[["SiO2]], ~ treatment)
+```
+
+
+
+```{r}
+resid_panel(models_24h[["SiO2"]])
+graphs_24h[["SiO2"]]
+```
+
+
+
 
 
 

@@ -93,7 +93,12 @@ meta <- meta %>% mutate(treatment = as.character(treatment)) %>%
 
 ```{r}
 cluster<- cluster %>% 
-  mutate(cluster = factor(cluster))
+  #mutate(cluster = factor(cluster)) %>% 
+  mutate(cluster2 = ifelse(cluster == 1, "Algae", 
+                           ifelse(cluster == 2, "CCA", 
+                                  ifelse(cluster == 3, "Coral", "Control")))) %>% 
+  select(-cluster) %>% 
+  rename(cluster = cluster2)
 
 meta<- meta %>% left_join(cluster)
 ```
