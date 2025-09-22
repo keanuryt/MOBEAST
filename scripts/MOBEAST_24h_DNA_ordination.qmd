@@ -1,7 +1,7 @@
 ---
 title: "MOBEAST- DNA Ordination 24h"
 format: html
-editor: visual
+editor: source
 ---
 
 ```{r setup, include = FALSE}
@@ -156,7 +156,9 @@ set.seed(2000)
 
 # calcultat the distance matrix with bray-curtis method
 MOBEAST_dist_24h <- vegdist(otu_ord_mat_24h, method = "bray")
+```
 
+```{r}
 #calculate the MDS scores such that it converges to a solutions. 
 ## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
 nmds <- metaMDS(MOBEAST_dist_24h, trymax = 10000)
@@ -241,15 +243,180 @@ MOBEAST_nmds_24h %>%
 #ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
-## Ordination of individual time points
 
 ### Stats on treatment only
 
 ```{r}
-adonis2(MOBEAST_dist_12~MOBEAST_nmds_12$treatment, 
+perma_24h <- adonis2(MOBEAST_dist_24h ~ MOBEAST_nmds_24h$treatment)#, 
         # formula to calculate p-value for treatments
-        strata = MOBEAST_nmds_12$tank_number) # accounts for repeated measures
+        #strata = MOBEAST_nmds_24h$tank_number) # accounts for repeated measures
+        # should I add the stratum here ? What should I put if I keep it? 
+perma_24h
 ```
+
+
+# Ordination of individual time points
+
+## 12:00:00 
+
+```{r}
+otu_ord <- OTU %>% t() %>% as.data.frame() 
+
+# Make the sample ID the rownames of the data frame
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
+# only select 12PM samples 
+samples_12PM <- meta %>% mutate(time_string = as.character(time_string),) %>% 
+  filter(time_string == "12:00:00" & date == ymd("2024-06-02")) %>% pull(id_number)
+
+otu_ord_12PM <- otu_ord %>% filter(id_number %in% samples_12PM)
+
+
+```
+
+```{r}
+# only keep the OTU numbers in the matrix and remove the id_number column
+## ID numbers are now rownames. then convert the df in a matrix.
+otu_ord_mat_12PM <- otu_ord_12PM %>%  select(-id_number) %>%  as.matrix()
+
+```
+
+### Calculate distances
+
+```{r}
+# metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
+set.seed(2000)
+
+# calcultat the distance matrix with bray-curtis method
+MOBEAST_dist_12PM <- vegdist(otu_ord_mat_12PM, method = "bray")
+
+#calculate the MDS scores such that it converges to a solutions. 
+## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
+nmds <- metaMDS(MOBEAST_dist_12PM, trymax = 10000)
+
+# save the NMDS scores in a tibble with the ID numbers. 
+MOBEAST_nmds_12PM <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+### Plotting NMDS
+```{r}
+# add the metadata to the NMDS tibble to make plots 
+MOBEAST_nmds_12PM <- left_join(MOBEAST_nmds_12PM, meta)
+```
+
+```{r, fig.width=16, fig.height= 12}
+# Plot
+MOBEAST_nmds_12PM %>%   
+  # mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      # "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  #facet_wrap(~time_string, ncol = 2)+
+  labs(title= "12:00 samples")+
+  scale_color_manual(values=treatment_colors)+
+  scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+### Stats on treatment only
+
+```{r}
+perma_12PM <- adonis2(MOBEAST_dist_12PM ~ MOBEAST_nmds_12PM$treatment) #, 
+        # formula to calculate p-value for treatments
+        #strata = MOBEAST_nmds_12PM$tank_number) # accounts for repeated measures
+
+perma_12PM
+```
+
+
+## 06:00:00 
+
+```{r}
+otu_ord <- OTU %>% 
+  t() %>% 
+  as.data.frame() 
+
+# Make the sample ID the rownames of the data frame
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
+# only select 12PM samples 
+samples_6AM <- meta %>% mutate(time_string = as.character(time_string)) %>% 
+  filter(time_string == "06:00:00") %>% pull(id_number)
+
+otu_ord_6AM <- otu_ord %>% filter(id_number %in% samples_6AM)
+
+
+```
+
+```{r}
+# only keep the OTU numbers in the matrix and remove the id_number column
+## ID numbers are now rownames. then convert the df in a matrix.
+otu_ord_mat_6AM <- otu_ord_6AM %>%  select(-id_number) %>%  as.matrix()
+
+```
+
+### Calculate distances
+
+```{r}
+# metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
+set.seed(2000)
+
+# calcultat the distance matrix with bray-curtis method
+MOBEAST_dist_6AM <- vegdist(otu_ord_mat_6AM, method = "bray")
+
+#calculate the MDS scores such that it converges to a solutions. 
+## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
+nmds <- metaMDS(MOBEAST_dist_6AM, trymax = 10000)
+
+# save the NMDS scores in a tibble with the ID numbers. 
+MOBEAST_nmds_6AM <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+### Plotting NMDS
+```{r}
+# add the metadata to the NMDS tibble to make plots 
+MOBEAST_nmds_6AM <- left_join(MOBEAST_nmds_6AM, meta)
+```
+
+```{r, fig.width=16, fig.height= 12}
+# Plot
+MOBEAST_nmds_6AM %>%   
+  # mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      # "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  #facet_wrap(~time_string, ncol = 2)+
+  labs(title= "12:00 samples")+
+  scale_color_manual(values=treatment_colors)+
+  scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+### Stats on treatment only
+
+```{r}
+perma_6AM <- adonis2(MOBEAST_dist_6AM ~ MOBEAST_nmds_6AM$treatment)#, 
+        # formula to calculate p-value for treatments
+        #strata = MOBEAST_nmds_6AM$tank_number) no need strata here because it restricts the permutations
+perma_6AM
+```
+
 
 #### Accounting for uneven variation in the data.
 
