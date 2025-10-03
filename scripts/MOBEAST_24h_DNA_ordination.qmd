@@ -61,19 +61,9 @@ cluster <- read_csv(here("data","DNA", "24h_clusters.csv"))
 
 # Data Clean Up
 
-```{, meta data clean up}
-meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
-               time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
-  # "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters
-  # "\\1:\\2", group1 + ":" + group2
-  mutate(time = paste0(time, ":00"),
-               date_time = paste(date, time),
-               date = mdy(date), 
-               date_time = mdy_hms(date_time),
-               time = factor(time))
-  
-  
-```
+```{, meta data clean up} 
+meta\<- meta %\>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"), time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %\>% \# "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters \# "\\1:\\2", group1 + ":" + group2 mutate(time = paste0(time, ":00"), date_time = paste(date, time), date = mdy(date), date_time = mdy_hms(date_time), time = factor(time))
+```         
 
 ## Preparing the metadata to annotate the heatmap
 
@@ -177,7 +167,7 @@ MOBEAST_nmds_24h <- left_join(MOBEAST_nmds_24h, meta)
 
 #### Plotting by treatment
 
-```{r, fig.width=16, fig.height= 12}
+```{r, fig.width=16, fig.height= 6}
 # Plot
 MOBEAST_nmds_24h %>%   
   mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
@@ -189,7 +179,7 @@ MOBEAST_nmds_24h %>%
   geom_point(size = 4) +
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = date_string))+
-  facet_wrap(~time_string, ncol = 2)+
+  facet_wrap(~time_string, ncol = 4)+
   labs(title= "24h samples, ellipse by treatment")+
   scale_color_manual(values=treatment_colors)+
   scale_fill_manual(values=treatment_colors) +
@@ -243,7 +233,6 @@ MOBEAST_nmds_24h %>%
 #ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))
 ```
 
-
 ### Stats on treatment only
 
 ```{r}
@@ -254,10 +243,9 @@ perma_24h <- adonis2(MOBEAST_dist_24h ~ MOBEAST_nmds_24h$treatment)#,
 perma_24h
 ```
 
-
 # Ordination of individual time points
 
-## 12:00:00 
+## 12:00:00
 
 ```{r}
 otu_ord <- OTU %>% t() %>% as.data.frame() 
@@ -300,6 +288,7 @@ MOBEAST_nmds_12PM <- scores(nmds) %>% as_tibble(rownames = "id_number")
 ```
 
 ### Plotting NMDS
+
 ```{r}
 # add the metadata to the NMDS tibble to make plots 
 MOBEAST_nmds_12PM <- left_join(MOBEAST_nmds_12PM, meta)
@@ -336,8 +325,7 @@ perma_12PM <- adonis2(MOBEAST_dist_12PM ~ MOBEAST_nmds_12PM$treatment) #,
 perma_12PM
 ```
 
-
-## 06:00:00 
+## 06:00:00
 
 ```{r}
 otu_ord <- OTU %>% 
@@ -382,6 +370,7 @@ MOBEAST_nmds_6AM <- scores(nmds) %>% as_tibble(rownames = "id_number")
 ```
 
 ### Plotting NMDS
+
 ```{r}
 # add the metadata to the NMDS tibble to make plots 
 MOBEAST_nmds_6AM <- left_join(MOBEAST_nmds_6AM, meta)
@@ -417,17 +406,15 @@ perma_6AM <- adonis2(MOBEAST_dist_6AM ~ MOBEAST_nmds_6AM$treatment)#,
 perma_6AM
 ```
 
-
 #### Accounting for uneven variation in the data.
 
 If the variation is uneven without the groups, adonis may come up with a significant result, although it's not. We can control for that using betdisper() and permutest()
 
-```{}
+```         
 # beta dispertion
 bd_12 <- betadisper(MOBEAST_dist_12, MOBEAST_nmds_12$treatment)
 
 anova(bd_12) 
 permutest(bd_12) 
 bd_12
-
 ```

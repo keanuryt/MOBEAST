@@ -3,7 +3,7 @@ author: 'Keanu Rochette '
 created: '18 April 2025'
 updated: '`r format(Sys.Date())`'
 title: "MOBEAST - Nutrients"
-format: pptx
+format: html
 execute:
   echo: false
   message: false

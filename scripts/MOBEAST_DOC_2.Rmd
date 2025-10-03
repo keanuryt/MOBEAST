@@ -258,7 +258,7 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ### No transformation 
 #### Normality and Homogenity 
 Data is not normal and variances are not homogenous
-```{r}
+```{}
 bartlett.test(npoc_u_m_norm ~ treatment,data = DOC_12PM) # homogeneity
 shapiro.test(DOC_12PM$npoc_u_m_norm) # normality
 ```
@@ -319,7 +319,7 @@ emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 emmeans(mod, ~ treatment)
 ```
 
-```{r}
+```{}
 emm <- emmeans(mod, ~ treatment)
 cld_letters <- cld(emm, Letters = letters)
 ```
@@ -763,7 +763,7 @@ anova(mod, type= "2")
 
 
 
-```{r, fig_height = 10, fig.width = 10}
+```{, fig_height = 10, fig.width = 10}
 plot_model(mod, type = "re")[[1]] +
   plot_model(mod, type = "re")[[2]] +
   plot_model(mod, type = "eff", terms = c('treatment')) +
