@@ -20,6 +20,15 @@ editor: visual
 knitr::opts_chunk$set(message = FALSE)
 ```
 
+## To Do : Craig Comments 
+- Try getting the two random samples that are clustering as outliers out of the analysis and see how it looks.  
+- Look at how those samples show up on the ordination. Prep some slides to explore those samples, particularly the relative abundance (not z-scores) of the module of taxa enriched in those two samples, to see if they are transient rare taxa or abundant in those samples.
+- Make a version of each violin plot where the points are colored by "Water Table" to see if there are any parameters or treatments or times where one table had some issues. Use "jitter" to spread the points out so you can see them.
+- Consider doing outlier removals (should never be more than a few points, maybe 10% max for each parameter) before subtracting inlet mean values. This way if you get some random high value in an inlet sample it doesn't have an outsized impact on your analyses.
+- If you are going to work with nitrate we need to look at distributions of the raw values of each of the nutrient parameters. You can make those graphs and/or send over your dataframe.
+
+
+
 ## Load Libraries {.hidden}
 
 ```{r}
@@ -48,7 +57,7 @@ library(multcompView)
 
 ```
 
-## Load Data {.hidden}
+## Load Data 
 
 ```{r}
 #| output: false
@@ -81,7 +90,7 @@ treatment_colors = c("Inflow"="#00838F",
                      "Rain"= "yellow")
 ```
 
-## Data Clean Up 
+## Data Clean Up
 
 ```{r}
 #| output: false
@@ -107,8 +116,7 @@ nutrients <- meta %>% left_join(nutrients) %>%
 #write_csv(nutrients, here("data", "Nutrients", "nutrient_raw.csv"))
 ```
 
-## Data exploration 
-
+## Data exploration
 
 ```{r}
 #| output: false
@@ -174,7 +182,7 @@ nutrients%>%
   pivot_longer(cols = N_N:NO3,
                names_to = "nutrient",
                values_to = "conc") %>% 
-  filter(conc>0) %>% 
+  filter(conc>0) %>% # one NO3 value that is negative due to subtraction
   filter(treatment != "Endmember") %>% 
   # removing outliers
   ## grouping by date, time and treatment
@@ -190,7 +198,7 @@ nutrients%>%
   
   ggplot(aes(x= treatment, y = conc))+
   geom_violin(aes(fill = treatment))+
-  geom_jitter(aes(color = outlier)) + 
+  geom_jitter(aes(color = outlier), alpha = 0.5) + 
   facet_wrap(~nutrient)+
   scale_color_manual(values = c("red", "blue"))
   
@@ -202,7 +210,35 @@ nutrients%>%
 
 
 ```{r}
-#| output: false
+## removing outliers from the data set
+raw_flagged_outliers <- nutrients%>%
+  select(-run_number) %>% 
+  pivot_longer(cols = N_N:NO3,
+               names_to = "nutrient",
+               values_to = "conc") %>% 
+  #filter(conc>0) %>% # one NO3 value that is negative due to subtraction
+  filter(treatment != "Endmember") %>% 
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(nutrient, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(log10(conc), probs = 0.25, na.rm = T),
+         quant3 = quantile(log10(conc), probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( log10(conc) > quant3 + (IQR*1.5) | log10(conc) < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() #%>% 
+  
+  ## remove the outliers 
+  #filter(outlier != "outlier") 
+
+
+```
+
+
+```{}
+# Normalization of data with the outliers 
 
 ## Normalization of the data to the inflow 
 nutrients_norm <- nutrients %>% 
@@ -238,7 +274,42 @@ nutrients_norm <- nutrients %>%
 #write_csv(nutrients_norm, here("data", "Nutrients", "nutrient_norm.csv"))
 ```
 
+
 ```{r}
+# Normalization version 2
+## averaging the inflows for normalization 
+## remove the outliers a right before the normalization 
+
+## Normalization of the data to the inflow 
+#nutrients_norm <- 
+nutrients_norm <- raw_flagged_outliers %>% 
+  mutate(time_string = as.character(time_string),
+         date_string = as.character(date_string),
+         date_time_string = as.character(date_time_string)) %>% 
+  select(-IQR, -quant1, -quant3) %>% 
+  
+  # Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table, nutrient) %>%
+  mutate(inflow = conc[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time, nutrient) %>% 
+  mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = conc - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+
+```{}
 ## Data frame with outliers for Craig
 ## removing outliers from the data set
 nutrient_Craig <- nutrients_norm %>%
@@ -260,7 +331,7 @@ nutrient_Craig <- nutrients_norm %>%
 
 ## 12PM Nutrient analysis
 
-```{r}
+```{}
 
 ## removing outliers from the data set
 nutrient_12PM <- nutrients_norm %>%
@@ -278,6 +349,18 @@ nutrient_12PM <- nutrients_norm %>%
   ## Important to filter later to understand why they are outliers. 
   mutate(outlier = ifelse( conc_norm > quant3 + (IQR*1.5) | conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
   ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") 
+
+```
+
+```{r}
+# Version 2
+## removing outliers from the data set
+nutrient_12PM <- nutrients_norm %>%
+  filter(time_string == "12:00:00") %>% 
+  filter(treatment != "Inflow") %>% 
+  
   ## remove the outliers 
   filter(outlier == "not outlier") 
 
@@ -373,7 +456,10 @@ resid_panel(models_12PM[[1]])
 ```
 
 ```{r}
-graphs_12PM[[1]]
+graphs_12PM[[1]]+ 
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 ```{r}
@@ -392,7 +478,10 @@ emmeans(models_12PM[[2]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_12PM[[2]])
-graphs_12PM[[2]]
+graphs_12PM[[2]] + 
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 #### Nitrate - need to log the data
@@ -406,7 +495,10 @@ emmeans(models_12PM[["NO3"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_12PM[["NO3"]])
-graphs_12PM[["NO3"]]
+graphs_12PM[["NO3"]]+ 
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 #### Ammonium
@@ -420,7 +512,10 @@ emmeans(models_12PM[["NH3"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_12PM[["NH3"]])
-graphs_12PM[["NH3"]]
+graphs_12PM[["NH3"]]+ 
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 #### Phosphate
@@ -434,7 +529,10 @@ emmeans(models_12PM[["PO4"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_12PM[["PO4"]])
-graphs_12PM[["PO4"]]
+graphs_12PM[["PO4"]]+ 
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 #### Silicate
@@ -448,7 +546,10 @@ emmeans(models_12PM[["SiO2"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_12PM[["SiO2"]])
-graphs_12PM[["SiO2"]]
+graphs_12PM[["SiO2"]]+ 
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 ## 24h Nutrient Analysis

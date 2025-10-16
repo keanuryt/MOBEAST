@@ -9,6 +9,11 @@ knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE)
 ```
 
+
+## To Do : Craig Feedbacks 
+
+- Sean suggested that you do your biclustering heatmap of families not with z-score data but rather with "normalized" relative abundances (value-intake) to see how it looks.
+
 ## Load Libraries
 
 ```{r}
@@ -92,7 +97,9 @@ OTU_long <- read_csv(here("data","MOBEAST_DNA_long.csv"))
 ```
 
 ## Data Clean Up
-Reformating the date, time and date-time in the metadata file 
+
+Reformating the date, time and date-time in the metadata file
+
 ```{r, meta data clean up}
 meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
                time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
@@ -106,6 +113,7 @@ meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0")
   
   
 ```
+
 ### Preparing the metadata to annotate the heatmap
 
 ```{r}
@@ -275,11 +283,10 @@ OTU_htm_24h %>% left_join(cluster_df) %>%
   #gtsave("24H_cluster_table.png")
 ```
 
-
-
 ### Cluster membership - code by Sean
 
 Not useful for cluster membership but to see the dendrograms, it's useful!
+
 ```{r}
 # choose a distance metric
 # note: you could use vegdist to do something like Bray curtis distances instead
@@ -321,8 +328,6 @@ plot(col_dend)
 #analyte_clust_df = data.frame(id_number = names(analyte_clusts), cluster = analyte_clusts)
 
 ```
-
-
 
 ## 24h separated maps
 
