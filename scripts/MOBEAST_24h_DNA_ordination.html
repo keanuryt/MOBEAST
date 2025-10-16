@@ -147,12 +147,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="data-clean-up" class="level1">
 <h1>Data Clean Up</h1>
-<p>```{, meta data clean up} meta&lt;- meta %&gt;% mutate(time = str_pad(time, width = 4, side = “left”, pad = “0”), time = str_replace(time, “(\d{2})(\d{2})”, “\1:\2”)) %&gt;% # “(\d{2})(\d{2})” separates the string in 2 groups of 2 characters # “\1:\2”, group1 + “:” + group2 mutate(time = paste0(time, “:00”), date_time = paste(date, time), date = mdy(date), date_time = mdy_hms(date_time), time = factor(time))</p>
-<pre><code>
-## Preparing the metadata to annotate the heatmap
-
-```{}
-# renaming some of treatment so that environmental data have a label: endmember or rain
+<pre class="{, meta data clean up}"><code>meta\&lt;- meta %\&gt;% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"), time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %\&gt;% \# "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters \# "\\1:\\2", group1 + ":" + group2 mutate(time = paste0(time, ":00"), date_time = paste(date, time), date = mdy(date), date_time = mdy_hms(date_time), time = factor(time))</code></pre>
+<section id="preparing-the-metadata-to-annotate-the-heatmap" class="level2">
+<h2 class="anchored" data-anchor-id="preparing-the-metadata-to-annotate-the-heatmap">Preparing the metadata to annotate the heatmap</h2>
+<pre><code># renaming some of treatment so that environmental data have a label: endmember or rain
 # Same for inflow table, environmental samples now have a label
 ## Convert tibble to df for later
 meta &lt;- meta %&gt;% mutate(treatment = as.character(treatment)) %&gt;% 
@@ -164,28 +162,29 @@ meta &lt;- meta %&gt;% mutate(treatment = as.character(treatment)) %&gt;%
                 date_time_string = paste(date_string, time_string)) %&gt;% 
   as.data.frame()</code></pre>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>cluster<span class="ot">&lt;-</span> cluster <span class="sc">%&gt;%</span> </span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">#mutate(cluster = factor(cluster)) %&gt;% </span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cluster2 =</span> <span class="fu">ifelse</span>(cluster <span class="sc">==</span> <span class="dv">1</span>, <span class="st">"Algae"</span>, </span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>                           <span class="fu">ifelse</span>(cluster <span class="sc">==</span> <span class="dv">2</span>, <span class="st">"CCA"</span>, </span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>                                  <span class="fu">ifelse</span>(cluster <span class="sc">==</span> <span class="dv">3</span>, <span class="st">"Coral"</span>, <span class="st">"Control"</span>)))) <span class="sc">%&gt;%</span> </span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>cluster) <span class="sc">%&gt;%</span> </span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">cluster =</span> cluster2)</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>meta<span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(cluster)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>cluster<span class="ot">&lt;-</span> cluster <span class="sc">%&gt;%</span> </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">#mutate(cluster = factor(cluster)) %&gt;% </span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cluster2 =</span> <span class="fu">ifelse</span>(cluster <span class="sc">==</span> <span class="dv">1</span>, <span class="st">"Algae"</span>, </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                           <span class="fu">ifelse</span>(cluster <span class="sc">==</span> <span class="dv">2</span>, <span class="st">"CCA"</span>, </span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>                                  <span class="fu">ifelse</span>(cluster <span class="sc">==</span> <span class="dv">3</span>, <span class="st">"Coral"</span>, <span class="st">"Control"</span>)))) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>cluster) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">cluster =</span> cluster2)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>meta<span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(cluster)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+</section>
 <section id="transform-the-dataframes-into-matrices" class="level2">
 <h2 class="anchored" data-anchor-id="transform-the-dataframes-into-matrices">Transform the dataframes into matrices</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Make an OTU matrix</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>otu<span class="ot">&lt;-</span> otu <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">ASV =</span> <span class="fu">toupper</span>(ASV))</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>otu_list<span class="ot">&lt;-</span> otu<span class="sc">$</span>ASV</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>otu<span class="ot">&lt;-</span> otu <span class="sc">%&gt;%</span> <span class="fu">select</span>(<span class="sc">-</span>(<span class="dv">117</span><span class="sc">:</span><span class="dv">122</span>), <span class="sc">-</span>MOBEAST017b)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>otu_mat <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(otu)</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(otu_mat) <span class="ot">&lt;-</span> otu_list</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Make an OTU matrix</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>otu<span class="ot">&lt;-</span> otu <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">ASV =</span> <span class="fu">toupper</span>(ASV))</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>otu_list<span class="ot">&lt;-</span> otu<span class="sc">$</span>ASV</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>otu<span class="ot">&lt;-</span> otu <span class="sc">%&gt;%</span> <span class="fu">select</span>(<span class="sc">-</span>(<span class="dv">117</span><span class="sc">:</span><span class="dv">122</span>), <span class="sc">-</span>MOBEAST017b)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>otu_mat <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(otu)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(otu_mat) <span class="ot">&lt;-</span> otu_list</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>OTU <span class="ot">&lt;-</span> <span class="fu">otu_table</span>(otu_mat, <span class="at">taxa_are_rows =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>OTU <span class="ot">&lt;-</span> <span class="fu">otu_table</span>(otu_mat, <span class="at">taxa_are_rows =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 </section>
@@ -194,38 +193,38 @@ meta &lt;- meta %&gt;% mutate(treatment = as.character(treatment)) %&gt;%
 <section id="h-samples" class="level2">
 <h2 class="anchored" data-anchor-id="h-samples">24h Samples</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>otu_ord <span class="ot">&lt;-</span> OTU <span class="sc">%&gt;%</span> </span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">t</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.data.frame</span>() </span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Make the sample ID the rownames of the data frame</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>otu_ord<span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">id_number =</span> <span class="fu">rownames</span>(otu_ord)) </span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="co"># only select 12PM samples </span></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>id_number_24h <span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> </span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(date_string <span class="sc">==</span> <span class="st">"2024-06-02"</span><span class="sc">|</span> date_string <span class="sc">==</span> <span class="st">"2024-06-03"</span>) <span class="sc">%&gt;%</span> </span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(id_number)</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>otu_ord_24h <span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">filter</span>(id_number <span class="sc">%in%</span> id_number_24h)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>otu_ord <span class="ot">&lt;-</span> OTU <span class="sc">%&gt;%</span> </span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">t</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.data.frame</span>() </span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Make the sample ID the rownames of the data frame</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>otu_ord<span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">id_number =</span> <span class="fu">rownames</span>(otu_ord)) </span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co"># only select 12PM samples </span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>id_number_24h <span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> </span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(date_string <span class="sc">==</span> <span class="st">"2024-06-02"</span><span class="sc">|</span> date_string <span class="sc">==</span> <span class="st">"2024-06-03"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(id_number)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>otu_ord_24h <span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">filter</span>(id_number <span class="sc">%in%</span> id_number_24h)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># only keep the OTU numbers in the matrix and remove the id_number column</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="do">## ID numbers are now rownames. then convert the df in a matrix.</span></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>otu_ord_mat_24h <span class="ot">&lt;-</span> otu_ord_24h <span class="sc">%&gt;%</span>  <span class="fu">select</span>(<span class="sc">-</span>id_number) <span class="sc">%&gt;%</span>  <span class="fu">as.matrix</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># only keep the OTU numbers in the matrix and remove the id_number column</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="do">## ID numbers are now rownames. then convert the df in a matrix.</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>otu_ord_mat_24h <span class="ot">&lt;-</span> otu_ord_24h <span class="sc">%&gt;%</span>  <span class="fu">select</span>(<span class="sc">-</span>id_number) <span class="sc">%&gt;%</span>  <span class="fu">as.matrix</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <section id="calculate-distances" class="level3">
 <h3 class="anchored" data-anchor-id="calculate-distances">Calculate distances</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. </span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2000</span>)</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co"># calcultat the distance matrix with bray-curtis method</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>MOBEAST_dist_24h <span class="ot">&lt;-</span> <span class="fu">vegdist</span>(otu_ord_mat_24h, <span class="at">method =</span> <span class="st">"bray"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. </span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2000</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># calcultat the distance matrix with bray-curtis method</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>MOBEAST_dist_24h <span class="ot">&lt;-</span> <span class="fu">vegdist</span>(otu_ord_mat_24h, <span class="at">method =</span> <span class="st">"bray"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co">#calculate the MDS scores such that it converges to a solutions. </span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="do">## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.</span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>nmds <span class="ot">&lt;-</span> <span class="fu">metaMDS</span>(MOBEAST_dist_24h, <span class="at">trymax =</span> <span class="dv">10000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co">#calculate the MDS scores such that it converges to a solutions. </span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="do">## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>nmds <span class="ot">&lt;-</span> <span class="fu">metaMDS</span>(MOBEAST_dist_24h, <span class="at">trymax =</span> <span class="dv">10000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Run 0 stress 0.131537 
 Run 1 stress 0.131537 
@@ -255,12 +254,12 @@ Run 19 stress 0.138874
 Run 20 stress 0.1737835 
 *** Best solution repeated 1 times</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># save the NMDS scores in a tibble with the ID numbers. </span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="ot">&lt;-</span> <span class="fu">scores</span>(nmds) <span class="sc">%&gt;%</span> <span class="fu">as_tibble</span>(<span class="at">rownames =</span> <span class="st">"id_number"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># save the NMDS scores in a tibble with the ID numbers. </span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="ot">&lt;-</span> <span class="fu">scores</span>(nmds) <span class="sc">%&gt;%</span> <span class="fu">as_tibble</span>(<span class="at">rownames =</span> <span class="st">"id_number"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add the metadata to the NMDS tibble to make plots </span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="ot">&lt;-</span> <span class="fu">left_join</span>(MOBEAST_nmds_24h, meta)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add the metadata to the NMDS tibble to make plots </span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="ot">&lt;-</span> <span class="fu">left_join</span>(MOBEAST_nmds_24h, meta)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="plotting-ndms-24h" class="level3">
@@ -268,23 +267,23 @@ Run 20 stress 0.1737835
 <section id="plotting-by-treatment" class="level4">
 <h4 class="anchored" data-anchor-id="plotting-by-treatment">Plotting by treatment</h4>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="sc">%&gt;%</span>   </span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">factor</span>(time_string, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"12:00:00"</span>, <span class="st">"18:00:00"</span>,</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="st">"00:00:00"</span>, <span class="st">"06:00:00"</span>))) <span class="sc">%&gt;%</span> </span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="co">#aes(colour = cluster, fill = cluster),</span></span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom=</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>, <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>time_string, <span class="at">ncol =</span> <span class="dv">4</span>)<span class="sc">+</span></span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"24h samples, ellipse by treatment"</span>)<span class="sc">+</span></span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
-<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="sc">%&gt;%</span>   </span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">factor</span>(time_string, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"12:00:00"</span>, <span class="st">"18:00:00"</span>,</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="st">"00:00:00"</span>, <span class="st">"06:00:00"</span>))) <span class="sc">%&gt;%</span> </span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="co">#aes(colour = cluster, fill = cluster),</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom=</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>, <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>time_string, <span class="at">ncol =</span> <span class="dv">4</span>)<span class="sc">+</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"24h samples, ellipse by treatment"</span>)<span class="sc">+</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -292,31 +291,31 @@ Run 20 stress 0.1737835
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="plotting-by-heatmap-cluster" class="level4">
 <h4 class="anchored" data-anchor-id="plotting-by-heatmap-cluster">Plotting by heatmap cluster</h4>
 <p>Note: cluster numbers are inaccurate and do not match what is seen in the heatmap. Problem with the distance matrix or clutering method or both…</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="sc">%&gt;%</span>   </span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">factor</span>(time_string, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"12:00:00"</span>, <span class="st">"18:00:00"</span>,</span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="st">"00:00:00"</span>, <span class="st">"06:00:00"</span>))) <span class="sc">%&gt;%</span> </span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">#stat_ellipse(aes(colour = cluster, fill = cluster),</span></span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>               <span class="co">#alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+</span></span>
-<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
-<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>time_string, <span class="at">ncol =</span> <span class="dv">2</span>)<span class="sc">+</span></span>
-<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"24h samples, ellipse by treatment"</span>)<span class="sc">+</span></span>
-<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
-<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
-<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>  ggforce<span class="sc">::</span><span class="fu">geom_mark_ellipse</span>(<span class="fu">aes</span>(<span class="at">color =</span> cluster, <span class="at">fill =</span> cluster), <span class="at">alpha =</span> <span class="fl">0.3</span>)<span class="sc">+</span></span>
-<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
-<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="sc">%&gt;%</span>   </span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">factor</span>(time_string, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"12:00:00"</span>, <span class="st">"18:00:00"</span>,</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="st">"00:00:00"</span>, <span class="st">"06:00:00"</span>))) <span class="sc">%&gt;%</span> </span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">#stat_ellipse(aes(colour = cluster, fill = cluster),</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>               <span class="co">#alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>time_string, <span class="at">ncol =</span> <span class="dv">2</span>)<span class="sc">+</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"24h samples, ellipse by treatment"</span>)<span class="sc">+</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>  ggforce<span class="sc">::</span><span class="fu">geom_mark_ellipse</span>(<span class="fu">aes</span>(<span class="at">color =</span> cluster, <span class="at">fill =</span> cluster), <span class="at">alpha =</span> <span class="fl">0.3</span>)<span class="sc">+</span></span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -324,24 +323,24 @@ Run 20 stress 0.1737835
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># raw NMDS plot with all the samples</span></span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="sc">%&gt;%</span>  </span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">factor</span>(time_string, </span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>                              <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"12:00:00"</span>,<span class="st">"18:00:00"</span>,<span class="st">"00:00:00"</span>,<span class="st">"06:00:00"</span> ))) <span class="sc">%&gt;%</span> </span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment))<span class="sc">+</span></span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="fu">aes</span>(<span class="at">colour =</span> time_string, <span class="at">fill =</span> time_string), </span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom =</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>)<span class="sc">+</span></span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
-<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"24h samples, ellipse by time"</span>)<span class="sc">+</span></span>
-<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
-<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#scale_fill_manual(values=treatment_colors) +</span></span>
-<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
-<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># raw NMDS plot with all the samples</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_24h <span class="sc">%&gt;%</span>  </span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">factor</span>(time_string, </span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>                              <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"12:00:00"</span>,<span class="st">"18:00:00"</span>,<span class="st">"00:00:00"</span>,<span class="st">"06:00:00"</span> ))) <span class="sc">%&gt;%</span> </span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment))<span class="sc">+</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="fu">aes</span>(<span class="at">colour =</span> time_string, <span class="at">fill =</span> time_string), </span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom =</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>)<span class="sc">+</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"24h samples, ellipse by time"</span>)<span class="sc">+</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#scale_fill_manual(values=treatment_colors) +</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -349,18 +348,18 @@ Run 20 stress 0.1737835
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 </section>
 <section id="stats-on-treatment-only" class="level3">
 <h3 class="anchored" data-anchor-id="stats-on-treatment-only">Stats on treatment only</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>perma_24h <span class="ot">&lt;-</span> <span class="fu">adonis2</span>(MOBEAST_dist_24h <span class="sc">~</span> MOBEAST_nmds_24h<span class="sc">$</span>treatment)<span class="co">#, </span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>        <span class="co"># formula to calculate p-value for treatments</span></span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#strata = MOBEAST_nmds_24h$tank_number) # accounts for repeated measures</span></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>        <span class="co"># should I add the stratum here ? What should I put if I keep it? </span></span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>perma_24h</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>perma_24h <span class="ot">&lt;-</span> <span class="fu">adonis2</span>(MOBEAST_dist_24h <span class="sc">~</span> MOBEAST_nmds_24h<span class="sc">$</span>treatment)<span class="co">#, </span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>        <span class="co"># formula to calculate p-value for treatments</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#strata = MOBEAST_nmds_24h$tank_number) # accounts for repeated measures</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>        <span class="co"># should I add the stratum here ? What should I put if I keep it? </span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>perma_24h</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Permutation test for adonis under reduced model
 Permutation: free
@@ -383,34 +382,34 @@ Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
 <section id="section" class="level2">
 <h2 class="anchored" data-anchor-id="section">12:00:00</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>otu_ord <span class="ot">&lt;-</span> OTU <span class="sc">%&gt;%</span> <span class="fu">t</span>() <span class="sc">%&gt;%</span> <span class="fu">as.data.frame</span>() </span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Make the sample ID the rownames of the data frame</span></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>otu_ord<span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">id_number =</span> <span class="fu">rownames</span>(otu_ord)) </span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="co"># only select 12PM samples </span></span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>samples_12PM <span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">as.character</span>(time_string),) <span class="sc">%&gt;%</span> </span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time_string <span class="sc">==</span> <span class="st">"12:00:00"</span> <span class="sc">&amp;</span> date <span class="sc">==</span> <span class="fu">ymd</span>(<span class="st">"2024-06-02"</span>)) <span class="sc">%&gt;%</span> <span class="fu">pull</span>(id_number)</span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>otu_ord_12PM <span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">filter</span>(id_number <span class="sc">%in%</span> samples_12PM)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>otu_ord <span class="ot">&lt;-</span> OTU <span class="sc">%&gt;%</span> <span class="fu">t</span>() <span class="sc">%&gt;%</span> <span class="fu">as.data.frame</span>() </span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Make the sample ID the rownames of the data frame</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>otu_ord<span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">id_number =</span> <span class="fu">rownames</span>(otu_ord)) </span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="co"># only select 12PM samples </span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>samples_12PM <span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">as.character</span>(time_string),) <span class="sc">%&gt;%</span> </span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time_string <span class="sc">==</span> <span class="st">"12:00:00"</span> <span class="sc">&amp;</span> date <span class="sc">==</span> <span class="fu">ymd</span>(<span class="st">"2024-06-02"</span>)) <span class="sc">%&gt;%</span> <span class="fu">pull</span>(id_number)</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>otu_ord_12PM <span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">filter</span>(id_number <span class="sc">%in%</span> samples_12PM)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># only keep the OTU numbers in the matrix and remove the id_number column</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="do">## ID numbers are now rownames. then convert the df in a matrix.</span></span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>otu_ord_mat_12PM <span class="ot">&lt;-</span> otu_ord_12PM <span class="sc">%&gt;%</span>  <span class="fu">select</span>(<span class="sc">-</span>id_number) <span class="sc">%&gt;%</span>  <span class="fu">as.matrix</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co"># only keep the OTU numbers in the matrix and remove the id_number column</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="do">## ID numbers are now rownames. then convert the df in a matrix.</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>otu_ord_mat_12PM <span class="ot">&lt;-</span> otu_ord_12PM <span class="sc">%&gt;%</span>  <span class="fu">select</span>(<span class="sc">-</span>id_number) <span class="sc">%&gt;%</span>  <span class="fu">as.matrix</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <section id="calculate-distances-1" class="level3">
 <h3 class="anchored" data-anchor-id="calculate-distances-1">Calculate distances</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co"># metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. </span></span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2000</span>)</span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="co"># calcultat the distance matrix with bray-curtis method</span></span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>MOBEAST_dist_12PM <span class="ot">&lt;-</span> <span class="fu">vegdist</span>(otu_ord_mat_12PM, <span class="at">method =</span> <span class="st">"bray"</span>)</span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a><span class="co">#calculate the MDS scores such that it converges to a solutions. </span></span>
-<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="do">## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.</span></span>
-<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>nmds <span class="ot">&lt;-</span> <span class="fu">metaMDS</span>(MOBEAST_dist_12PM, <span class="at">trymax =</span> <span class="dv">10000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co"># metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. </span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2000</span>)</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a><span class="co"># calcultat the distance matrix with bray-curtis method</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>MOBEAST_dist_12PM <span class="ot">&lt;-</span> <span class="fu">vegdist</span>(otu_ord_mat_12PM, <span class="at">method =</span> <span class="st">"bray"</span>)</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a><span class="co">#calculate the MDS scores such that it converges to a solutions. </span></span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a><span class="do">## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.</span></span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>nmds <span class="ot">&lt;-</span> <span class="fu">metaMDS</span>(MOBEAST_dist_12PM, <span class="at">trymax =</span> <span class="dv">10000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Run 0 stress 0.1093189 
 Run 1 stress 0.1235485 
@@ -444,34 +443,34 @@ Run 19 stress 0.1237929
 Run 20 stress 0.1235485 
 *** Best solution repeated 1 times</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># save the NMDS scores in a tibble with the ID numbers. </span></span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_12PM <span class="ot">&lt;-</span> <span class="fu">scores</span>(nmds) <span class="sc">%&gt;%</span> <span class="fu">as_tibble</span>(<span class="at">rownames =</span> <span class="st">"id_number"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># save the NMDS scores in a tibble with the ID numbers. </span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_12PM <span class="ot">&lt;-</span> <span class="fu">scores</span>(nmds) <span class="sc">%&gt;%</span> <span class="fu">as_tibble</span>(<span class="at">rownames =</span> <span class="st">"id_number"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="plotting-nmds" class="level3">
 <h3 class="anchored" data-anchor-id="plotting-nmds">Plotting NMDS</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add the metadata to the NMDS tibble to make plots </span></span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_12PM <span class="ot">&lt;-</span> <span class="fu">left_join</span>(MOBEAST_nmds_12PM, meta)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add the metadata to the NMDS tibble to make plots </span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_12PM <span class="ot">&lt;-</span> <span class="fu">left_join</span>(MOBEAST_nmds_12PM, meta)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_12PM <span class="sc">%&gt;%</span>   </span>
-<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",</span></span>
-<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="co"># "00:00:00", "06:00:00"))) %&gt;% </span></span>
-<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
-<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="co">#aes(colour = cluster, fill = cluster),</span></span>
-<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom=</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>, <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
-<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
-<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#facet_wrap(~time_string, ncol = 2)+</span></span>
-<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"12:00 samples"</span>)<span class="sc">+</span></span>
-<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
-<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
-<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
-<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_12PM <span class="sc">%&gt;%</span>   </span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="co"># "00:00:00", "06:00:00"))) %&gt;% </span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="co">#aes(colour = cluster, fill = cluster),</span></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom=</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>, <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#facet_wrap(~time_string, ncol = 2)+</span></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"12:00 samples"</span>)<span class="sc">+</span></span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -479,17 +478,17 @@ Run 20 stress 0.1235485
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="stats-on-treatment-only-1" class="level3">
 <h3 class="anchored" data-anchor-id="stats-on-treatment-only-1">Stats on treatment only</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>perma_12PM <span class="ot">&lt;-</span> <span class="fu">adonis2</span>(MOBEAST_dist_12PM <span class="sc">~</span> MOBEAST_nmds_12PM<span class="sc">$</span>treatment) <span class="co">#, </span></span>
-<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>        <span class="co"># formula to calculate p-value for treatments</span></span>
-<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#strata = MOBEAST_nmds_12PM$tank_number) # accounts for repeated measures</span></span>
-<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>perma_12PM</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>perma_12PM <span class="ot">&lt;-</span> <span class="fu">adonis2</span>(MOBEAST_dist_12PM <span class="sc">~</span> MOBEAST_nmds_12PM<span class="sc">$</span>treatment) <span class="co">#, </span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>        <span class="co"># formula to calculate p-value for treatments</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#strata = MOBEAST_nmds_12PM$tank_number) # accounts for repeated measures</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>perma_12PM</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Permutation test for adonis under reduced model
 Permutation: free
@@ -507,36 +506,36 @@ Total    17   2.1324 1.00000             </code></pre>
 <section id="section-1" class="level2">
 <h2 class="anchored" data-anchor-id="section-1">06:00:00</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>otu_ord <span class="ot">&lt;-</span> OTU <span class="sc">%&gt;%</span> </span>
-<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">t</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.data.frame</span>() </span>
-<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Make the sample ID the rownames of the data frame</span></span>
-<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>otu_ord<span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">id_number =</span> <span class="fu">rownames</span>(otu_ord)) </span>
-<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a><span class="co"># only select 12PM samples </span></span>
-<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>samples_6AM <span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">as.character</span>(time_string)) <span class="sc">%&gt;%</span> </span>
-<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time_string <span class="sc">==</span> <span class="st">"06:00:00"</span>) <span class="sc">%&gt;%</span> <span class="fu">pull</span>(id_number)</span>
-<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>otu_ord_6AM <span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">filter</span>(id_number <span class="sc">%in%</span> samples_6AM)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>otu_ord <span class="ot">&lt;-</span> OTU <span class="sc">%&gt;%</span> </span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">t</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.data.frame</span>() </span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Make the sample ID the rownames of the data frame</span></span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>otu_ord<span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">id_number =</span> <span class="fu">rownames</span>(otu_ord)) </span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a><span class="co"># only select 12PM samples </span></span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>samples_6AM <span class="ot">&lt;-</span> meta <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">time_string =</span> <span class="fu">as.character</span>(time_string)) <span class="sc">%&gt;%</span> </span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time_string <span class="sc">==</span> <span class="st">"06:00:00"</span>) <span class="sc">%&gt;%</span> <span class="fu">pull</span>(id_number)</span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a>otu_ord_6AM <span class="ot">&lt;-</span> otu_ord <span class="sc">%&gt;%</span> <span class="fu">filter</span>(id_number <span class="sc">%in%</span> samples_6AM)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="co"># only keep the OTU numbers in the matrix and remove the id_number column</span></span>
-<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="do">## ID numbers are now rownames. then convert the df in a matrix.</span></span>
-<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>otu_ord_mat_6AM <span class="ot">&lt;-</span> otu_ord_6AM <span class="sc">%&gt;%</span>  <span class="fu">select</span>(<span class="sc">-</span>id_number) <span class="sc">%&gt;%</span>  <span class="fu">as.matrix</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># only keep the OTU numbers in the matrix and remove the id_number column</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="do">## ID numbers are now rownames. then convert the df in a matrix.</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>otu_ord_mat_6AM <span class="ot">&lt;-</span> otu_ord_6AM <span class="sc">%&gt;%</span>  <span class="fu">select</span>(<span class="sc">-</span>id_number) <span class="sc">%&gt;%</span>  <span class="fu">as.matrix</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <section id="calculate-distances-2" class="level3">
 <h3 class="anchored" data-anchor-id="calculate-distances-2">Calculate distances</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. </span></span>
-<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2000</span>)</span>
-<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a><span class="co"># calcultat the distance matrix with bray-curtis method</span></span>
-<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>MOBEAST_dist_6AM <span class="ot">&lt;-</span> <span class="fu">vegdist</span>(otu_ord_mat_6AM, <span class="at">method =</span> <span class="st">"bray"</span>)</span>
-<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a><span class="co">#calculate the MDS scores such that it converges to a solutions. </span></span>
-<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a><span class="do">## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.</span></span>
-<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>nmds <span class="ot">&lt;-</span> <span class="fu">metaMDS</span>(MOBEAST_dist_6AM, <span class="at">trymax =</span> <span class="dv">10000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co"># metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. </span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2000</span>)</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a><span class="co"># calcultat the distance matrix with bray-curtis method</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>MOBEAST_dist_6AM <span class="ot">&lt;-</span> <span class="fu">vegdist</span>(otu_ord_mat_6AM, <span class="at">method =</span> <span class="st">"bray"</span>)</span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a><span class="co">#calculate the MDS scores such that it converges to a solutions. </span></span>
+<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a><span class="do">## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.</span></span>
+<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>nmds <span class="ot">&lt;-</span> <span class="fu">metaMDS</span>(MOBEAST_dist_6AM, <span class="at">trymax =</span> <span class="dv">10000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Run 0 stress 0.05695024 
 Run 1 stress 0.05183408 
@@ -574,34 +573,34 @@ Run 19 stress 0.05038186
 Run 20 stress 0.08067185 
 *** Best solution repeated 1 times</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># save the NMDS scores in a tibble with the ID numbers. </span></span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_6AM <span class="ot">&lt;-</span> <span class="fu">scores</span>(nmds) <span class="sc">%&gt;%</span> <span class="fu">as_tibble</span>(<span class="at">rownames =</span> <span class="st">"id_number"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co"># save the NMDS scores in a tibble with the ID numbers. </span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_6AM <span class="ot">&lt;-</span> <span class="fu">scores</span>(nmds) <span class="sc">%&gt;%</span> <span class="fu">as_tibble</span>(<span class="at">rownames =</span> <span class="st">"id_number"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="plotting-nmds-1" class="level3">
 <h3 class="anchored" data-anchor-id="plotting-nmds-1">Plotting NMDS</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add the metadata to the NMDS tibble to make plots </span></span>
-<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_6AM <span class="ot">&lt;-</span> <span class="fu">left_join</span>(MOBEAST_nmds_6AM, meta)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add the metadata to the NMDS tibble to make plots </span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_6AM <span class="ot">&lt;-</span> <span class="fu">left_join</span>(MOBEAST_nmds_6AM, meta)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
-<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_6AM <span class="sc">%&gt;%</span>   </span>
-<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",</span></span>
-<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="co"># "00:00:00", "06:00:00"))) %&gt;% </span></span>
-<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
-<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="co">#aes(colour = cluster, fill = cluster),</span></span>
-<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom=</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>, <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
-<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
-<span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#facet_wrap(~time_string, ncol = 2)+</span></span>
-<span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"12:00 samples"</span>)<span class="sc">+</span></span>
-<span id="cb40-14"><a href="#cb40-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
-<span id="cb40-15"><a href="#cb40-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
-<span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
-<span id="cb40-17"><a href="#cb40-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>MOBEAST_nmds_6AM <span class="sc">%&gt;%</span>   </span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",</span></span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>                                                      <span class="co"># "00:00:00", "06:00:00"))) %&gt;% </span></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x=</span> NMDS1, <span class="at">y =</span> NMDS2, <span class="at">colour =</span> treatment, <span class="at">fill=</span> treatment))<span class="sc">+</span></span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_ellipse</span>(<span class="co">#aes(colour = cluster, fill = cluster),</span></span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha =</span> <span class="fl">0.2</span>, <span class="at">geom=</span> <span class="st">"polygon"</span>, <span class="at">level =</span> <span class="fl">0.95</span>, <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">shape =</span> <span class="dv">1</span>, <span class="at">color =</span> <span class="st">"black"</span>,<span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#geom_label_repel(aes(label = date_string))+</span></span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#facet_wrap(~time_string, ncol = 2)+</span></span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title=</span> <span class="st">"12:00 samples"</span>)<span class="sc">+</span></span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values=</span>treatment_colors)<span class="sc">+</span></span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span>treatment_colors) <span class="sc">+</span></span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">#nunu_theme+</span></span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -609,16 +608,16 @@ Run 20 stress 0.08067185
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co">#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="stats-on-treatment-only-2" class="level3">
 <h3 class="anchored" data-anchor-id="stats-on-treatment-only-2">Stats on treatment only</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>perma_6AM <span class="ot">&lt;-</span> <span class="fu">adonis2</span>(MOBEAST_dist_6AM <span class="sc">~</span> MOBEAST_nmds_6AM<span class="sc">$</span>treatment)<span class="co">#, </span></span>
-<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>        <span class="co"># formula to calculate p-value for treatments</span></span>
-<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#strata = MOBEAST_nmds_6AM$tank_number) no need strata here because it restricts the permutations</span></span>
-<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>perma_6AM</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>perma_6AM <span class="ot">&lt;-</span> <span class="fu">adonis2</span>(MOBEAST_dist_6AM <span class="sc">~</span> MOBEAST_nmds_6AM<span class="sc">$</span>treatment)<span class="co">#, </span></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>        <span class="co"># formula to calculate p-value for treatments</span></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">#strata = MOBEAST_nmds_6AM$tank_number) no need strata here because it restricts the permutations</span></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>perma_6AM</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Permutation test for adonis under reduced model
 Permutation: free

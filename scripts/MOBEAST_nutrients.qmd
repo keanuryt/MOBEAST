@@ -20,7 +20,6 @@ editor: visual
 knitr::opts_chunk$set(message = FALSE)
 ```
 
-
 ## Load Libraries {.hidden}
 
 ```{r}
@@ -48,7 +47,6 @@ library(performance)
 library(multcompView)
 
 ```
-
 
 ## Load Data {.hidden}
 
@@ -83,7 +81,7 @@ treatment_colors = c("Inflow"="#00838F",
                      "Rain"= "yellow")
 ```
 
-## Data Clean Up {.hidden}
+## Data Clean Up 
 
 ```{r}
 #| output: false
@@ -105,28 +103,12 @@ nutrients<- nutrients %>% clean_names() %>%
 
 nutrients <- meta %>% left_join(nutrients) %>% 
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow", "Endmember")))
+
+#write_csv(nutrients, here("data", "Nutrients", "nutrient_raw.csv"))
 ```
 
-```{r}
-#| output: false
+## Data exploration 
 
-nutrients %>% 
-  filter(treatment == "Inflow") %>%
-  mutate(time_string = as.character(time_string),
-         date_string = as.character(date_string)) %>% 
-  pivot_longer(cols = N_N:NO3,
-               names_to = "nutrient",
-               values_to = "conc") %>% 
-  #mutate(inflow_color = ifelse(treatment == "Inflow", "Inflow", "Treatment")) %>% 
-  ggplot(aes(x= tank_number, y = conc, fill = tank_number))+
-  geom_boxplot()+
-  geom_jitter()+
-  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
-  facet_grid(time_string~date_string)+
-  nunu_theme
-  
-  
-```
 
 ```{r}
 #| output: false
@@ -160,7 +142,7 @@ nutrients %>%
 ```
 
 ```{r}
-#| output: false
+
 ## Table of high concentration nutrient, maybe should be remeasured
 nutrients %>% 
   filter(treatment != "Endmember") %>%
@@ -184,6 +166,40 @@ nutrients %>%
   #gtsave("nutrient_outliers.png")
          
 ```
+
+```{r}
+## removing outliers from the data set
+nutrients%>%
+  select(-run_number) %>% 
+  pivot_longer(cols = N_N:NO3,
+               names_to = "nutrient",
+               values_to = "conc") %>% 
+  filter(conc>0) %>% 
+  filter(treatment != "Endmember") %>% 
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(nutrient, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(log10(conc), probs = 0.25, na.rm = T),
+         quant3 = quantile(log10(conc), probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( log10(conc) > quant3 + (IQR*1.5) | log10(conc) < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% drop_na() %>% 
+  
+  ggplot(aes(x= treatment, y = conc))+
+  geom_violin(aes(fill = treatment))+
+  geom_jitter(aes(color = outlier)) + 
+  facet_wrap(~nutrient)+
+  scale_color_manual(values = c("red", "blue"))
+  
+  ## remove the outliers 
+  #filter(outlier == "outlier") 
+
+
+```
+
 
 ```{r}
 #| output: false
@@ -219,13 +235,32 @@ nutrients_norm <- nutrients %>%
   #organize the treatment levels
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
 
-#write_csv(DOC_norm, here("data", "DOC", "DOC_norm.csv"))
+#write_csv(nutrients_norm, here("data", "Nutrients", "nutrient_norm.csv"))
 ```
 
-
-## 12PM Nutrient analysis 
 ```{r}
-#| output: false
+## Data frame with outliers for Craig
+## removing outliers from the data set
+nutrient_Craig <- nutrients_norm %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment, nutrient) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(conc_norm, probs = 0.25, na.rm = T),
+         quant3 = quantile(conc_norm, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( conc_norm > quant3 + (IQR*1.5) | conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup()  
+
+#write_csv(nutrient_Craig, here("data", "Nutrients", "nutrient_norm_w_outliers.csv"))
+```
+
+## 12PM Nutrient analysis
+
+```{r}
 
 ## removing outliers from the data set
 nutrient_12PM <- nutrients_norm %>%
@@ -247,7 +282,6 @@ nutrient_12PM <- nutrients_norm %>%
   filter(outlier == "not outlier") 
 
 ```
-
 
 ```{r, fig.width=16, fig.height = 8}
 #| output: false 
@@ -273,7 +307,6 @@ nutrients_norm %>%
   nunu_theme +
   theme(legend.position = "none") 
 ```
-
 
 ### Iterative statistical modeling {.hidden}
 
@@ -325,7 +358,6 @@ for (var in nutrient_loop) {
 
 ```
 
-
 #### Nitrate-Nitrite
 
 ```{r}
@@ -344,15 +376,12 @@ resid_panel(models_12PM[[1]])
 graphs_12PM[[1]]
 ```
 
-
-
 ```{r}
 #emm <- emmeans(models_12PM[[1]], ~ treatment)
 #cld_letters <- cld(models_12PM[[1]], Letters = letters)
 ```
 
 #### Nitrite - Significant !
-
 
 ```{r}
 summary(models_12PM[[2]])
@@ -365,8 +394,6 @@ emmeans(models_12PM[[2]], specs = trt.vs.ctrl ~ treatment)
 resid_panel(models_12PM[[2]])
 graphs_12PM[[2]]
 ```
-
-
 
 #### Nitrate - need to log the data
 
@@ -382,7 +409,6 @@ resid_panel(models_12PM[["NO3"]])
 graphs_12PM[["NO3"]]
 ```
 
-
 #### Ammonium
 
 ```{r}
@@ -397,7 +423,6 @@ resid_panel(models_12PM[["NH3"]])
 graphs_12PM[["NH3"]]
 ```
 
-
 #### Phosphate
 
 ```{r}
@@ -407,12 +432,10 @@ emmeans(models_12PM[["PO4"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_12PM[["PO4]], ~ treatment)
 ```
 
-
 ```{r}
 resid_panel(models_12PM[["PO4"]])
 graphs_12PM[["PO4"]]
 ```
-
 
 #### Silicate
 
@@ -423,15 +446,12 @@ emmeans(models_12PM[["SiO2"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_12PM[["SiO2]], ~ treatment)
 ```
 
-
 ```{r}
 resid_panel(models_12PM[["SiO2"]])
 graphs_12PM[["SiO2"]]
 ```
 
-
-
-## 24h Nutrient Analysis 
+## 24h Nutrient Analysis
 
 ```{r}
 ## removing outliers from the data set
@@ -458,7 +478,6 @@ nutrient_24h <- nutrients_norm %>%
 
 ```
 
-
 ```{r, fig.width=16, fig.height = 8}
 ## Initial graph of the data distribution
 nutrient_24h %>% 
@@ -481,9 +500,8 @@ nutrient_24h %>%
         legend.position = "none") 
 ```
 
-
-
 ##### Data viz
+
 ```{r}
 ## Initial graph of the data distribution
 nutrient_24h%>% 
@@ -508,7 +526,7 @@ nutrient_24h%>%
 #ggsave(here("outputs","24H_NO2.png"), width = 16, height = 8)
 ```
 
-### Iterative stats 
+### Iterative stats
 
 ```{r}
 # Suppose your dataframe is df with columns: date, time, resp, var1, var2, var3
@@ -527,6 +545,7 @@ for (var in nutrient_loop) {
 ```
 
 ### Iterative graphing
+
 ```{r}
 
 nutrient_loop <- nutrient_24h %>% select(nutrient) %>% distinct() %>% pull()
@@ -558,7 +577,6 @@ for (var in nutrient_loop) {
 
 ```
 
-
 #### Nitrate-Nitrite
 
 ```{r}
@@ -568,12 +586,10 @@ emmeans(models_24h[["N_N"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_24h[["N _N]], ~ treatment)
 ```
 
-
 ```{r}
 resid_panel(models_24h[["N_N"]])
 graphs_24h[["N_N"]]
 ```
-
 
 #### Nitrite - Significant !
 
@@ -584,15 +600,11 @@ emmeans(models_24h[["NO2"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_24h[["NO2]], ~ treatment)
 ```
 
-
-
 ```{r}
 resid_panel(models_24h[["NO2"]])
 graphs_24h[["NO2"]]
 ```
 
-
- 
 #### Nitrate - Significant different in the CCA
 
 ```{r}
@@ -602,14 +614,10 @@ emmeans(models_24h[["NO3"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_24h[["NO3]], ~ treatment)
 ```
 
-
-
 ```{r}
 resid_panel(models_24h[["NO3"]])
 graphs_24h[["NO3"]]
 ```
-
-
 
 #### Ammonium
 
@@ -620,15 +628,12 @@ emmeans(models_24h[["NH3"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_24h[["NH3]], ~ treatment)
 ```
 
-
 ```{r}
 resid_panel(models_24h[["NH3"]])
 graphs_24h[["NH3"]]
 ```
-:::
-::::
 
-
+::: ::::
 #### Phosphate
 
 ```{r}
@@ -643,8 +648,7 @@ resid_panel(models_24h[["PO4"]])
 graphs_24h[["PO4"]]
 ```
 
-
-#### Silicate - May need to log transform 
+#### Silicate - May need to log transform
 
 ```{r}
 summary(models_24h[["SiO2"]])
@@ -653,17 +657,8 @@ emmeans(models_24h[["SiO2"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_24h[["SiO2]], ~ treatment)
 ```
 
-
-
 ```{r}
 resid_panel(models_24h[["SiO2"]])
 graphs_24h[["SiO2"]]
 ```
-
-
-
-
-
-
-
-
+:::
