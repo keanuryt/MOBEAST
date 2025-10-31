@@ -163,8 +163,9 @@ MOBEAST_nmds_24h <- scores(nmds) %>% as_tibble(rownames = "id_number")
 MOBEAST_nmds_24h <- left_join(MOBEAST_nmds_24h, meta)
 ```
 
-### Plotting NDMS 24h
 
+
+### Plotting NDMS 24h
 #### Plotting by treatment
 
 ```{r, fig.width=16, fig.height= 6}
@@ -181,11 +182,43 @@ MOBEAST_nmds_24h %>%
   #geom_label_repel(aes(label = date_string))+
   facet_wrap(~time_string, ncol = 4)+
   labs(title= "24h samples, ellipse by treatment")+
-  scale_color_manual(values=treatment_colors)+
-  scale_fill_manual(values=treatment_colors) +
+  scale_color_manual(values=treatment_colors )+
+  scale_fill_manual(values= treatment_colors) +
   #nunu_theme+
   theme_bw()
 #ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+
+```
+
+
+
+#### Identifying the 2 samples that cluster alone in the Heatmaps 
+```{r}
+MOBEAST_nmds_24h_bis <- MOBEAST_nmds_24h %>% 
+  mutate(treatment_bis = treatment) %>% 
+  mutate(treatment_bis = ifelse(id_number == "MOBEAST010" |id_number == "MOBEAST060", "weird", treatment_bis ))
+```
+
+```{r, fig.width=16, fig.height= 6}
+# Plot
+MOBEAST_nmds_24h_bis %>%  
+  mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment_bis, fill= treatment_bis))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  facet_wrap(~time_string, ncol = 4)+
+  labs(title= "24h samples, ellipse by treatment")+
+  scale_color_manual(values= c("Inflow"="#00838F", "Control"="grey", "Coral"="#03A9F4", "CCA"="#EF5350", "Algae"="#4CAF50","weird"= "yellow"))+
+  scale_fill_manual(values= c("Inflow"="#00838F", "Control"="grey", "Coral"="#03A9F4", "CCA"="#EF5350", "Algae"="#4CAF50","weird"= "yellow")) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+
 ```
 
 #### Plotting by heatmap cluster
