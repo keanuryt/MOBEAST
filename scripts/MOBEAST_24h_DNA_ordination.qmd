@@ -62,7 +62,7 @@ cluster <- read_csv(here("data","DNA", "24h_clusters.csv"))
 # Data Clean Up
 
 ```{, meta data clean up} 
-meta\<- meta %\>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"), time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %\>% \# "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters \# "\\1:\\2", group1 + ":" + group2 mutate(time = paste0(time, ":00"), date_time = paste(date, time), date = mdy(date), date_time = mdy_hms(date_time), time = factor(time))
+meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"), time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %\>% \# "(\\d{2})(\\d{2})" separates the string in 2 groups of 2 characters \# "\\1:\\2", group1 + ":" + group2 mutate(time = paste0(time, ":00"), date_time = paste(date, time), date = mdy(date), date_time = mdy_hms(date_time), time = factor(time))
 ```         
 
 ## Preparing the metadata to annotate the heatmap
@@ -269,10 +269,42 @@ MOBEAST_nmds_24h %>%
 ### Stats on treatment only
 
 ```{r}
-perma_24h <- adonis2(MOBEAST_dist_24h ~ MOBEAST_nmds_24h$treatment)#, 
+# Tranform the distance matrix into a df that I can use adonis on 
+id_number_24h <- meta %>% filter(date_string == "2024-06-02" |date_string == "2024-06-03") %>% pull(id_number)
+
+distance_24h <- MOBEAST_dist_24h %>% as.matrix() %>% as.data.frame() %>% 
+  mutate(id_number = id_number_24h)%>% 
+  relocate(id_number, .before = MOBEAST001)
+
+rownames(distance_24h) <- NULL
+```
+```{r}
+meta_distance_24h <- inner_join(meta, distance_24h, by = "id_number") %>% 
+  select(-long_name, -date_string, -time_string, -date_time_string,-cluster)
+meta_distance_24h 
+
+all_dist <- meta_distance_24h %>% 
+  select(all_of(meta_distance_24h[["id_number"]])) %>% 
+  as.dist()
+```
+
+```{r}
+# Note : Version 2 of adonis 
+perma_24h <- adonis2(all_dist ~ treatment + date_time + treatment:date_time, data = meta_distance_24h,
+        permutations = 1000)
+perma_24h
+
+```
+
+
+```{r}
+# Note : Version 1 of adonis
+## the results are the same between adonis stats V1 and V2
+perma_24h <- adonis2(MOBEAST_dist_24h ~ treatment*date_time, 
+                     data = MOBEAST_nmds_24h)# , 
         # formula to calculate p-value for treatments
-        #strata = MOBEAST_nmds_24h$tank_number) # accounts for repeated measures
-        # should I add the stratum here ? What should I put if I keep it? 
+        #strata = MOBEAST_nmds_24h$date_time) # accounts for repeated measures
+
 perma_24h
 ```
 

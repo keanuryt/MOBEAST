@@ -419,11 +419,15 @@ nutrients_norm %>%
   #theme(legend.position = "none") 
 ```
 
-### Iterative statistical modeling {.hidden}
+### Iterative statistical modeling 
 
 ```{r}
-# Suppose your dataframe is df with columns: date, time, resp, var1, var2, var3
-# Independent variables:
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
 nutrient_loop <- nutrient_12PM %>% select(nutrient) %>% distinct() %>% pull()
 
 models_12PM <- vector(mode = "list", length = length(nutrient_loop))
@@ -436,9 +440,14 @@ for (var in nutrient_loop) {
 
 ```
 
-### Iterative graphing {.hidden}
+### Iterative graphing 
 
 ```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## --> In the for-loop, filter the df by nutrient and make a graph that will display nutrient data
+## Save the outputs of the model in the list such that each nutrient has its stats
 
 nutrient_loop <- nutrient_12PM %>% select(nutrient) %>% distinct() %>% pull()
 
@@ -487,6 +496,7 @@ resid_panel(models_12PM[[1]])
 graphs_12PM[[1]]+ 
   geom_jitter(aes(color = inflow_table), size = 2)+
   scale_color_manual(values = c("red", "blue"))+
+  facet_wrap(date~.)+
   theme(legend.position = "right")
 ```
 
@@ -509,6 +519,7 @@ resid_panel(models_12PM[[2]])
 graphs_12PM[[2]] + 
   geom_jitter(aes(color = inflow_table), size = 2)+
   scale_color_manual(values = c("red", "blue"))+
+  facet_wrap(date~.)+
   theme(legend.position = "right")
 ```
 
@@ -526,6 +537,7 @@ resid_panel(models_12PM[["NO3"]])
 graphs_12PM[["NO3"]]+ 
   geom_jitter(aes(color = inflow_table), size = 2)+
   scale_color_manual(values = c("red", "blue"))+
+  facet_wrap(date~.)+
   theme(legend.position = "right")
 ```
 
@@ -543,6 +555,7 @@ resid_panel(models_12PM[["NH3"]])
 graphs_12PM[["NH3"]]+ 
   geom_jitter(aes(color = inflow_table), size = 2)+
   scale_color_manual(values = c("red", "blue"))+
+  facet_wrap(date~.)+
   theme(legend.position = "right")
 ```
 
@@ -560,6 +573,7 @@ resid_panel(models_12PM[["PO4"]])
 graphs_12PM[["PO4"]]+ 
   geom_jitter(aes(color = inflow_table), size = 2)+
   scale_color_manual(values = c("red", "blue"))+
+  facet_wrap(date~.)+
   theme(legend.position = "right")
 ```
 
@@ -577,6 +591,7 @@ resid_panel(models_12PM[["SiO2"]])
 graphs_12PM[["SiO2"]]+ 
   geom_jitter(aes(color = inflow_table), size = 2)+
   scale_color_manual(values = c("red", "blue"))+
+  facet_wrap(date~.)+
   theme(legend.position = "right")
 ```
 
@@ -717,7 +732,12 @@ emmeans(models_24h[["N_N"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_24h[["N_N"]])
-graphs_24h[["N_N"]]
+graphs_24h[["N_N"]]+
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
+  
+
 ```
 
 #### Nitrite - Significant !
@@ -731,7 +751,10 @@ emmeans(models_24h[["NO2"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_24h[["NO2"]])
-graphs_24h[["NO2"]]
+graphs_24h[["NO2"]]+
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 #### Nitrate - Significant different in the CCA
@@ -745,7 +768,10 @@ emmeans(models_24h[["NO3"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_24h[["NO3"]])
-graphs_24h[["NO3"]]
+graphs_24h[["NO3"]]+
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 #### Ammonium
@@ -759,7 +785,10 @@ emmeans(models_24h[["NH3"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_24h[["NH3"]])
-graphs_24h[["NH3"]]
+graphs_24h[["NH3"]]+
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 ::: ::::
@@ -774,7 +803,10 @@ emmeans(models_24h[["PO4"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_24h[["PO4"]])
-graphs_24h[["PO4"]]
+graphs_24h[["PO4"]] +
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 
 #### Silicate - May need to log transform
@@ -788,6 +820,9 @@ emmeans(models_24h[["SiO2"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r}
 resid_panel(models_24h[["SiO2"]])
-graphs_24h[["SiO2"]]
+graphs_24h[["SiO2"]]+
+  geom_jitter(aes(color = inflow_table), size = 2)+
+  scale_color_manual(values = c("red", "blue"))+
+  theme(legend.position = "right")
 ```
 :::
