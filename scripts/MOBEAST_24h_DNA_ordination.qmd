@@ -290,9 +290,17 @@ all_dist <- meta_distance_24h %>%
 
 ```{r}
 # Note : Version 2 of adonis 
-perma_24h <- adonis2(all_dist ~ treatment + date_time + treatment:date_time, data = meta_distance_24h,
-        permutations = 1000)
+perma_24h <- adonis2(all_dist ~ treatment + date_time + treatment:date_time, 
+                     data = meta_distance_24h,
+                     #permutations = 1000, 
+                     strata = meta_distance_24h$tank_number)
 perma_24h
+
+## Random effect (strata) should be applied on the tank because we sample repeatedly in the tank.
+## We don't sample the same tank multiple times at a time point. 
+## We may have a time interaction tho, so I added the date_time in the model formula. 
+### Note: why is the output of the model not show fixed effects and random effects like lmer()? 
+
 
 ```
 
@@ -301,9 +309,9 @@ perma_24h
 # Note : Version 1 of adonis
 ## the results are the same between adonis stats V1 and V2
 perma_24h <- adonis2(MOBEAST_dist_24h ~ treatment*date_time, 
-                     data = MOBEAST_nmds_24h)# , 
+                     data = MOBEAST_nmds_24h, 
         # formula to calculate p-value for treatments
-        #strata = MOBEAST_nmds_24h$date_time) # accounts for repeated measures
+        strata = MOBEAST_nmds_24h$date_time) # accounts for repeated measures
 
 perma_24h
 ```

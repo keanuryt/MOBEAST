@@ -20,14 +20,10 @@ editor: visual
 knitr::opts_chunk$set(message = FALSE)
 ```
 
-## To Do : Craig Comments 
-XX - Try getting the two random samples that are clustering as outliers out of the analysis and see how it looks.  
-- Look at how those samples show up on the ordination. Prep some slides to explore those samples, particularly the relative abundance (not z-scores) of the module of taxa enriched in those two samples, to see if they are transient rare taxa or abundant in those samples.
-- Make a version of each violin plot where the points are colored by "Water Table" to see if there are any parameters or treatments or times where one table had some issues. Use "jitter" to spread the points out so you can see them.
-- Consider doing outlier removals (should never be more than a few points, maybe 10% max for each parameter) before subtracting inlet mean values. This way if you get some random high value in an inlet sample it doesn't have an outsized impact on your analyses.
-- If you are going to work with nitrate we need to look at distributions of the raw values of each of the nutrient parameters. You can make those graphs and/or send over your dataframe.
+## To Do : Craig Comments
 
-
+XX - Try getting the two random samples that are clustering as outliers out of the analysis and see how it looks.\
+- Look at how those samples show up on the ordination. Prep some slides to explore those samples, particularly the relative abundance (not z-scores) of the module of taxa enriched in those two samples, to see if they are transient rare taxa or abundant in those samples. - Make a version of each violin plot where the points are colored by "Water Table" to see if there are any parameters or treatments or times where one table had some issues. Use "jitter" to spread the points out so you can see them. - Consider doing outlier removals (should never be more than a few points, maybe 10% max for each parameter) before subtracting inlet mean values. This way if you get some random high value in an inlet sample it doesn't have an outsized impact on your analyses. - If you are going to work with nitrate we need to look at distributions of the raw values of each of the nutrient parameters. You can make those graphs and/or send over your dataframe.
 
 ## Load Libraries {.hidden}
 
@@ -57,7 +53,7 @@ library(multcompView)
 
 ```
 
-## Load Data 
+## Load Data
 
 ```{r}
 #| output: false
@@ -116,7 +112,6 @@ nutrients <- meta %>% left_join(nutrients) %>%
 #write_csv(nutrients, here("data", "Nutrients", "nutrient_raw.csv"))
 ```
 
-
 ```{r}
 ## removing outliers from the data set
 raw_flagged_outliers <- nutrients%>%
@@ -143,7 +138,6 @@ raw_flagged_outliers <- nutrients%>%
 
 
 ```
-
 
 ## Data exploration
 
@@ -178,8 +172,7 @@ nutrients %>%
 
 ```
 
-```{}
-
+```         
 ## Table of high concentration nutrient, maybe should be remeasured
 nutrients %>% 
   filter(treatment != "Endmember") %>%
@@ -260,10 +253,9 @@ raw_flagged_outliers %>%
   nunu_theme
 ```
 
+## Data Normalization
 
-## Data Normalization 
-
-```{}
+```         
 # Version 1
 # Normalization of data with the outliers 
 
@@ -301,7 +293,6 @@ nutrients_norm <- nutrients %>%
 #write_csv(nutrients_norm, here("data", "Nutrients", "nutrient_norm.csv"))
 ```
 
-
 ```{r}
 # Normalization version 2
 ## averaging the inflows for normalization 
@@ -335,8 +326,7 @@ nutrients_norm <- raw_flagged_outliers %>%
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
 ```
 
-
-```{}
+```         
 ## Data frame with outliers for Craig
 ## removing outliers from the data set
 nutrient_Craig <- nutrients_norm %>%
@@ -358,8 +348,7 @@ nutrient_Craig <- nutrients_norm %>%
 
 ## 12PM Nutrient analysis
 
-```{}
-
+```         
 ## removing outliers from the data set
 nutrient_12PM <- nutrients_norm %>%
   filter(time_string == "12:00:00") %>% 
@@ -378,7 +367,6 @@ nutrient_12PM <- nutrients_norm %>%
   ungroup() %>% 
   ## remove the outliers 
   filter(outlier == "not outlier") 
-
 ```
 
 ```{r}
@@ -419,7 +407,7 @@ nutrients_norm %>%
   #theme(legend.position = "none") 
 ```
 
-### Iterative statistical modeling 
+### Iterative statistical modeling
 
 ```{r}
 # Loop Function:
@@ -440,7 +428,7 @@ for (var in nutrient_loop) {
 
 ```
 
-### Iterative graphing 
+### Iterative graphing
 
 ```{r}
 # Loop Function:
@@ -598,6 +586,9 @@ graphs_12PM[["SiO2"]]+
 ## 24h Nutrient Analysis
 
 ```{r}
+ATTENTION : THIS BLOCK IS WRONG
+Double outlier detection ? 
+  
 ## removing outliers from the data set
 nutrient_24h <- nutrients_norm %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 

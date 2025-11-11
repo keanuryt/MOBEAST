@@ -1,7 +1,7 @@
 ---
 title: "MOBEAST DNA"
 format: html
-editor: visual
+editor: source
 ---
 
 ```{r setup, include = FALSE}
@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 ## Load Libraries
+
 ```{r}
 library(tidyverse)
 library(lubridate)
@@ -40,13 +41,12 @@ library(circlize)
 
 ```
 
-Heatmap info and tutorial:
-https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html
-
+Heatmap info and tutorial: https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html
 
 ## Functions
 
 ### Heatmap Sean's function
+
 ```{r}
 # Heat map funciton
 # function to sum by family
@@ -100,7 +100,7 @@ prep_ht_mat = function(otus,
 }
 ```
 
-### Rayna's z-score function 
+### Rayna's z-score function
 
 ```{r, echo=FALSE, collapse=TRUE}
 
@@ -119,6 +119,7 @@ zscore.calculation = function(x) {
 ```
 
 ## Data visualization theme
+
 ```{r}
 nunu_theme <- theme_bw() + 
   theme(plot.title = element_text(size=14, face = "bold"), 
@@ -133,6 +134,7 @@ nunu_theme <- theme_bw() +
 ```
 
 ### Color palette
+
 ```{r}
 treatment_colors = c(
   #Treatments
@@ -144,8 +146,8 @@ treatment_colors = c(
 
 ```
 
+## Load Data
 
-## Load Data 
 ```{r}
 OTU <- read_csv(here("data", "DNA","MOBEAST_OTU_culled.csv"))
 meta <- read_csv(here("data","MOBEAST_metadata_heatmaps.csv"))
@@ -158,10 +160,10 @@ OTU_long <- read_csv(here("data","MOBEAST_DNA_long.csv"))
 
 ```
 
-
 ## Data clean-up
 
-Reformating the date, time and date-time in the metadata file 
+Reformating the date, time and date-time in the metadata file
+
 ```{r, meta data clean up}
 meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0"),
                time = str_replace(time, "(\\d{2})(\\d{2})", "\\1:\\2")) %>% 
@@ -175,6 +177,7 @@ meta<- meta %>% mutate(time = str_pad(time, width = 4, side = "left", pad = "0")
   
   
 ```
+
 ### Preparing the metadata to annotate the heatmap
 
 ```{r}
@@ -192,6 +195,7 @@ meta <- meta %>% mutate(treatment = as.character(treatment)) %>%
 ```
 
 Clean up the long format data to make it easier to merge with the meta data file
+
 ```{r}
 OTU_long<- OTU_long %>% clean_names() %>% 
   mutate(id_number = sample_id) %>% 
@@ -200,13 +204,14 @@ OTU_long<- OTU_long %>% clean_names() %>%
 ```
 
 Fusion!
+
 ```{r}
 OTU_htm <- left_join(OTU_long, meta)
 #write_csv(OTU_htm, "OTU_heatmap_ready.csv", path = here("data", "OTU_heatmap_ready.csv"))
 ```
 
-
 ## Z-Scored Heatmap Reference
+
 ### Preparing the OTU matrix for heatmap
 
 ```{r, echo=TRUE, collapse=TRUE}
@@ -223,14 +228,12 @@ family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family
 
 ```
 
-
 ```{r, nunu's}
 # Remove ID number from the data frame
 ## Z-score function only works on df that has a matrix format
 culled.abund.OTU <- family.culled.abund %>% ungroup() %>% tibble() %>%  select(-id_number)
 
 ```
-
 
 ```{r, nunu's}
 # Calculate Z-score on df/matrix
@@ -239,7 +242,6 @@ z.zscore.data.otu.subset <- as.data.frame(apply(culled.abund.OTU, 2, FUN=zscore.
 # bring back the sample ID number in the df 
 z.zscore.data.otu.subset$id_number = family.culled.abund$id_number
 ```
-
 
 ```{r, nunu's}
 # Set the ID numbers as the rownames (to make a matrix)
@@ -251,7 +253,9 @@ zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>%
 ```
 
 ### Generate Heatmap
+
 #### Annotations for the heatmap
+
 ```{r}
 ## Create a vector that will have information of a variable and its associate sample 
 treatment <- meta[match(colnames(zscore.data.otu.matrix),
@@ -295,6 +299,7 @@ ha = HeatmapAnnotation(
 ```
 
 #### Print the Heatmap
+
 ```{r, fig.height = 10, fig.width = 16}
 #png(width=1800, height=1000, file= here("outputs", "zscore_alldata.png"))
 
@@ -314,14 +319,13 @@ draw(ht)
 
 ```
 
+## 12PM Z-Scored Heatmap
 
-## 12PM Z-Scored Heatmap 
 ### Preparing the OTU matrix for heatmap
 
 ```{r}
 OTU_htm_12PM <- OTU_htm %>% filter(time_string == "12:00:00")
 ```
-
 
 ```{r, echo=TRUE, collapse=TRUE}
 #Make a heatmap of z-scored relative abundance data after it was summed by family
@@ -355,7 +359,9 @@ zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>%
 ```
 
 ### Generate Heatmap
+
 #### Annotation
+
 ```{r}
 ## Create a vector that will have information of a variable and its associate sample 
 treatment <- meta[match(colnames(zscore.data.otu.matrix),
@@ -384,6 +390,7 @@ ha = HeatmapAnnotation(
 ```
 
 #### Printing heatmap
+
 ```{r, fig.height = 10, fig.width = 16}
 #png(width=1800, height=1000, file= here("outputs", "zscore_12PMdata.png"))
 
@@ -403,8 +410,7 @@ draw(ht)
 
 ```
 
-
-### 12PM color by day 
+### 12PM color by day
 
 ```{r}
 OTU_htm_12PM <- OTU_htm %>% filter(time_string == "12:00:00") 
@@ -442,7 +448,9 @@ zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>%
 ```
 
 ### Generate Heatmap
+
 #### Annotation
+
 ```{r}
 ## Create a vector that will have information of a variable and its associate sample 
 treatment <- meta[match(colnames(zscore.data.otu.matrix),
@@ -471,6 +479,7 @@ ha = HeatmapAnnotation(
 ```
 
 #### Printing heatmap
+
 ```{r, fig.height = 10, fig.width = 16}
 #png(width=1800, height=1000, file= here("outputs", "zscore_12PMdata.png"))
 
@@ -490,13 +499,12 @@ draw(ht)
 
 ```
 
-## June 4 and 6 map 
+## June 4 and 6 map
 
 ```{r}
 OTU_htm_June4_6 <- OTU_htm %>% filter(time_string == "12:00:00") %>% 
   filter(date_string == "2024-06-04" | date_string == "2024-06-06" ) 
 ```
-
 
 ```{r, echo=TRUE, collapse=TRUE}
 #Make a heatmap of z-scored relative abundance data after it was summed by family
@@ -541,7 +549,9 @@ zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>%
 ```
 
 ### Generate Heatmap
+
 #### Annotation
+
 ```{r}
 ## Create a vector that will have information of a variable and its associate sample 
 treatment <- meta[match(colnames(zscore.data.otu.matrix),
@@ -570,6 +580,7 @@ ha = HeatmapAnnotation(
 ```
 
 #### Printing heatmap
+
 ```{r, fig.height = 10, fig.width = 16}
 #png(width=1800, height=1000, file= here("outputs", "zscore_12PMdata.png"))
 
@@ -589,9 +600,8 @@ draw(ht)
 
 ```
 
+## 24h Z-Scored Heatmap
 
-
-## 24h Z-Scored Heatmap 
 ### Preparing the OTU matrix for heatmap
 
 ```{r}
@@ -599,7 +609,6 @@ OTU_htm_24h <- OTU_htm %>%
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) 
 OTU_htm_24h <- OTU_htm_24h %>% filter(family != "Bradymonadales_fa")
 ```
-
 
 ```{r, echo=TRUE, collapse=TRUE}
 #Make a heatmap of z-scored relative abundance data after it was summed by family
@@ -633,7 +642,9 @@ zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>%
 ```
 
 ### Generate Heatmap
+
 #### Annotation
+
 ```{r}
 ## Create a vector that will have information of a variable and its associate sample 
 treatment <- meta[match(colnames(zscore.data.otu.matrix),
@@ -663,9 +674,8 @@ ha = HeatmapAnnotation(
 
 ```
 
-
-
 #### Printing heatmap
+
 ```{r, fig.height = 10, fig.width = 16}
 #png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
 
@@ -689,7 +699,8 @@ ht_drawn <- draw(ht)
 
 ```
 
-### Cluster membership 
+### Cluster membership
+
 ```{r}
 col_orders<- column_order(ht_drawn)
 
@@ -701,6 +712,7 @@ cluster_df <- data.frame(
 rownames(cluster_df)<- NULL
 
 ```
+
 ```{r}
 cluster_df<- cluster_df %>% 
   mutate(id_number = ifelse(id_number<10,
@@ -709,10 +721,11 @@ cluster_df<- cluster_df %>%
 #write_csv(cluster_df, here("data", "DNA", "24h_clusters.csv"))
 ```
 
+### Cluster membership - code by Sean
 
-### Cluster membership - code by Sean 
 Not useful for cluster membership but to see the dendrograms, it's useful!
-```{}
+
+```         
 # choose a distance metric
 # note: you could use vegdist to do something like Bray curtis distances instead
 # by default Heatmap uses 'euclidean' distances
@@ -779,9 +792,8 @@ par(mfrow = c(2,1))
 plot(col_dend)
 ```
 
+## 24h separated maps
 
-
-## 24h separated maps 
 ### Preparing the OTU matrix for heatmap
 
 ```{r}
@@ -803,7 +815,8 @@ OTU_htm_24_06 <- OTU_htm %>%
 
 ```
 
-### 24h - 12:00 map 
+### 24h - 12:00 map
+
 ```{r, echo=TRUE, collapse=TRUE}
 #Make a heatmap of z-scored relative abundance data after it was summed by family
 #https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
@@ -836,7 +849,9 @@ zscore.data.otu.matrix <- z.zscore.data.otu.subset %>% select(-id_number) %>%
 ```
 
 ### Generate Heatmap
+
 #### Annotation
+
 ```{r}
 ## Create a vector that will have information of a variable and its associate sample 
 treatment <- meta[match(colnames(zscore.data.otu.matrix),
@@ -866,6 +881,7 @@ ha = HeatmapAnnotation(
 ```
 
 #### Printing heatmap
+
 ```{r, fig.height = 10, fig.width = 16}
 #png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
 
@@ -885,8 +901,7 @@ draw(ht)
 
 ```
 
-### 24h - 06:00 map 
-
+### 24h - 06:00 map
 
 ```{r, echo=TRUE, collapse=TRUE}
 #Make a heatmap of z-scored relative abundance data after it was summed by family
@@ -921,7 +936,9 @@ zscore.data.otu.matrix <- z.zscore.data.otu.subset %>%
 ```
 
 ### Generate Heatmap
+
 #### Annotation
+
 ```{r}
 ## Create a vector that will have information of a variable and its associate sample 
 treatment <- meta[match(colnames(zscore.data.otu.matrix),
@@ -951,6 +968,7 @@ ha = HeatmapAnnotation(
 ```
 
 #### Printing heatmap
+
 ```{r, fig.height = 10, fig.width = 16}
 #png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
 
@@ -969,4 +987,3 @@ draw(ht)
 #dev.off()
 
 ```
-
