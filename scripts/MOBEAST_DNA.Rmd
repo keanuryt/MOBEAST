@@ -1,0 +1,66 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: MOBEAST - DNA
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+#library(car) # ANOVA package
+#library(ggeffects)
+#library(effects) #dependency for ggeffects
+#library(ggResidpanel) #residual panel
+#library(lme4)
+#library(lmerTest)
+#library(sjPlot)
+#library(GGally)
+#library(emmeans)
+#library(performance)
+
+```
+
+## Data visualization theme
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=14, face = "bold"), 
+        plot.subtitle = element_text(size=12),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 12, face = "bold"),
+        legend.title=element_text(size=12, face = "bold"),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        panel.background = element_rect(fill = "azure1"))
+```
+
+## Load Data 
+```{r}
+DNA <- read_csv(here("data", "MOBEAST_DNA_long.csv"))
+```
+
+## Data clean up
+```{r}
+DNA %>% mutate(date = mdy(date), 
+               time = paste0(time, ":00"),
+               time = hms(time))
+```
+
+
+
+
+

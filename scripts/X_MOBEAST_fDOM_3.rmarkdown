@@ -1,0 +1,1347 @@
+---
+title: "MOBEAST fDOM V3"
+format: 
+  html:
+    toc: true
+    toc-location: left
+editor: source
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+
+
+## Load Libraries
+
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+library(ggridges)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+#library(GGally)
+library(emmeans)
+library(performance)
+
+
+```
+
+
+
+## Data visualization theme
+
+
+
+```{r}
+nunu_theme <- theme_bw() + 
+  theme(plot.title = element_text(size=32, face = "bold"), 
+        plot.subtitle = element_text(size=30),
+        axis.title = element_text(size = 28, face = "bold"),
+        axis.text = element_text(size = 28),
+        strip.text.x = element_text(size = 28, face = "bold"),
+        legend.title=element_text(size=28, face = "bold"),
+        legend.text=element_text(size=28))
+```
+
+```{r}
+#| output: false
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
+
+## Load Data
+
+
+
+```{r}
+fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
+
+fDOM <- fDOM %>% mutate(treatment = ifelse(treatment == "Rubble", "CCA", treatment)) %>%
+  select(-sample_type)
+
+table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+```
+
+
+
+## Data Clean-Up
+### Sub-catergorization of fDOM types
+
+
+```{r}
+fDOM_desc <- tibble(fdom = c("coble_a","coble_b","coble_c","coble_m","coble_t",
+  "m_to_c","bix","hix","fpeak","fi",
+  "lignin"),
+  fdom_alt_name = c("UV-Humic","Tyrosine","Visible-Humic","Marine Humic","Tryptophan",
+  "m_to_c","bix","hix","Phenylalanine","Fluvic Acid",
+  "lignin"),
+  fdom_cat= c("Humic","Proteinaceous","Humic","Humic","Proteinaceous",
+  "Humic","Humic","Humic","Proteinaceous","Humic",
+  "Other"))
+```
+
+
+
+### Assign Table ID to samples
+
+
+```{r}
+table_id <- clean_names(table_id)
+
+table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+  mutate(tank_number = paste0("T", tank_number)) %>% 
+  mutate(inflow_table = paste("Table", inflow_table))
+fDOM <- left_join(fDOM, table_id, by= "tank_number")
+```
+
+```{r}
+fDOM <- fDOM %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, inflow_table)) %>% 
+   mutate(inflow_table = ifelse(inflow_table == "F1", "Table 1", 
+                                ifelse(inflow_table == "F2", "Table 2", inflow_table))) %>% 
+  mutate(inflow_table = factor(inflow_table)) %>% 
+  relocate(inflow_table, .after = "treatment") %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow", "Endmember")))
+```
+
+
+
+### Create long format df to make data analysis easier later
+
+
+```{r}
+fDOM_long <- fDOM %>% pivot_longer(cols = coble_a:lignin,
+                      names_to = "fdom", 
+                      values_to = "fdom_conc") %>% 
+  select(-long_name)
+```
+
+
+
+Attaching the subcategories of fDOM to the long df
+
+
+```{r}
+fdom_long <- left_join(fDOM_long, fDOM_desc, by = "fdom")
+```
+
+
+
+
+## Outlier detection 
+
+```{, log10 data for IQR}
+## removing outliers from the data set
+raw_flagged_outliers <- fdom_long%>%
+  filter(treatment != "Endmember") %>% 
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(fdom, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  
+# ATTENTION !!!!!!!!!!!!! Data was log transform to do the IQR method. 
+
+  mutate(quant1 = quantile(log10(fdom_conc), probs = 0.25, na.rm = T),
+         quant3 = quantile(log10(fdom_conc), probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( log10(fdom_conc) > quant3 + (IQR*1.5) | log10(fdom_conc) < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup()  
+```
+
+
+
+
+```{r}
+## removing outliers from the data set
+raw_flagged_outliers <- fdom_long%>%
+  filter(treatment != "Endmember") %>% 
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(fdom, treatment) %>% 
+  ## calculating the Interquantile range and of the raw data
+
+  mutate(quant1 = quantile(fdom_conc, probs = 0.25, na.rm = T),
+         quant3 = quantile(fdom_conc, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse(fdom_conc > quant3 + (IQR*1.5) | fdom_conc < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup()  
+```
+
+```{r}
+# Normalization version 2
+## averaging the inflows for normalization 
+## remove the outliers a right before the normalization 
+
+## Normalization of the data to the inflow 
+#nutrients_norm <- 
+fDOM_norm <- raw_flagged_outliers %>% 
+  mutate(time_string = as.character(time),
+         date_string = as.character(date),
+         date_time_string = paste(date_string, time_string),
+         date_time = ymd_hms(date_time_string)) %>% 
+  select(-IQR, -quant1, -quant3) %>% 
+  
+  filter(treatment != "Rain") %>% 
+  
+  # Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table, fdom) %>%
+  mutate(inflow = fdom_conc[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time, fdom) %>% 
+  mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = fdom_conc - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+
+
+## 12PM data
+
+
+```{r}
+# Version 2
+## removing outliers from the data set
+fDOM_12PM <- fDOM_norm %>%
+  filter(time_string == "12:00:00") %>% 
+  filter(treatment != "Inflow") %>% 
+  
+  ## remove the outliers 
+  filter(outlier == "not outlier") 
+
+```
+
+
+
+### Iterative statistical modeling
+
+
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+fDOM_loop <- fDOM_12PM %>% select(fdom) %>% distinct() %>% pull()
+
+models_12PM <- vector(mode = "list", length = length(fDOM_loop))
+names(models_12PM) <- fDOM_loop
+
+for (var in fDOM_loop) {
+  df <- fDOM_12PM %>% filter(fdom == var)
+  models_12PM[[var]] <- lmer(conc_norm ~ treatment + (1|tank_number), data = df)
+}
+
+```
+
+
+
+### Iterative graphing
+
+
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## --> In the for-loop, filter the df by nutrient and make a graph that will display nutrient data
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+fDOM_loop <- fDOM_12PM %>% select(fdom) %>% distinct() %>% pull()
+
+graphs_12PM <- vector(mode = "list", length = length(fDOM_loop))
+names(graphs_12PM) <- fDOM_loop
+
+for (var in fDOM_loop) {
+  
+  df <- fDOM_12PM %>% filter(fdom == var)
+  
+  graphs_12PM[[var]] <- df %>%  
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("12PM", var, "concentrations"),
+       x= "Treatment",
+       y = "Concentration (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+}
+
+```
+
+```{r}
+fDOM_norm <- fdom_long %>% filter(date > as.Date("2024-05-31")) %>% # Removes end members
+  filter(treatment != "Rain") %>% 
+  mutate(date_time = factor(ymd_hms(paste(date, time)))) %>% 
+   group_by(date_time, inflow_table, fdom) %>%
+  mutate(inflow= fdom_conc[treatment == "Inflow"]) %>%  # Isolate inflow for each date_time and table
+  ungroup() %>% 
+  #group_by(date_time) %>% 
+  #mutate(inflow = ifelse(is.na(inflow),
+   #   inflow[!is.na(inflow)][1],  # get the other table's value for that date
+   #   inflow)) %>% 
+  #ungroup() %>% 
+  mutate(fdom_conc_norm = fdom_conc - inflow)  %>% # Normalize for treatments 
+  relocate(inflow, .after = "fdom_conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+  
+
+head(fDOM_norm, 15)
+
+#write_csv(fDOM_norm, here("data", "fDOM", "fDOM_norm.csv"))
+```
+
+
+
+## Quick visulitation
+
+
+
+```{r}
+ggplot(fDOM_norm, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_bar(position="stack", stat="identity")+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+```{r}
+fDOM_norm %>% filter(fdom_cat != "Other") %>% 
+  ggplot(aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+```{r}
+fDOM_norm %>% mutate(fdom_cat = factor(fdom_cat, levels = c("Humic", "Proteinaceous", "Other"))) %>% 
+  group_by(fdom_cat,fdom) %>% 
+  summarize(min = round(min(fdom_conc, na.rm = T),3), 
+            avg = round(mean(fdom_conc, na.rm = T),3),
+            max = round(max(fdom_conc, na.rm = T),3)) %>% 
+  ungroup() %>% 
+  gt()
+```
+
+
+
+## Hypothesis 1: fDOM 12PM
+
+
+
+```{r}
+fDOM_12PM <- fDOM_norm %>% filter(treatment != "Inflow") %>% 
+  filter(time == hms("12:00:00")) %>% 
+  filter(fdom_cat != "Other")
+```
+
+
+
+### Humic
+
+#### CobleA
+
+
+
+```{r}
+fDOM_12PM_cobA <- fDOM_12PM %>% filter(fdom == "coble_a") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_cobA <- fDOM_12PM_cobA %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date), data = fDOM_12PM_cobA)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+
+
+`{, fig_height = 10, fig.width = 10} plot_model(mod, type = "re")[[1]] +   plot_model(mod, type = "re")[[2]] +   plot_model(mod, type = "eff", terms = c('treatment')) +   plot_model(mod, type = "diag")[[1]]`
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs = ~ treatment)
+```
+
+
+
+##### Interpretation
+
+
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobA$fdom_conc)$out)
+ggplot(fDOM_12PM_cobA, aes(x= treatment, y = fdom_conc_norm, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+#### CobleM
+
+
+
+```{r}
+fDOM_12PM_cobM <- fDOM_12PM %>% filter(fdom == "coble_m") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_cobM <- fDOM_12PM_cobM %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+
+
+###### Normality and Homogeneity
+
+
+
+```{r}
+bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_12PM_cobM) # homogeneity
+shapiro.test(fDOM_12PM_cobM$fdom_conc_norm) # normality
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_cobM)
+summary(mod)
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+anova(mod)
+kruskal.test(fdom_conc_norm ~ treatment, data = fDOM_12PM_cobM )
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs = ~ treatment)
+```
+
+```{r}
+emm <- emmeans(mod, ~ treatment)
+cld_letters <- multcomp::cld(emm, Letters = letters)
+```
+
+```{r, fig.width = 18, fig.height=8}
+ggplot(fDOM_12PM_cobM, aes(x= treatment, fdom_conc, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 1.5)+ 
+  geom_point(color = "black", alpha = 0.5, size = 4)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "DOC Enrichment",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Marine Humics Production (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  #ylim(-20,120)+
+  nunu_theme +
+  theme(legend.position = "none") 
+
+#ggsave("CobM_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
+
+
+
+#### CobleC
+
+
+
+```{r}
+fDOM_12PM_cobC <- fDOM_12PM %>% filter(fdom == "coble_c") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_cobC <- fDOM_12PM_cobC %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+
+
+##### No data transformation
+
+###### Normality and Homogeneity
+
+
+
+```{r}
+bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_12PM_cobC) # homogeneity
+shapiro.test(fDOM_12PM_cobC$fdom_conc_norm) # normality
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_cobC)
+summary(mod)
+```
+
+```{r}
+anova(mod)
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+ggplot(fDOM_12PM_cobC, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_violin()+
+  geom_point(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  #facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+##### With data transformation
+
+###### Normality and Homogeneity
+
+
+
+```{r}
+power_model <- powerTransform(fDOM_12PM_cobC$fdom_conc_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+## lambda = -186.9304 according to the above 
+
+```
+
+```{r}
+bartlett.test(yjPower(fdom_conc_norm, lambda = -186.9304) ~ treatment,data = fDOM_12PM_cobC) # homogeneity
+shapiro.test(yjPower(fDOM_12PM_cobC$fdom_conc_norm, lambda = -186.9304)) # normality
+```
+
+```{r}
+fDOM_12PM_cobC <- fDOM_12PM_cobC %>% 
+  mutate(fdom_conc_trans= yjPower(fdom_conc_norm, lambda = -186.9304)) %>% 
+  relocate(fdom_conc_trans, .after = fdom_conc_norm)
+```
+
+```{r}
+mod <- lmer(fdom_conc_trans ~ treatment + (1|tank_number), data = fDOM_12PM_cobC)
+summary(mod)
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+anova(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+emm <- emmeans(mod, ~ treatment)
+cld_letters <- multcomp::cld(emm, Letters = letters)
+```
+
+
+
+##### Data Visualization
+
+
+
+```{r, fig.width= 18, fig.height = 8}
+ggplot(fDOM_12PM_cobC, aes(x= treatment, fdom_conc_trans, fill = treatment)) +
+  geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
+  geom_violin(linewidth = 1.5)+
+  geom_point(color = "black", alpha = 0.5, size = 4)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "DOC Enrichment",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Colored Humic Production (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  ylim(min(fDOM_12PM_cobC$fdom_conc_trans),max(fDOM_12PM_cobC$fdom_conc_trans)+0.001)+
+  nunu_theme +
+  theme(legend.position = "none") 
+
+#ggsave("CobC_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
+
+
+
+#### M:C SIGNIFICANT
+
+
+
+```{r}
+fDOM_12PM_mtoc <- fDOM_12PM %>% filter(fdom == "m_to_c") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_mtoc <- fDOM_12PM_mtoc %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+
+
+##### No data transformation
+
+###### Normality and Homogeneity
+
+
+
+```{r}
+bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_12PM_mtoc) # homogeneity
+shapiro.test(fDOM_12PM_mtoc$fdom_conc_norm) # normality
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_mtoc)
+summary(mod)
+```
+
+
+
+```         
+## Transforming the data with yjPower did not change the Q-Q plot 
+
+power_model <- powerTransform(fDOM_12PM_mtoc$fdom_conc_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
+summary(power_model)
+
+## lambda = 0.1449 according to the above 
+mod <- lmer(yjPower(fdom_conc_norm, lambda = 0.1449) ~ treatment + (1|tank_number), data = fDOM_12PM_mtoc)
+summary(mod)
+```
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+anova(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+emm <- emmeans(mod, ~ treatment)
+cld_letters <- multcomp::cld(emm, Letters = letters)
+```
+
+
+
+##### Data Visualization
+
+
+
+```{r,fig.width = 18, fig.height = 8}
+
+ggplot(fDOM_12PM_mtoc, aes(x= treatment, fdom_conc, fill = treatment)) +
+  #geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 1.5)+
+  geom_point(color = "black", alpha = 0.5, size = 4)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "DOC Enrichment",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Marine:Colored (M:C) Ratio ")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  ylim(0.3,0.9)+
+  nunu_theme +
+  theme(legend.position = "none") 
+
+ggsave("MtoC_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
+
+```{r, fig.width=18, fig.height=8}
+cobM_boxp <- ggplot(fDOM_12PM_cobM, aes(x= treatment, y = fdom_conc))+
+  geom_boxplot(aes(fill = treatment), linewidth = 1.5)+
+  geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
+  #geom_jitter(aes(color = treatment), alpha = 0.5)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+   ylim(0,0.016)+
+   labs(title = "Marine Humics (M)",
+        x= "Treatment",
+        y= "Concentration ()")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  #facet_grid(~date)+
+  nunu_theme+ theme(plot.title = element_text(hjust = 0.5),
+                    legend.position = "none")
+  
+cobC_boxp <- ggplot(fDOM_12PM_cobC, aes(x= treatment, y = fdom_conc_trans))+
+  geom_boxplot(aes(fill = treatment), linewidth = 1.5)+
+  geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  #geom_jitter(aes(color = treatment), alpha = 0.5)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+    ylim(0,0.016)+
+    labs(title = "Colored Humics (C)",
+         x= "Treatment",
+         y= "Concentration ()")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  #facet_grid(~date)+
+  nunu_theme + theme(plot.title = element_text(hjust = 0.5),
+                     legend.position = "none")
+  
+mtoc_boxp <- ggplot(fDOM_12PM_mtoc, aes(x= treatment, y = fdom_conc))+
+  geom_boxplot( fill = "yellow", linewidth = 1.5)+
+  geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
+  #geom_jitter(aes(color = treatment), alpha = 0.5)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  #facet_grid(~date)+
+    labs(title = "M:C Ratio",
+         x= " Treatment",
+         y= "Ratio")+
+  nunu_theme + theme(plot.title = element_text(hjust = 0.5))
+
+cobM_boxp + cobC_boxp + plot_layout(axis_titles = "collect")
+
+ggsave("CobM_C_12PM.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
+
+
+
+#### FI
+
+
+
+```{r}
+fDOM_12PM_fi <- fDOM_12PM %>% filter(fdom == "fi") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_fi <- fDOM_12PM_fi %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|tank_number), data = fDOM_12PM_fi)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+
+
+`{, fig_height = 10, fig.width = 10} plot_model(mod, type = "re")[[1]] +   plot_model(mod, type = "re")[[2]] +   plot_model(mod, type = "eff", terms = c('treatment')) +   plot_model(mod, type = "diag")[[1]]`
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_fi, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+#### BIX
+
+
+
+```{r}
+fDOM_12PM_bix <- fDOM_12PM %>% filter(fdom == "bix") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_bix <- fDOM_12PM_bix %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_bix)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+
+
+`{, fig_height = 10, fig.width = 10} plot_model(mod, type = "re")[[1]] +   plot_model(mod, type = "re")[[2]] +   plot_model(mod, type = "eff", terms = c('treatment')) +   plot_model(mod, type = "diag")[[1]]`
+
+
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_bix, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+#### HIX
+
+
+
+```{r}
+fDOM_12PM_hix <- fDOM_12PM %>% filter(fdom == "hix") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_hix <- fDOM_12PM_hix %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_hix)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_hix, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+### Proteinaceous
+
+
+
+```{r}
+fDOM_12PM %>% filter(fdom_cat == "Proteinaceous") %>% 
+  select(fdom) %>% distinct()
+```
+
+
+
+#### CobleB
+
+
+
+```{r}
+fDOM_12PM_cobB <- fDOM_12PM %>% filter(fdom == "coble_b") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_cobB <- fDOM_12PM_cobB %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_cobB)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs =  pairwise~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_cobB, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+#### CobleT
+
+
+
+```{r}
+fDOM_12PM_cobT <- fDOM_12PM %>% filter(fdom == "coble_t") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_cobT <- fDOM_12PM_cobT %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment + (1|date), data = fDOM_12PM_cobT)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs =  pairwise~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_cobT, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+#### Fpeak
+
+
+
+```{r}
+fDOM_12PM_fpeak <- fDOM_12PM %>% filter(fdom == "fpeak") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_12PM_fpeak <- fDOM_12PM_fpeak %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time)) %>% 
+  mutate(date_fac = factor(date))
+
+```
+
+```{r}
+mod <- lmer(fdom_conc ~ treatment + (1|date)+ (1|inflow_table), data = fDOM_12PM_fpeak)
+summary(mod)
+```
+
+```{r}
+anova(mod, type= "2")
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+emmeans(mod, specs =  pairwise~ treatment)
+```
+
+```{r}
+#sort(boxplot.stats(fDOM_12PM_cobC$fdom_conc)$out)
+ggplot(fDOM_12PM_fpeak, aes(x= treatment, y = fdom_conc, fill = fdom))+
+  geom_boxplot()+
+  geom_jitter(aes(color = treatment), alpha = 0.5)+
+  geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  facet_grid(fdom_cat~date, scales = "free")+
+  nunu_theme
+```
+
+
+
+## 24h
+
+
+
+```{r}
+fDOM_24h <- fDOM_norm %>% filter(treatment != "Inflow") %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  mutate(time_fac = factor(as.character(time),levels = c("12:00:00","18:00:00","00:00:00",
+                                            "06:00:00"))) %>% 
+  mutate(date_fac = factor(date)) %>% 
+  filter(fdom_cat != "Other")
+```
+
+
+
+### Humics
+
+#### M:C
+
+
+
+```{r}
+fDOM_24h_mtoc <- fDOM_24h %>% filter(fdom == "m_to_c") 
+```
+
+```{r}
+## Outlier detection
+
+fDOM_24h_mtoc <- fDOM_24h_mtoc %>%
+  
+  # removing outliers
+  ## grouping by date, time and treatment
+  group_by(date, time, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(fdom_conc_norm, probs = 0.25),
+         quant3 = quantile(fdom_conc_norm, probs = 0.75),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( fdom_conc_norm > quant3 + (IQR*1.5) | fdom_conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier")
+
+```
+
+
+
+##### No data transformation
+
+###### Normality and Homogeneity
+
+
+
+```{r}
+bartlett.test(fdom_conc_norm ~ treatment,data = fDOM_24h_mtoc) # homogeneity
+shapiro.test(fDOM_24h_mtoc$fdom_conc_norm) # normality
+```
+
+```{r}
+mod <- lmer(fdom_conc_norm ~ treatment*time_fac + (1|tank_number), data = fDOM_24h_mtoc)
+summary(mod)
+```
+
+```{r}
+resid_panel(mod)
+```
+
+```{r}
+anova(mod)
+```
+
+```{r}
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+emm <- emmeans(mod, ~ treatment)
+cld_letters <- multcomp::cld(emm, Letters = letters)
+```
+
+
+
+##### Data Visualization
+
+
+
+```{r,fig.width = 18, fig.height = 8}
+
+fDOM_24h_mtoc %>% filter(time_fac != as.character("00:00:00")) %>% 
+  ggplot(aes(x= treatment, fdom_conc, fill = treatment)) +
+  #geom_hline(yintercept = 0, lty = 2,linewidth = 0.8)+
+  geom_violin(linewidth = 1)+
+  geom_point(color = "black", alpha = 0.5, size = 4)+
+  #geom_text_repel(aes(label = tank_number), alpha = 0.4)+
+  stat_summary(color = "yellow", alpha =0.5, size = 1.5)+
+  labs(#title = "DOC Enrichment",
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Marine:Colored (M:C) Ratio ")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  facet_wrap(~time_fac)+
+  ylim(0.3,0.9)+
+  nunu_theme +
+  theme(legend.position = "none",
+        strip.background = element_rect(fill = "white")) 
+
+ggsave("MtoC_24h.png", width = 18,height = 8,path = here("outputs", "OOSC_2025"))
+```
+
