@@ -418,8 +418,7 @@ graphs_12PM[["fpeak"]]
 ```
 
 
-
-## 24h data --- Need to edit 
+## 24h data 
 ```{r}
 # Version 2
 ## removing outliers from the data set
@@ -547,8 +546,8 @@ emmeans(models_24h[["m_to_c"]], specs = trt.vs.ctrl ~ treatment)
 ```
 
 ```{r}
-resid_panel(models_12PM[["m_to_c"]])
-graphs_12PM[["m_to_c"]]
+resid_panel(models_24h[["m_to_c"]])
+graphs_24h[["m_to_c"]]
 ```
 
 

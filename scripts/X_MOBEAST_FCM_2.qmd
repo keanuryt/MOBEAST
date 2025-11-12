@@ -7,7 +7,7 @@ format:
   html:
     toc: true
     toc-location: left
-editor: visual
+editor: source
 ---
 
 ```{r setup, include = FALSE}
@@ -15,8 +15,8 @@ knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE)
 ```
 
-
 ## Load Libraries
+
 ```{r}
 library(tidyverse)
 library(here)
@@ -56,7 +56,8 @@ nunu_theme <- theme_bw() +
 ```
 
 ## functions
-```{}
+
+```         
 lm_eqn <- function(df){
     m <- lm(y ~ x, df);
     eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
@@ -67,8 +68,8 @@ lm_eqn <- function(df){
 }
 ```
 
-
 # Load Data
+
 ```{r}
 FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
 meta <- read_csv(here("data", "MOBEAST_metadata.csv"))
@@ -95,13 +96,12 @@ table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>%
 ```
 
 # Note
-**Mislabeling**:  
-- There were 2 batches of MOBEAST 2024-06-02 18:00 containing a total of 3 T4 samples. 
-- MOBEAST 2024-06-02 21:00 is missing, one of the 18:00 is actually the 21:00 time point.
-- One tube was missing a label (marked "X"). Assume it's the bay sample (2024-05-25).
 
-For the preliminary results, I removed the duplicates for T4, only keeping 1 random T4 sample.  
-I will be averaging the values of MOBEAST 2024-06-02 18:00. 
+**Mislabeling**:\
+- There were 2 batches of MOBEAST 2024-06-02 18:00 containing a total of 3 T4 samples. - MOBEAST 2024-06-02 21:00 is missing, one of the 18:00 is actually the 21:00 time point. - One tube was missing a label (marked "X"). Assume it's the bay sample (2024-05-25).
+
+For the preliminary results, I removed the duplicates for T4, only keeping 1 random T4 sample.\
+I will be averaging the values of MOBEAST 2024-06-02 18:00.
 
 ```{r}
 FCM_pre <- FCM %>% filter(str_detect(sample, pattern = "MOBEAST")) %>% 
@@ -140,7 +140,6 @@ FCM_pre <- FCM_pre %>% mutate(date_time = ymd_hms(paste0(date," ", time,":00")))
          time = as_hms(time))
 ```
 
-
 ```{r}
 FCM_norm <- FCM_pre %>% 
   select(-pro, -tot_bact, -cyano, -include_vol) %>% 
@@ -160,17 +159,14 @@ FCM_norm <- FCM_pre %>%
   select(-conc_ul, -inflow_avg) 
 ```
 
-
-
-
-```{}
+```         
 DOC_norm <- read_csv(here("data", "DOC", "DOC_norm.csv"))
 DOC_norm <- DOC_norm %>% select(-npoc_mg_l, -tn_mg_l,
                                 -tn_u_m,-inflow,
                                 -sample) 
 ```
 
-```{}
+```         
 DOC_FCM_norm <- left_join(FCM_norm, DOC_norm, 
                           by= c("date","time","date_time", "tank_number"))
 
@@ -184,7 +180,7 @@ DOC_FCM_norm <- DOC_FCM_norm %>% select(-treatment.y) %>%
   rename(treatment = treatment.x)
 ```
 
-```{}
+```         
 DOC_FCM_norm<- left_join(DOC_FCM_norm, table_id, by= "tank_number")
 
 DOC_FCM_norm <-DOC_FCM_norm %>% 
@@ -193,7 +189,7 @@ DOC_FCM_norm <-DOC_FCM_norm %>%
   mutate(treatment = factor(treatment, levels= c("Control", "Coral", "CCA", "Algae")))
 ```
 
-```{}
+```         
 ## Outlier detection
 
 DOC_FCM <- DOC_FCM_norm %>%
@@ -213,11 +209,10 @@ DOC_FCM <- DOC_FCM_norm %>%
   filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time)) %>% 
   mutate(date_fac = factor(date))
-
 ```
 
+## 12PM
 
-## 12PM 
 ```{r}
 FCM_12PM_norm <- FCM_norm %>% filter(time == as_hms("12:00:00"))
 ```
@@ -245,14 +240,13 @@ FCM_12PM_norm <- FCM_12PM_norm %>%
 
 ```
 
-
 ### Hypothesis 1: there will be more heterotrophic bacteria in algae tanks
 
 ```{r}
 hbact_12PM <- FCM_12PM_norm %>% filter(org == "het_bact")
 ```
 
-#### Normality and Homogenity 
+#### Normality and Homogenity
 
 ```{r}
 bartlett.test(conc_ul_norm ~ treatment,data = hbact_12PM) # homogeneity
@@ -265,13 +259,12 @@ summary(power_model)
 ## lambda = 0.9345 according to the above 
 ```
 
-
-```{}
+```         
 hbact_12PM <- hbact_12PM %>% mutate(conc_ul_trans = yjPower(conc_ul_norm, lambda = 0.9345)) %>% 
   relocate(conc_ul_trans, .after =conc_ul_norm )
 ```
 
-```{}
+```         
 bartlett.test(conc_ul_trans ~ treatment,data = hbact_12PM) # homogeneity
 shapiro.test(hbact_12PM$conc_ul_norm) # normality
 ```
@@ -297,9 +290,6 @@ emm <- emmeans(mod, ~ treatment)
 cld_letters <- multcomp::cld(emm, Letters = letters)
 ```
 
-
-
-
 ```{r, fig.width= 18, fig.height = 8}
 ggplot(hbact_12PM, aes(x= treatment, conc_ul_norm, fill = treatment)) +
   geom_hline(yintercept = 0, lty = 2,linewidth = 1)+
@@ -320,7 +310,6 @@ ggplot(hbact_12PM, aes(x= treatment, conc_ul_norm, fill = treatment)) +
         axis.text.x = element_text(angle= 0, hjust= 0.5))
 #ggsave("hbact_12PM.png", width = 18, height = 8,path = here("outputs", "OOSC_2025"))
 ```
-
 
 ### Hypothesis 2: Synechococcus
 
@@ -376,8 +365,9 @@ ggplot(picoeuk_12PM, aes(x= treatment, conc_ul_norm, fill = treatment)) +
 
 ```
 
-## 24h 
-WARNING !!! 18:00 IS DUPLICATED SOMEHOW! 
+## 24h
+
+WARNING !!! 18:00 IS DUPLICATED SOMEHOW!
 
 ```{r}
 FCM_24h_norm <- FCM_norm %>% 
@@ -385,29 +375,27 @@ FCM_24h_norm <- FCM_norm %>%
 
 ```
 
-```{}
+```         
 FCM_18PM_norm <- FCM_24h_norm %>% filter(time == as_hms("18:00:00")) %>% 
   group_by(tank_number, org) %>% 
   reframe(tank_number, treatment,date_time, date, time, org, conc_ul_norm = mean(conc_ul_norm)) %>% 
   ungroup() %>% distinct()
 ```
 
-```{}
+```         
 FCM_24h_norm <- FCM_24h_norm %>% filter(time != as_hms("18:00:00"))
 ```
 
-```{}
+```         
 FCM_24h_norm <- rbind(FCM_24h_norm, FCM_18PM_norm)
 ```
 
-```{}
+```         
 FCM_24h_norm %>% mutate(time_fac = factor(time_fac, 
                                           levels=c("12:00:00", "15:00:00","18:00:00",
                                                    "21:00:00","00:00:00","03:00:00",
                                                    "06:00:00")))
 ```
-
-
 
 ```{r}
 ## Outlier detection
@@ -432,7 +420,7 @@ FCM_24h_norm <- FCM_24h_norm %>%
 
 ```
 
-### Hypothesis 1: there will be more heterotrophic bacteria in algae tanks on a diel cycle 
+### Hypothesis 1: there will be more heterotrophic bacteria in algae tanks on a diel cycle
 
 ```{r}
 hbact_24h <- FCM_24h_norm %>% filter(org == "het_bact") %>% 
@@ -470,14 +458,11 @@ hbact_18h <- hbact_24h_temp %>% filter(time == as_hms("18:00:00")) %>%
 hbact_24h_no_18 <- hbact_24h_temp %>% filter(time != as_hms("18:00:00"))
 ```
 
-
 ```{r}
 hbact_24h_temp2 <- rbind(hbact_24h_no_18, hbact_18h)
 ```
 
-
-
-#### Normality and Homogenity 
+#### Normality and Homogenity
 
 ```{r}
 bartlett.test(conc_ul_norm ~ treatment,data = hbact_24h_temp2) # homogeneity
@@ -495,7 +480,7 @@ hbact_24h_temp2 <- hbact_24h_temp2 %>% mutate(conc_ul_trans = yjPower(conc_ul_no
   relocate(conc_ul_trans, .after =conc_ul_norm )
 ```
 
-```{}
+```         
 bartlett.test(conc_ul_trans ~ treatment,data = hbact_24h_temp2) # homogeneity
 shapiro.test(hbact_24h$conc_ul_trans) # normality
 ```
@@ -515,7 +500,6 @@ kruskal.test(conc_ul_norm ~ treatment, data = hbact_24h_temp2)
 ```{r}
 emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ```
-
 
 ```{r, fig.width = 18, fig.height = 8}
 
@@ -538,14 +522,13 @@ ggplot(hbact_24h_temp2, aes(x= treatment, conc_ul_norm, fill = treatment)) +
 ggsave("hbact_24_TEMPORARY.png", width = 18, height = 8, path = here("outputs", "OOSC_2025"))
 ```
 
+#### Reference section
 
-#### Reference section 
 ```{r}
 power_model <- powerTransform(hbact_24h$conc_ul_norm ~ 1, family = "yjPower")  # no predictors, just transforming y
 summary(power_model)
 ## lambda = 0.9779 according to the above 
 ```
-
 
 ```{r}
 hbact_24h <- hbact_24h %>% mutate(conc_ul_trans = yjPower(conc_ul_norm, lambda = 0.9779)) %>% 
@@ -573,8 +556,6 @@ kruskal.test(conc_ul_norm ~ treatment, data = hbact_24h)
 emmeans(mod, specs = trt.vs.ctrl ~ treatment)
 ```
 
-
-
 ```{r}
 hbact_24h %>% #filter(time == as_hms("18:00:00")) %>%
   ggplot(aes(x= tank_number, conc_ul_norm, fill = treatment)) +
@@ -594,7 +575,6 @@ hbact_24h %>% #filter(time == as_hms("18:00:00")) %>%
   theme(legend.position = "none",
         axis.text.x = element_text(angle= 0, hjust= 0.5))
 ```
-
 
 ```{r, fig.width = 18, fig.height = 11}
 

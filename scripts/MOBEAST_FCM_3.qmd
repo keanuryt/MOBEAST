@@ -1,0 +1,449 @@
+---
+title: "MOBEAST FCM V3"
+author: "Keanu Rochette"
+created: '11 November 2025'
+updated: '`r format(Sys.Date())`'
+format: 
+  html:
+    toc: true
+    toc-location: left
+editor: source
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+#library(ggpmisc)
+library(hms)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+#library(GGally)
+library(emmeans)
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(performance)
+
+```
+
+## Data visualization theme
+
+```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+## Functions
+
+```         
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+```
+
+# Load Data
+```{r}
+FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
+meta <- read_csv(here("data", "MOBEAST_metadata.csv"))
+# can't use the good metadata V2 bcs we sampled FCM more frequently than the other variable
+# we are missing some id numbers for the additional samples...
+
+FCM<- FCM %>% clean_names()
+meta <-meta %>% clean_names()
+```
+
+```{r}
+treat_code <- tibble(
+  treatment = c("A", "K", "C", "R", "Inflow", "Endmember", "Rain"),
+  full_name = c("Algae", "Coral", "Control", "CCA", "Inflow", "Endmember", "Rain")
+)
+
+```
+
+```{r}
+table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+table_id <- clean_names(table_id)
+
+table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+  mutate(tank_number = paste0("T", tank_number)) %>% 
+  mutate(inflow_table = paste("Table", inflow_table))
+```
+
+# Data Cleaning 
+
+Note
+
+**Mislabeling**:\
+- There were 2 batches of MOBEAST 2024-06-02 18:00 containing a total of 3 T4 samples. 
+- MOBEAST 2024-06-02 21:00 is missing, one of the 18:00 is actually the 21:00 time point. 
+- One tube was missing a label (marked "X"). Assume it's the bay sample (2024-05-25).
+
+For the preliminary results, I removed the duplicates for T4, only keeping 1 random T4 sample.\
+I will be averaging the values of MOBEAST 2024-06-02 18:00.
+
+```{r}
+FCM_pre <- FCM %>% filter(str_detect(sample, pattern = "MOBEAST")) %>% 
+    mutate(sample = str_remove(sample, pattern = "X_")) %>% 
+  filter(sample!= "2_MOBEAST_T4_A_2024-06-02_18:00", 
+         sample!= "3_MOBEAST_T4_A_2024-06-02_18:00") %>% 
+  separate_wider_delim(sample, names= c("project", "tank", "treatment", "date","time"), 
+                             delim = "_") 
+
+
+```
+
+```{r}
+FCM_pre <- left_join(FCM_pre, treat_code, by= "treatment")
+
+FCM_pre <- FCM_pre %>% relocate(full_name,.before = treatment) %>%
+  select(-treatment) %>% 
+  rename(treatment = full_name) %>% 
+  rename(tank_number = tank)
+```
+
+```{r}
+FCM_pre <- FCM_pre %>% left_join(table_id, by = "tank_number") %>% 
+  mutate(inflow_table = ifelse(tank_number == "F1", "Table 1",
+                               ifelse(tank_number == "F2", "Table 2", inflow_table))) %>% 
+  mutate(inflow_table = ifelse(is.na(inflow_table), "Endmember", inflow_table))
+```
+
+
+```{r}
+FCM_pre <- FCM_pre %>% 
+  
+  ## 18:00 is duplicated because one batch is actually 21:00
+  ## there is also multiple samples for 1 tank (T4?)
+  ## removed for simplicity (Nov 11 2025)
+  filter(time != "18:00") %>% 
+  mutate(date_time = ymd_hms(paste0(date," ", time,":00"))) %>% 
+  select(tank_number, treatment, inflow_table, date_time, date, time, 
+                   het_bact = het_bact_events_u_l,
+                   pico_euk = pico_euk_events_u_l,
+                   syn = syn_events_u_l,
+                   pro = pro_events_u_l,
+                   tot_bact = bacteria_events_u_l) %>% 
+  group_by(date_time, treatment, tank_number) %>% 
+  mutate(cyano = sum(syn, pro, het_bact) - het_bact) %>%  
+  ungroup() %>% 
+  mutate(date =  ymd(date),
+         time = paste0(time,":00"),
+         time = as_hms(time)) 
+```
+
+
+## Outlier detection 
+
+```{r}
+raw_flagged_outliers <- FCM_pre %>% 
+  select(-pro, -tot_bact, -cyano) %>% 
+  pivot_longer(cols = het_bact:syn,
+               names_to = "org", 
+               values_to = "conc_ul") %>% 
+  filter(treatment != "Endmember", treatment != "Rain") %>% 
+  # flagging outliers
+  ## grouping by date, time and treatment
+  group_by(org, treatment) %>% 
+  ## calculating the Interquantile range and of the raw data
+
+  mutate(quant1 = quantile(conc_ul, probs = 0.25, na.rm = T),
+         quant3 = quantile(conc_ul, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse(conc_ul > quant3 + (IQR*1.5) | conc_ul < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup()  
+```
+
+
+```{r}
+# Normalization version 2
+## averaging the inflows for normalization 
+## remove the outliers a right before the normalization 
+
+## Normalization of the data to the inflow 
+ 
+FCM_norm <- raw_flagged_outliers %>% 
+  mutate(time_string = as.character(time),
+         date_string = as.character(date),
+         date_time_string = paste(date_string, time_string)) %>% 
+  select(-IQR, -quant1, -quant3) %>% 
+  
+  # Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table, org) %>%
+  mutate(inflow = conc_ul[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time, org) %>% 
+  mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = conc_ul - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+
+## 12PM
+
+```{r}
+FCM_12PM <- FCM_norm %>% filter(time_string == "12:00:00") %>% 
+  filter(outlier != "outlier") %>% 
+  filter(treatment != "Inflow")
+```
+
+## Iterative statistical modeling
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+FCM_loop <- FCM_12PM %>% select(org) %>% distinct() %>% pull()
+
+models_12PM <- vector(mode = "list", length = length(FCM_loop))
+names(models_12PM) <- FCM_loop
+
+for (var in FCM_loop) {
+  df <- FCM_12PM %>% filter(org == var)
+  models_12PM[[var]] <- lmer(conc_norm ~ treatment + (1|tank_number), data = df)
+}
+
+```
+
+## Iterative graphing
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## --> In the for-loop, filter the df by nutrient and make a graph that will display nutrient data
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+FCM_loop <- FCM_12PM %>% select(org) %>% distinct() %>% pull()
+
+graphs_12PM <- vector(mode = "list", length = length(FCM_loop))
+names(graphs_12PM) <- FCM_loop
+
+for (var in FCM_loop) {
+  
+  df <- FCM_12PM %>% filter(org == var)
+  
+  graphs_12PM[[var]] <- df %>%  
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("12PM", var, "concentrations"),
+       x= "Treatment",
+       y = "Concentration (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+}
+
+```
+
+
+### Heterotrophic Bacteria
+
+```{r}
+summary(models_12PM[["het_bact"]])
+anova(models_12PM[["het_bact"]], type = 2)
+emmeans(models_12PM[["het_bact"]], specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+resid_panel(models_12PM[["het_bact"]])
+graphs_12PM[["het_bact"]]
+```
+
+
+### Synechococcus 
+
+```{r}
+summary(models_12PM[["syn"]])
+anova(models_12PM[["syn"]], type = 2)
+emmeans(models_12PM[["syn"]], specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+resid_panel(models_12PM[["syn"]])
+graphs_12PM[["syn"]]
+```
+
+
+### Pico Eukaryotes 
+
+```{r}
+summary(models_12PM[["pico_euk"]])
+anova(models_12PM[["pico_euk"]], type = 2)
+emmeans(models_12PM[["pico_euk"]], specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+resid_panel(models_12PM[["pico_euk"]])
+graphs_12PM[["pico_euk"]]
+```
+
+
+
+# 24h
+
+```{r}
+# Version 2
+## removing outliers from the data set
+FCM_24h <- FCM_norm %>%
+  filter(date_string == "2024-06-02" | date_string == "2024-06-03" ) %>% 
+  #filter(time_string == "12:00:00"|time_string == "00:00:00"| time_string == "06:00:00") %>%
+  filter(treatment != "Inflow") %>% 
+  
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time_string, levels = c("12:00:00", "15:00:00","18:00:00",
+                                                  "21:00:00", "00:00:00", "03:00:00",
+                                                  "06:00:00", "09:00:00")))
+  # no 18h and 21h due to mixed up samples
+
+```
+
+
+
+
+
+## Iterative statistical modeling
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+FCM_loop <- FCM_24h %>% select(org) %>% distinct() %>% pull()
+
+models_24h <- vector(mode = "list", length = length(FCM_loop))
+names(models_24h) <- FCM_loop
+
+for (var in FCM_loop) {
+  df <- FCM_24h %>% filter(org == var)
+  models_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + (1|tank_number), data = df)
+}
+
+```
+
+## Iterative graphing
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## --> In the for-loop, filter the df by nutrient and make a graph that will display nutrient data
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+FCM_loop <- FCM_24h %>% select(org) %>% distinct() %>% pull()
+
+graphs_24h <- vector(mode = "list", length = length(FCM_loop))
+names(graphs_24h) <- FCM_loop
+
+for (var in FCM_loop) {
+  
+  df <- FCM_24h %>% filter(org == var)
+  
+  graphs_24h[[var]] <- df %>%  
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("24h", var, "concentrations"),
+       x= "Treatment",
+       y = "Concentration (µmol/L)")+
+    facet_wrap(~time_fac, ncol = 3 )+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+}
+
+```
+
+### Heterotrophic Bacteria
+```{r}
+summary(models_24h[["het_bact"]])
+anova(models_24h[["het_bact"]], type = 2)
+emmeans(models_24h[["het_bact"]], specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+resid_panel(models_24h[["het_bact"]])
+graphs_24h[["het_bact"]]
+```
+
+### Synechococcus
+```{r}
+summary(models_24h[["syn"]])
+anova(models_24h[["syn"]], type = 2)
+emmeans(models_24h[["syn"]], specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+resid_panel(models_24h[["syn"]])
+graphs_24h[["syn"]]
+```
+
+
+### Pico Eukaryotes
+```{r}
+summary(models_24h[["pico_euk"]])
+anova(models_24h[["pico_euk"]], type = 2)
+emmeans(models_24h[["pico_euk"]], specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+resid_panel(models_24h[["pico_euk"]])
+graphs_24h[["pico_euk"]]
+```
+

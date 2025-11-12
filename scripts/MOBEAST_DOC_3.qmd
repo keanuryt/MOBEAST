@@ -50,16 +50,30 @@ table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
 
 ## Data visualization theme
 
-```{r}
+```{}
 nunu_theme <- theme_bw() + 
-  theme(plot.title = element_text(size=32, face = "bold"), 
-        plot.subtitle = element_text(size=30),
-        axis.title = element_text(size = 28, face = "bold"),
-        axis.text = element_text(size = 28),
-        strip.text.x = element_text(size = 28, face = "bold"),
-        legend.title=element_text(size=28, face = "bold"),
-        legend.text=element_text(size=28))
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=28),
+        axis.title = element_text(size = 24, face = "bold"),
+        axis.text = element_text(size = 24),
+        strip.text.x = element_text(size = 24, face = "bold"),
+        legend.title=element_text(size=24, face = "bold"),
+        legend.text=element_text(size=22))
 ```
+
+```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+
 
 ```{r}
 treatment_colors = c("Inflow"="#00838F",
@@ -256,9 +270,9 @@ for (var in DOC_loop) {
     stat_summary(color = "yellow", alpha =0.5)+
     #coord_trans(y="log10")+
   #facet_wrap(~date_string, scales = "free")+
-    labs(title = paste("12PM", var, "concentrations"),
+    labs(title = paste("12PM", var, "Production"),
        x= "Treatment",
-       y = "Concentration (µmol/L)")+
+       y = "Production (µmol/L)")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   nunu_theme +
@@ -333,13 +347,13 @@ DOC_24h %>%
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
     facet_wrap(~time_fac, ncol = 4 )+
-    labs(title = paste("24h DOC concentrations"),
+    labs(title = paste("24h DOC Production"),
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
-       y = "Concentration  (µmol/L)")+
+       y = "Production (µmol/L)")+
     scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-    nunu_theme +
+    nunu_theme + 
     theme(axis.text = element_text(size = 18),
         legend.position = "none") #+
   #geom_jitter(aes(color = inflow_table), size = 2)+
