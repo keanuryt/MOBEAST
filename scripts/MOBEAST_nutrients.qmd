@@ -13,7 +13,7 @@ fig-align: center
 knitr:
   opts_chunk:
     out.width: "20%"
-editor: visual
+editor: source
 ---
 
 ```{r setup, include = FALSE}
@@ -22,8 +22,9 @@ knitr::opts_chunk$set(message = FALSE)
 
 ## To Do : Craig Comments
 
-XX - Try getting the two random samples that are clustering as outliers out of the analysis and see how it looks.\
-- Look at how those samples show up on the ordination. Prep some slides to explore those samples, particularly the relative abundance (not z-scores) of the module of taxa enriched in those two samples, to see if they are transient rare taxa or abundant in those samples. - Make a version of each violin plot where the points are colored by "Water Table" to see if there are any parameters or treatments or times where one table had some issues. Use "jitter" to spread the points out so you can see them. - Consider doing outlier removals (should never be more than a few points, maybe 10% max for each parameter) before subtracting inlet mean values. This way if you get some random high value in an inlet sample it doesn't have an outsized impact on your analyses. - If you are going to work with nitrate we need to look at distributions of the raw values of each of the nutrient parameters. You can make those graphs and/or send over your dataframe.
+-   NH3 6AM June 3rd the mean average didn't work and need to flag it again, the relativization ent wrong.
+-   NO2 has issues with outliers inflow. What to do with this?
+-   No need to log the rest of the data because its mostly normal and the nutrients are typically log10 to make the data normal.
 
 ## Load Libraries {.hidden}
 
@@ -64,6 +65,18 @@ meta <- read_csv(here("data", "MOBEAST_metadata_V2.csv"))
 ## Data visualization theme {.hidden}
 
 ```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+```         
 #| output: false
 nunu_theme <- theme_bw() + 
   theme(plot.title = element_text(size=32, face = "bold"), 
@@ -326,48 +339,15 @@ nutrients_norm <- raw_flagged_outliers %>%
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
 ```
 
-```         
-## Data frame with outliers for Craig
-## removing outliers from the data set
-nutrient_Craig <- nutrients_norm %>%
-  
-  # removing outliers
-  ## grouping by date, time and treatment
-  group_by(date, time, treatment, nutrient) %>% 
-  ## caluculating the Interquantile range and of the raw data
-  mutate(quant1 = quantile(conc_norm, probs = 0.25, na.rm = T),
-         quant3 = quantile(conc_norm, probs = 0.75, na.rm = T),
-         IQR = quant3-quant1) %>% 
-  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
-  ## Important to filter later to understand why they are outliers. 
-  mutate(outlier = ifelse( conc_norm > quant3 + (IQR*1.5) | conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
-  ungroup()  
+```{r}
+# Dataset sent to Craig 
+nutrient_craig <- nutrients_norm %>% filter(outlier != "outlier") %>% 
+  select(-inflow)
 
-#write_csv(nutrient_Craig, here("data", "Nutrients", "nutrient_norm_w_outliers.csv"))
+#write_csv(nutrient_craig, here("data","craig_data", "nutrient_Craig.csv"))
 ```
 
 ## 12PM Nutrient analysis
-
-```         
-## removing outliers from the data set
-nutrient_12PM <- nutrients_norm %>%
-  filter(time_string == "12:00:00") %>% 
-  filter(treatment != "Inflow") %>% 
-  
-  # removing outliers
-  ## grouping by date, time and treatment
-  group_by(date, time, treatment, nutrient) %>% 
-  ## caluculating the Interquantile range and of the raw data
-  mutate(quant1 = quantile(conc_norm, probs = 0.25, na.rm = T),
-         quant3 = quantile(conc_norm, probs = 0.75, na.rm = T),
-         IQR = quant3-quant1) %>% 
-  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
-  ## Important to filter later to understand why they are outliers. 
-  mutate(outlier = ifelse( conc_norm > quant3 + (IQR*1.5) | conc_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
-  ungroup() %>% 
-  ## remove the outliers 
-  filter(outlier == "not outlier") 
-```
 
 ```{r}
 # Version 2
@@ -502,13 +482,13 @@ emmeans(models_12PM[[2]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_12PM[[2]], ~ treatment)
 ```
 
-```{r}
+```{r, fig.width=12, fig.height=6}
 resid_panel(models_12PM[[2]])
-graphs_12PM[[2]] + 
-  geom_jitter(aes(color = inflow_table), size = 2)+
-  scale_color_manual(values = c("red", "blue"))+
-  facet_wrap(date~.)+
-  theme(legend.position = "right")
+graphs_12PM[[2]] #+ 
+  #geom_jitter(aes(color = inflow_table), size = 2)+
+  #scale_color_manual(values = c("red", "blue"))+
+  #facet_wrap(date~.)+
+  #theme(legend.position = "right")
 ```
 
 #### Nitrate - need to log the data
@@ -586,8 +566,8 @@ graphs_12PM[["SiO2"]]+
 ## 24h Nutrient Analysis
 
 ```{r}
-ATTENTION : THIS BLOCK IS WRONG
-Double outlier detection ? 
+#ATTENTION : THIS BLOCK IS WRONG
+#Double outlier detection ? 
   
 ## removing outliers from the data set
 nutrient_24h <- nutrients_norm %>%
@@ -740,12 +720,12 @@ emmeans(models_24h[["NO2"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_24h[["NO2]], ~ treatment)
 ```
 
-```{r}
+```{r, fig.width=12, fig.height=6}
 resid_panel(models_24h[["NO2"]])
-graphs_24h[["NO2"]]+
-  geom_jitter(aes(color = inflow_table), size = 2)+
-  scale_color_manual(values = c("red", "blue"))+
-  theme(legend.position = "right")
+graphs_24h[["NO2"]]#+
+  #geom_jitter(aes(color = inflow_table), size = 2)+
+  #scale_color_manual(values = c("red", "blue"))+
+  #theme(legend.position = "right")
 ```
 
 #### Nitrate - Significant different in the CCA
@@ -782,7 +762,17 @@ graphs_24h[["NH3"]]+
   theme(legend.position = "right")
 ```
 
-::: ::::
+###### Review this comment
+
+```{r}
+nutrients_norm %>%  filter(nutrient == "NH3") %>% 
+  mutate(time_string = as.character(time_string)) %>% 
+  filter(time_string == "06:00:00")
+
+#NH3 6AM June 3 
+# the inflow mean was not calculated correctly, F1 is outlier and F2 is not 
+```
+
 #### Phosphate
 
 ```{r}
@@ -816,4 +806,5 @@ graphs_24h[["SiO2"]]+
   scale_color_manual(values = c("red", "blue"))+
   theme(legend.position = "right")
 ```
+
 :::

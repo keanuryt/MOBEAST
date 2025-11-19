@@ -105,6 +105,16 @@ DOC <- DOC %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, in
   relocate(inflow_table, .after = "treatment")
 ```
 
+
+```{r}
+nutrients_norm %>%  filter(nutrient == "NH3") %>% 
+  mutate(time_string = as.character(time_string)) %>% 
+  filter(time_string == "06:00:00")
+
+#NH3 6AM June 3 
+# the inflow mean was not calculated correctly, F1 is outlier and F2 is not 
+```
+
 ### Outlier detection on bulk data
 ```{}
 ## flagging outliers from the data set
@@ -200,6 +210,14 @@ DOC_norm <- raw_flagged_outliers %>%
 
 ```{r}
 DOC_norm <- DOC_norm %>% mutate(nutrient = ifelse(nutrient == "npoc_u_m", "DOC", "TN"))
+```
+
+```{r}
+# Dataset sent to Craig 
+DOC_craig <- DOC_norm %>% filter(outlier != "outlier") %>% 
+  filter(nutrient == "DOC") %>% select(-inflow)
+
+#write_csv(DOC_craig, here("data","craig_data", "DOC_Craig.csv"))
 ```
 
 
@@ -298,12 +316,14 @@ resid_panel(models_12PM[["DOC"]])
 
 #### Data Visualization 
 
-```{r}
+```{r, fig.width= 12, fig.height = 6}
 graphs_12PM[["DOC"]]#+ 
   #geom_jitter(aes(color = inflow_table), size = 2)+
   #scale_color_manual(values = c("red", "blue"))+
   #facet_wrap(date~.)+
   #theme(legend.position = "right")
+
+#ggsave(DOC_12PM.png, path = here("outputs", "Nov_com_meeting", "DOC_12PM.png"))
 ```
 
 
@@ -339,7 +359,7 @@ resid_panel(mod)
 ```
 
 #### Data Visualization 
-```{r}
+```{r, fig.width= 12, fig.height = 6}
 DOC_24h %>% 
     ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
     geom_violin()+

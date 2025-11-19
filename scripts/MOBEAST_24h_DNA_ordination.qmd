@@ -39,14 +39,15 @@ treatment_colors = c("Inflow"="#00838F",
 ```
 
 ```{r}
-nunu_theme <- theme_bw() + 
-  theme(plot.title = element_text(size=32, face = "bold"), 
-        plot.subtitle = element_text(size=30),
-        axis.title = element_text(size = 28, face = "bold"),
-        axis.text = element_text(size = 28),
-        strip.text.x = element_text(size = 28, face = "bold"),
-        legend.title=element_text(size=28, face = "bold"),
-        legend.text=element_text(size=28))
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
 ```
 
 # Load Data
@@ -184,8 +185,7 @@ MOBEAST_nmds_24h %>%
   labs(title= "24h samples, ellipse by treatment")+
   scale_color_manual(values=treatment_colors )+
   scale_fill_manual(values= treatment_colors) +
-  #nunu_theme+
-  theme_bw()
+  nunu_theme
 #ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
 
 ```

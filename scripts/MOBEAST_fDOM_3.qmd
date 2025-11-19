@@ -42,6 +42,18 @@ library(performance)
 ## Data visualization theme
 
 ```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+```{}
 nunu_theme <- theme_bw() + 
   theme(plot.title = element_text(size=32, face = "bold"), 
         plot.subtitle = element_text(size=30),
@@ -200,6 +212,15 @@ fDOM_norm <- raw_flagged_outliers %>%
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
 ```
 
+```{r}
+# Dataset sent to Craig 
+fdom_craig <- fDOM_norm %>% filter(outlier != "outlier") %>% 
+  select(-inflow)
+
+#write_csv(fdom_craig, here("data","craig_data", "fdom_Craig.csv"))
+```
+
+
 ## 12PM data
 ```{r}
 # Version 2
@@ -308,7 +329,7 @@ emmeans(models_12PM[["coble_c"]], specs = trt.vs.ctrl ~ treatment)
 
 ```
 
-```{r}
+```{r, fig.width= 12, fig.height = 6}
 resid_panel(models_12PM[["coble_c"]])
 graphs_12PM[["coble_c"]]
 ```
@@ -323,7 +344,7 @@ emmeans(models_12PM[["m_to_c"]], specs = trt.vs.ctrl ~ treatment)
 
 ```
 
-```{r}
+```{r,fig.width= 12, fig.height = 6 }
 resid_panel(models_12PM[["m_to_c"]])
 graphs_12PM[["m_to_c"]]
 ```
@@ -338,9 +359,10 @@ emmeans(models_12PM[["fi"]], specs = trt.vs.ctrl ~ treatment)
 
 ```
 
-```{r}
+```{r,fig.width= 12, fig.height = 6}
 resid_panel(models_12PM[["fi"]])
-graphs_12PM[["fi"]]
+graphs_12PM[["fi"]]+
+  labs(title = "12PM Fluvic Acid")
 ```
 
 
@@ -529,7 +551,7 @@ emmeans(models_24h[["coble_c"]], specs = trt.vs.ctrl ~ treatment)
 
 ```
 
-```{r}
+```{r,fig.width= 12, fig.height = 6}
 resid_panel(models_24h[["coble_c"]])
 graphs_24h[["coble_c"]]
 ```
@@ -545,7 +567,7 @@ emmeans(models_24h[["m_to_c"]], specs = trt.vs.ctrl ~ treatment)
 
 ```
 
-```{r}
+```{r,fig.width= 12, fig.height = 6}
 resid_panel(models_24h[["m_to_c"]])
 graphs_24h[["m_to_c"]]
 ```
@@ -561,9 +583,10 @@ emmeans(models_24h[["fi"]], specs = trt.vs.ctrl ~ treatment)
 
 ```
 
-```{r}
+```{r,fig.width= 12, fig.height = 6}
 resid_panel(models_24h[["fi"]])
-graphs_24h[["fi"]]
+graphs_24h[["fi"]]+
+  labs(title = "24h Fluvic Acid")
 ```
 
 
