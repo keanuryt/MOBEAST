@@ -106,17 +106,9 @@ DOC <- DOC %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, in
 ```
 
 
-```{r}
-nutrients_norm %>%  filter(nutrient == "NH3") %>% 
-  mutate(time_string = as.character(time_string)) %>% 
-  filter(time_string == "06:00:00")
-
-#NH3 6AM June 3 
-# the inflow mean was not calculated correctly, F1 is outlier and F2 is not 
-```
-
 ### Outlier detection on bulk data
-```{}
+```{r}
+# this data is log transformed
 ## flagging outliers from the data set
 raw_flagged_outliers <- DOC %>%
   select(-npoc_mg_l, -tn_mg_l, -long_name, -sample) %>% 
@@ -142,7 +134,7 @@ raw_flagged_outliers <- DOC %>%
 ```
 
 
-```{r}
+```{}
 ## flagging outliers from the data set
 raw_flagged_outliers <- DOC %>%
   select(-npoc_mg_l, -tn_mg_l, -long_name, -sample) %>% 
@@ -187,6 +179,9 @@ DOC_norm <- raw_flagged_outliers %>%
   select(-IQR, -quant1, -quant3) %>% 
   
   filter(treatment != "Rain") %>% 
+  
+  ## testing the log10 data transformation
+  #mutate(conc = log10(conc)) %>% 
   
   # Isolate inflow for each date_time and table
   group_by(date_time, inflow_table, nutrient) %>%
@@ -257,7 +252,7 @@ names(models_12PM) <- DOC_loop
 
 for (var in DOC_loop) {
   df <- DOC_12PM %>% filter(nutrient == var)
-  models_12PM[[var]] <- lmer(conc_norm ~ treatment + (1|tank_number), data = df)
+  models_12PM[[var]] <- lmer(conc_norm~ treatment + (1|tank_number), data = df)
 }
 
 ```
@@ -326,6 +321,28 @@ graphs_12PM[["DOC"]]#+
 #ggsave(DOC_12PM.png, path = here("outputs", "Nov_com_meeting", "DOC_12PM.png"))
 ```
 
+#### one-sample t-test
+
+```{r}
+qqnorm(DOC_12PM$conc_norm)
+qqline(DOC_12PM$conc_norm)
+```
+
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+DOC_12PM %>%
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
 
 ## Hypothesis 2: There are variation in exudation on a diel cycle 24h
 
@@ -380,6 +397,47 @@ DOC_24h %>%
   #scale_color_manual(values = c("red", "blue"))+
   #theme(legend.position = "right")
 ```
+
+
+### one sample t-test 
+
+```{r}
+
+DOC_24h %>%
+  group_by(time_string,treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+
+
+```
+
+
+
+### Pairwise comparison
+
+```{r}
+control_24h <- DOC_24h %>% filter(treatment == "Control") %>% 
+  filter(time_string != "12:00:00") %>% 
+  mutate(time_US = ifelse(time_string == "18:00:00", "six_pm", "six_am")) %>% 
+  pivot_wider(names_from = time_US, values_from = conc_norm) 
+
+t.test(wide$``, wide$`6PM`, paired = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -306,6 +306,24 @@ resid_panel(models_12PM[["coble_a"]])
 graphs_12PM[["coble_a"]]
 ```
 
+##### !!!! Coral sig diff
+ 
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "coble_a") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
 #### CobleM
 
 ```{r}
@@ -320,6 +338,8 @@ resid_panel(models_12PM[["coble_m"]])
 graphs_12PM[["coble_m"]]
 ```
 
+
+
 #### CobleC *
 Sig ANOVA with log10 data outlier detection but not contrast
 ```{r}
@@ -333,6 +353,24 @@ emmeans(models_12PM[["coble_c"]], specs = trt.vs.ctrl ~ treatment)
 resid_panel(models_12PM[["coble_c"]])
 graphs_12PM[["coble_c"]]
 ```
+
+
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "coble_c") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
 
 
 #### Sig! M to C
@@ -366,6 +404,24 @@ graphs_12PM[["fi"]]+
 ```
 
 
+##### !!!! Sig diff coral 
+
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "fi") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
 #### BIX
 
 ```{r}
@@ -380,6 +436,24 @@ resid_panel(models_12PM[["bix"]])
 graphs_12PM[["bix"]]
 ```
 
+##### !!! All sig diff compared to 0 
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "bix") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
+
 #### HIX
 
 ```{r}
@@ -393,6 +467,24 @@ emmeans(models_12PM[["hix"]], specs = trt.vs.ctrl ~ treatment)
 resid_panel(models_12PM[["hix"]])
 graphs_12PM[["hix"]]
 ```
+##### !!! Control & Coral sig diff
+
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "hix") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
 
 ### Proteinaceous
 #### CobleB
