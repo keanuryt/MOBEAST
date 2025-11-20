@@ -1,0 +1,104 @@
+---
+title: "MOBEAST - Unifrac"
+author: "Keanu Rochette-Yu Tsuen"
+date: "2025-11-18"
+output: html_document
+---
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(emmeans)
+library(performance)
+library(multcompView)
+library(vegan)
+
+```
+
+
+## Load Data 
+```{r}
+unifrac <- read.csv(here("data", "DNA", "unifrac", "unifrac_weighted_97.csv"), row.names = 1,
+                    header = TRUE)
+meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
+```
+
+```{r}
+sample_list <- meta %>% pull(id_number)
+```
+
+```{r}
+unifrac_subset <- unifrac[rownames(unifrac) %in% sample_list, colnames(unifrac) %in% sample_list]
+```
+
+
+```{r}
+nmds <- metaMDS(unifrac_subset, k=2, trymax = 1000)
+# put stress in the corner fo the nmds plot
+```
+```{r}
+nmds_scores <- as.data.frame(scores(nmds, display = "site"))
+```
+
+```{r}
+nmds_scores$id_number= rownames(nmds_scores)
+```
+```{r}
+nmds_merged <- merge(nmds_scores, meta, by.x ="id_number", by.y = "id_number")
+```
+
+
+```{r}
+nmds_merged<- nmds_merged %>% mutate(treatment = as.factor(treatment))
+```
+
+
+```{r}
+# Plot
+nmds_merged %>%   
+  #mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      #"00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  facet_wrap(~time_string, ncol = 4)+
+  labs(title= "24h samples, ellipse by treatment")#+
+  #scale_color_manual(values=treatment_colors )+
+  #scale_fill_manual(values= treatment_colors) +
+  #nunu_theme
+#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+
+```
+
+
+##
+- permnova : adonis2
+- pairwise pairwise.adonis2(p.adjust.m = "BH"), make sure that it's a distance matrix (as.dist())
+
+
+
+
+

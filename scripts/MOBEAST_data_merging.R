@@ -19,6 +19,7 @@ fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
 FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
 nutrients <- read_delim(here("data", "Nutrients", "MOBEAST_nutrients.csv"))
 meta2 <- read_csv(here("data", "MOBEAST_metadata.csv"))
+res_time <- read_csv(here("data", "tank_residence_time.csv"))
 
 
 ## Data Clean up 
@@ -145,9 +146,17 @@ merged<- merged %>% left_join(nutrients)
 merged <- merged %>% mutate(time = as_hms(time)) %>% 
   full_join(carbonate) 
 
+### merge residence time with meta data
+res_time<- res_time %>% clean_names() %>% 
+  rename(tank_number = tank_num) %>% 
+  mutate(tank_number = paste0("T",tank_number)) 
+
+res_time_list <- colnames(res_time[,c(2:5)])
+merged<- merged %>% left_join(res_time) 
+
 ## Data clean up
 merged_data <- merged %>% 
-  mutate(time_string = as.character(time_string),
+  mutate(time_string = as.character(time),
          date_string = as.character(date),
          date_time_string = as.character(date_time)) 
 
@@ -155,7 +164,7 @@ merged_data <- merged %>%
 
 ## Creating long format data 
 merged_long <- merged_data %>% 
-  pivot_longer(cols = het_bact:delta_ta,
+  pivot_longer(cols = het_bact:flow_error,
                names_to = "variable",
               values_to = "value") %>% 
   mutate(variable_cat =
@@ -164,7 +173,8 @@ merged_long <- merged_data %>%
                          ifelse(variable %in% carbonate_list, "carbonate", 
                                 ifelse(variable %in% fcm_list, "FCM", 
                                        ifelse(variable %in% nutrient_list, "nutrients", 
-                                              "AAAHHH")))))) 
+                                              ifelse(variable %in% res_time_list, "residence time",
+                                                     "AAAHHH"))))))) 
 
 #write_csv(merged_long, here("data", "MOBEAST_full_merged_data_long.csv"))
 
