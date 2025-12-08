@@ -44,22 +44,10 @@ library(multcompView)
 ## Load Data
 
 ```{r}
-DOC <- read_csv(here("data", "DOC", "DOC_clean.csv"))
-table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+mobeast <- read_csv(here("data", "MOBEAST_full_merged_data.csv"))
 ```
 
 ## Data visualization theme
-
-```{}
-nunu_theme <- theme_bw() + 
-  theme(plot.title = element_text(size=30, face = "bold"), 
-        plot.subtitle = element_text(size=28),
-        axis.title = element_text(size = 24, face = "bold"),
-        axis.text = element_text(size = 24),
-        strip.text.x = element_text(size = 24, face = "bold"),
-        legend.title=element_text(size=24, face = "bold"),
-        legend.text=element_text(size=22))
-```
 
 ```{r}
 nunu_theme <- theme_bw()+ 
@@ -88,21 +76,7 @@ treatment_colors = c("Inflow"="#00838F",
 ## Data Clean Up
 
 ```{r}
-table_id <- clean_names(table_id)
-
-table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
-  mutate(tank_number = paste0("T", tank_number)) %>% 
-  mutate(inflow_table = paste("Table", inflow_table))
-DOC <- left_join(DOC, table_id, by= "tank_number")
-```
-
-```{r}
-DOC <- DOC %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, inflow_table)) %>% 
-   mutate(inflow_table = ifelse(inflow_table == "F1", "Table 1", 
-                                ifelse(inflow_table == "F2", "Table 2", inflow_table))) %>% 
-  mutate(inflow_table = factor(inflow_table),
-         tank_number = factor(tank_number)) %>% 
-  relocate(inflow_table, .after = "treatment")
+mobeast %>% select(id_number:date_time, npoc_u_m, avg_res_time, avg_flow_rate)
 ```
 
 

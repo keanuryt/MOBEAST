@@ -39,6 +39,9 @@ library(performance)
 
 ```
 
+
+
+
 ## Data visualization theme
 
 ```{r}
@@ -65,7 +68,7 @@ nunu_theme <- theme_bw() +
 ```
 
 ```{r}
-#| output: false
+
 treatment_colors = c("Inflow"="#00838F",
                      "Control"="grey", 
                      "Coral"="#03A9F4", 
@@ -213,11 +216,27 @@ fDOM_norm <- raw_flagged_outliers %>%
 ```
 
 ```{r}
-# Dataset sent to Craig 
-fdom_craig <- fDOM_norm %>% filter(outlier != "outlier") %>% 
-  select(-inflow)
 
-#write_csv(fdom_craig, here("data","craig_data", "fdom_Craig.csv"))
+## Check outlier detection 
+ fDOM_norm %>% filter(outlier == "outlier") %>% 
+  select(id_number, tank_number, treatment, date_time, fdom, fdom_conc, conc_norm) %>% 
+  group_by(fdom) %>% 
+  summarise(number = n())
+
+
+```
+
+```{r, warning=FALSE}
+fDOM_norm %>% 
+  #filter(outlier == "outlier") %>% 
+  ggplot(aes(treatment, fdom_conc, fill = treatment))+
+  #geom_violin()+
+  geom_point(aes(color = outlier), size = 1.7)+
+  facet_wrap(.~fdom, scales = "free")+
+  scale_fill_manual(values = treatment_colors)+
+
+  scale_color_manual(values = c("white", "red"))
+  
 ```
 
 
@@ -306,7 +325,7 @@ resid_panel(models_12PM[["coble_a"]])
 graphs_12PM[["coble_a"]]
 ```
 
-##### !!!! Coral sig diff
+##### !!!! T-test  Coral sig diff
  
 ```{r}
 # We are testing if the average of the treatments at 12PM is significantly different to 0
@@ -324,6 +343,8 @@ fDOM_12PM %>%
 # p<0.05, reject the null hypothesis, the difference in mean is not due to chance
 ```
 
+
+
 #### CobleM
 
 ```{r}
@@ -338,7 +359,23 @@ resid_panel(models_12PM[["coble_m"]])
 graphs_12PM[["coble_m"]]
 ```
 
+##### !!!! T-test  Coral sig diff
+ 
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "coble_m") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
 
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
 
 #### CobleC *
 Sig ANOVA with log10 data outlier detection but not contrast
@@ -354,7 +391,7 @@ resid_panel(models_12PM[["coble_c"]])
 graphs_12PM[["coble_c"]]
 ```
 
-
+##### !!!! T-test sig 
 ```{r}
 # We are testing if the average of the treatments at 12PM is significantly different to 0
 ## H0 : mean of treatments is equal to 0
@@ -387,6 +424,22 @@ resid_panel(models_12PM[["m_to_c"]])
 graphs_12PM[["m_to_c"]]
 ```
 
+##### T-test Sig 
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "m_to_c") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
 
 #### FI
 
@@ -437,6 +490,8 @@ graphs_12PM[["bix"]]
 ```
 
 ##### !!! All sig diff compared to 0 
+
+CONTROL IS NOT SUPPOSED TO BE DIFFERENT !!! ?????? WHAT ????
 ```{r}
 # We are testing if the average of the treatments at 12PM is significantly different to 0
 ## H0 : mean of treatments is equal to 0
@@ -467,6 +522,7 @@ emmeans(models_12PM[["hix"]], specs = trt.vs.ctrl ~ treatment)
 resid_panel(models_12PM[["hix"]])
 graphs_12PM[["hix"]]
 ```
+
 ##### !!! Control & Coral sig diff
 
 ```{r}
@@ -501,6 +557,22 @@ resid_panel(models_12PM[["coble_b"]])
 graphs_12PM[["coble_b"]]
 ```
 
+##### Sig in Coral and Algae
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "coble_b") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
 
 #### CobleT
 
@@ -516,6 +588,22 @@ resid_panel(models_12PM[["coble_t"]])
 graphs_12PM[["coble_t"]]
 ```
 
+##### Sig in Coral, CCA and Algae
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "coble_t") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
 
 #### Fpeak
 
@@ -531,6 +619,47 @@ resid_panel(models_12PM[["fpeak"]])
 graphs_12PM[["fpeak"]]
 ```
 
+##### T-test NO sig
+
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  filter(fdom == "fpeak") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
+#### Graphs 12PM 
+
+```{r, fig.width=6, fig.height = 10}
+fDOM_12PM %>%  
+  filter(fdom_cat == "Humic") %>% 
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("12PM concentrations"),
+       x= "Treatment",
+       y = "X")+
+    facet_grid(fdom~., scales = "free")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme + theme_bw()+
+  theme(legend.position = "none")
+
+```
+
 
 ## 24h data 
 ```{r}
@@ -543,7 +672,8 @@ fDOM_24h <- fDOM_norm %>%
   ## remove the outliers 
   filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00")))
+                                                   "00:00:00","06:00:00"))) %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
 
 ```
 
@@ -606,6 +736,90 @@ for (var in fDOM_loop) {
 
 ```
 
+
+### Pairwise comparison function
+
+```{r}
+nunu_pairwise <- function(data, type = "coble_a", time_point = 6){
+
+  ## Get a list of the treatments for the for loop   
+  treatment <- data %>% mutate(treatment = as.character(treatment)) %>%
+  select(treatment) %>%  distinct() %>% pull()
+  
+  ## Create un empty data frame
+pairwise_results <- tibble(
+  time_point = vector(),
+  treatment= vector(),
+  mean = vector(),
+  p_value = vector())
+
+# this is the pairwise comparison for the 6 pairs (6AM-6PM)
+  if(time_point == 6){
+    for(var in treatment){
+      
+      ## only keep the 6AM and 6PM
+      df <- data %>% 
+        filter(fdom == type) %>% 
+        filter(treatment == var) %>% 
+  filter(time_string == "18:00:00" | time_string == "06:00:00") %>% 
+        ## Rename the times so they can become column names
+  mutate(time_US = ifelse(time_string == "18:00:00", "T18", "T06")) %>% 
+        ## Only keep the column of interest for the stats
+  select(tank_number, time_US, conc_norm) %>% 
+  pivot_wider(names_from = time_US, values_from = conc_norm) 
+      
+      ## Pairwise function 
+      paired <- t.test(df$T18, df$T06, paired = TRUE, na.action = na.pass)
+      
+      ## Save the result in at data frame
+      df2 <- tibble(
+        time_point = "06AM-06PM",
+        fdom = type,
+        treatment = var,
+        mean = paired$estimate, 
+        p_value = paired$p.value)
+      
+      # Code will loop oveer all treatments and save the results in a data frame
+      pairwise_results <-rbind(pairwise_results,df2)
+      
+      # Save the results in RStudio
+      pairwise_results <<- pairwise_results
+    }  
+  
+
+# This is for the 12 samples (12AM-12PM)
+  }else if(time_point == 12){
+    for(var in treatment){
+      
+      ## Same as before but for the 12AM-12PM
+      df <- data %>% 
+        filter(fdom == type) %>% 
+        filter(treatment == var) %>% 
+  filter(time_string == "12:00:00" | time_string == "00:00:00") %>% 
+  mutate(time_US = ifelse(time_string == "12:00:00", "T12", "T00")) %>% 
+  select(tank_number, time_US, conc_norm) %>% 
+  pivot_wider(names_from = time_US, values_from = conc_norm) 
+      
+      paired <- t.test(df$T12, df$T00, paired = TRUE, na.action = na.pass)
+      
+      df2 <- tibble(
+        time_point = "12AM-12PM",
+        fdom = type,
+        treatment = var,
+        mean = paired$estimate, 
+        p_value = paired$p.value)
+      
+      pairwise_results <- rbind(pairwise_results, df2)
+      pairwise_results <<- pairwise_results
+    }
+}
+
+# Display the results of the code 
+print(pairwise_results)
+}
+
+```
+
 ### Humics
 #### CobleA
 
@@ -620,6 +834,20 @@ resid_panel(models_24h[["coble_a"]])
 graphs_24h[["coble_a"]]
 ```
 
+
+
+
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_a")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_a")
+```
+
+
+
+
 #### CobleM
 
 ```{r}
@@ -632,6 +860,14 @@ emmeans(models_24h[["coble_m"]], specs = trt.vs.ctrl ~ treatment)
 ```{r}
 resid_panel(models_24h[["coble_m"]])
 graphs_24h[["coble_m"]]
+```
+
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_m")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_m")
 ```
 
 #### Sig! CobleC 
@@ -648,6 +884,13 @@ resid_panel(models_24h[["coble_c"]])
 graphs_24h[["coble_c"]]
 ```
 
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_c")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_c")
+```
 
 #### Sig! M to C 
 Sig ANOVA and Contrasts with and without log10 outlier detection method
@@ -664,6 +907,13 @@ resid_panel(models_24h[["m_to_c"]])
 graphs_24h[["m_to_c"]]
 ```
 
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "m_to_c")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "m_to_c")
+```
 
 #### Sig! FI  
 Sig ANOVA and Contrasts with and without log10 outlier detection method
@@ -681,6 +931,13 @@ graphs_24h[["fi"]]+
   labs(title = "24h Fluvic Acid")
 ```
 
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "fi")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "fi")
+```
 
 #### BIX
 
@@ -695,6 +952,15 @@ emmeans(models_24h[["bix"]], specs = trt.vs.ctrl ~ treatment)
 resid_panel(models_24h[["bix"]])
 graphs_24h[["bix"]]
 ```
+
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "bix")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "bix")
+```
+
 
 #### HIX *Sig ANOVA
 Sig ANOVA with log10 outlier detection method but not the contrasts
@@ -712,6 +978,56 @@ resid_panel(models_24h[["hix"]])
 graphs_24h[["hix"]]
 ```
 
+
+##### Pairwise
+
+```{r}
+HIX_pairwise <- fDOM_24h %>% 
+        filter(fdom == "hix") %>% 
+  filter(time_string == "18:00:00" | time_string == "06:00:00") %>% 
+        ## Rename the times so they can become column names
+  mutate(time_US = ifelse(time_string == "18:00:00", "T18", "T06")) %>% 
+        ## Only keep the column of interest for the stats
+  select(tank_number, time_US, conc_norm) %>% 
+  pivot_wider(names_from = time_US, values_from = conc_norm) %>% drop_na()
+```
+
+```{r}
+t.test(HIX_pairwise$T06, HIX_pairwise$T18, paired = TRUE, na.action = na.pass)
+```
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "hix")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "hix")
+```
+
+### Graphs 24h fDOM 
+
+```{r,  fig.width=6, fig.height = 10}
+fDOM_24h %>%  
+  filter(fdom_cat == "Proteinaceous") %>% 
+  filter(time_string == "06:00:00"| time_string == "18:00:00") %>% 
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("24h concentrations"),
+       x= "Treatment",
+       y = "X")+
+    facet_grid(fdom~time_fac, scales = "free")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme + theme_bw()+
+  theme(legend.position = "none")
+
+```
+
+
+
 ### Proteinaceous
 #### CobleB
 
@@ -727,6 +1043,13 @@ resid_panel(models_24h[["coble_b"]])
 graphs_24h[["coble_b"]]
 ```
 
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_b")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_b")
+```
 
 #### CobleT
 
@@ -742,6 +1065,13 @@ resid_panel(models_24h[["coble_t"]])
 graphs_24h[["coble_t"]]
 ```
 
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_t")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_t")
+```
 
 #### Fpeak
 
@@ -756,4 +1086,14 @@ emmeans(models_24h[["fpeak"]], specs = trt.vs.ctrl ~ treatment)
 resid_panel(models_24h[["fpeak"]])
 graphs_24h[["fpeak"]]
 ```
+
+##### Pairwise
+
+```{r}
+nunu_pairwise(data = fDOM_24h, time_point = 6, type = "fpeak")
+
+nunu_pairwise(data = fDOM_24h, time_point = 12, type = "fpeak")
+```
+
+
 

@@ -30,6 +30,7 @@ library(RColorBrewer)
 library(ComplexHeatmap)
 library(data.table)
 library(dendextend)
+library(grid)
 
 # Rayna library
 library(dendsort)
@@ -152,8 +153,10 @@ OTU_htm <- left_join(OTU_long, meta)
 
 ```{r}
 OTU_htm_24h <- OTU_htm %>% 
-  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) 
-OTU_htm_24h <- OTU_htm_24h %>% filter(family != "Bradymonadales_fa")
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  filter(family != "Bradymonadales_fa") %>% 
+  filter(treatment !="Inflow")
+
 ```
 
 ```{r, echo=TRUE, collapse=TRUE}
@@ -201,29 +204,76 @@ date_time <- meta[match(colnames(zscore.data.otu.matrix),
                            meta$id_number),
                   "date_time_string"]
 
+time <- meta[match(colnames(zscore.data.otu.matrix),
+                           meta$id_number),
+                  "time_string"]
+
+```
+
+
+## organize the samples (ChatGPT)
+```{r}
+
+## organize the treatment in order they will be display on the heatmap
+treatment2 <- factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))
+
+## organize the time in order they will be display on the heatmap
+time <- factor(time, levels = c("12:00:00", "18:00:00", "00:00:00", "06:00:00"))
+
+#store that info in a df
+col_info <- data.frame(
+  Treatment = treatment2,
+  Time = time)
+
+# create the order in which the samples with be organize in the heatmap
+sample_order <- order(col_info$Treatment,col_info$Time)
+
+# tell the matrix with my z-scores how the samples should be arranged
+mat_ordered <- zscore.data.otu.matrix[, sample_order]
+
+# have vectors specifying the order of the treatment for the heatmap
+treatment_ordered <- col_info$Treatment[sample_order]
+time_ordered <- col_info$Time[sample_order]
+
+
 ```
 
 ```{r}
-## 12PM Samples
-ha = HeatmapAnnotation(
-  treatment = treatment,
-  date_time = date_time,
-  col = list(treatment = c("Inflow"="#00838F","Control"="grey", "Coral"="#03A9F4", 
-                           "CCA"="#EF5350", "Algae"="#4CAF50",
-                           "Endmember" = "black", "Rain"= "yellow"),
-             date_time = c("2024-06-02 12:00:00" = "red",
-                           "2024-06-02 18:00:00" = "yellow", 
-                           "2024-06-03 00:00:00" = "green",
-                           "2024-06-03 06:00:00" = "blue"
-                           ))
+## Create Annotation for the heatmap 
+col_ha <- HeatmapAnnotation(
+  #Treatment = treatment_ordered,
+  
+  ## Creates annotations blocks from treatments
+  Treatment = anno_block(
+    
+  gp = gpar(fill = c("grey", "#03A9F4", "#EF5350", "#4CAF50")), # choose label colors
+  #choose the name of the blocks
+        labels = c("Control", "Coral", "CCA", "Algae"), 
+  # customize the font color, size and font type
+        labels_gp = gpar(col = "white", fontsize = 14,fontface = "bold")),
+  
+  # Creates clustering for time
+  Time = time_ordered, 
+  
+  #Specifying the labels and the colors of the cluster groups.
+  ## here Treatment is not very useful bcs they are specified above already
+  col = list(Treatment = c("Control"="grey", 
+                           "Coral"="#03A9F4", "CCA"="#EF5350",
+                           "Algae"="#4CAF50"),
+             Time = c("12:00:00" = "black",
+                          "18:00:00" = "green", 
+                          "00:00:00" = "blue",
+                          "06:00:00" = "grey"))
 )
-
 
 ```
 
+
+
 #### Printing heatmap
 
-```{r, fig.height = 10, fig.width = 16}
+```{, fig.height = 10, fig.width = 16}
+#Version 1: OG
 #png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
 
 ht = Heatmap(zscore.data.otu.matrix, name = "z-scored", 
@@ -232,11 +282,13 @@ ht = Heatmap(zscore.data.otu.matrix, name = "z-scored",
         column_title = "24h Sampling - All samples", 
         column_title_gp = gpar(fontsize = 16, fontface = "bold"),
         #column_title_side = "bottom",
+        cluster_rows = TRUE,
+        cluster_columns =  FALSE,
         row_title = "Family",
         row_names_gp = gpar(fontsize = 10),
         column_names_gp = gpar(fontsize = 10),
         row_km = 5, #number of forced segregation in rows 
-        column_km = 4,#number of forced segregation in columns 
+        #column_km = 4,#number of forced segregation in columns 
         top_annotation = ha
         )
 set.seed(1999)
@@ -246,6 +298,37 @@ ht_drawn <- draw(ht)
 
 ```
 
+
+```{r, fig.height = 10, fig.width = 16}
+# Version 2
+#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
+
+ht = Heatmap(mat_ordered, name = "z-scored", 
+             #rect_gp = gpar(col = "white", lwd = 0.1),
+        
+        column_title = "Bacterial Community Shift Over 24h", 
+        column_title_gp = gpar(fontsize = 18, fontface = "bold"),
+        #column_title_side = "bottom",
+        cluster_rows = TRUE,
+        cluster_columns =  FALSE,
+        row_title = "Bacterial Families",
+        row_title_gp = gpar(fontsize = 14, fontface = "bold"),
+        row_names_gp = gpar(fontsize = 10),
+        row_dend_width = unit(1.5, "cm"),
+        #column_names_gp = gpar(fontsize = 10),
+        show_column_names = FALSE,
+        row_km = 5, #number of forced segregation in rows 
+        #column_km = 4,#number of forced segregation in columns 
+        top_annotation = col_ha,
+        #bottom_annotation = col_ha,
+        column_split = treatment_ordered
+        )
+set.seed(1999)
+ht_drawn <- draw(ht)
+
+#dev.off()
+
+```
 ### Cluster membership
 
 ```{r}
@@ -287,7 +370,7 @@ OTU_htm_24h %>% left_join(cluster_df) %>%
 
 Not useful for cluster membership but to see the dendrograms, it's useful!
 
-```{r}
+```{}
 # choose a distance metric
 # note: you could use vegdist to do something like Bray curtis distances instead
 # by default Heatmap uses 'euclidean' distances

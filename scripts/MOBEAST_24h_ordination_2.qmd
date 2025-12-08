@@ -1,0 +1,482 @@
+---
+title: "MOBEAST- DNA Ordination 24h V2"
+format: html
+editor: source
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+# Load Libraries
+
+```{r}
+library(tidyverse)
+#library(lubridate)
+library(here)
+library(janitor)
+#library(ggrepel)
+#library(ghibli)
+#library(gt)
+library(patchwork)
+#library(RColorBrewer)
+library(vegan)
+library(OmicFlow)
+library(phyloseq)
+#library(GUniFrac)
+```
+
+# Data visualization
+
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
+```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+# Load Data
+
+```{r}
+unifrac <- read.csv(here("data", "DNA", "unifrac", "unifrac_weighted_97.csv"), row.names = 1,
+                    header = TRUE)
+
+meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
+
+```
+
+# Data Clean Up
+
+```{r}
+endmember_list <- meta %>% 
+  filter(treatment == "Endmember" |treatment == "Rain") %>% 
+  pull(id_number)
+
+inflow_list <- meta %>% 
+  filter(treatment == "Inflow") %>% 
+  pull(id_number)
+
+sample_list <- meta %>% 
+  filter(!id_number %in% endmember_list) %>% 
+  filter(!id_number %in% inflow_list) %>% 
+  pull(id_number)
+```
+
+```{r}
+unifrac_subset <- unifrac[rownames(unifrac) %in% sample_list, colnames(unifrac) %in% sample_list]
+
+unifrac_dist <- as.dist(unifrac_subset)
+```
+
+
+
+```{}
+cluster<- cluster %>% 
+  #mutate(cluster = factor(cluster)) %>% 
+  mutate(cluster2 = ifelse(cluster == 1, "Algae", 
+                           ifelse(cluster == 2, "CCA", 
+                                  ifelse(cluster == 3, "Coral", "Control")))) %>% 
+  select(-cluster) %>% 
+  rename(cluster = cluster2)
+
+meta<- meta %>% left_join(cluster)
+```
+
+
+
+# NMDS Calculation
+
+```{r}
+nmds <- metaMDS(unifrac_dist, k=2, trymax = 1000)
+# put stress in the corner fo the nmds plot
+```
+
+```{r}
+nmds_scores <- as.data.frame(scores(nmds, display = "site"))
+```
+
+```{r}
+nmds_scores$id_number= rownames(nmds_scores)
+```
+
+```{r}
+nmds_merged <- merge(nmds_scores, meta, by.x ="id_number", by.y = "id_number")
+```
+
+```{r}
+nmds_merged<- nmds_merged %>% mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+
+# Plotting Ordination 
+
+
+```{r, fig.width=16, fig.height= 6}
+# Plot
+nmds_merged %>%   
+  mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  facet_wrap(~time_string, ncol = 4)+
+  labs(title= "24h samples, ellipse by treatment")+
+  scale_color_manual(values=treatment_colors )+
+  scale_fill_manual(values= treatment_colors) +
+  nunu_theme
+#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+
+```
+## PERMANOVA 
+
+```{r}
+# Note : Version 2 of adonis 
+perma_24h <- adonis2(unifrac_dist ~ treatment + date_time + treatment:date_time, 
+                     data = nmds_merged,
+                     #permutations = 1000, 
+                     strata = nmds_merged$tank_number)
+perma_24h
+
+## Random effect (strata) should be applied on the tank because we sample repeatedly in the tank.
+## We don't sample the same tank multiple times at a time point. 
+## We may have a time interaction tho, so I added the date_time in the model formula. 
+### Note: why is the output of the model not show fixed effects and random effects like lmer()? 
+
+
+```
+
+## Pairwise comparison 
+
+- permnova : adonis2
+- pairwise pairwise.adonis2(p.adjust.m = "BH"), make sure that it's a distance matrix (as.dist())
+
+```{r}
+pairwise_adonis(x = unifrac_dist, 
+                groups = as.vector(nmds_merged$treatment),
+                  p.adjust.m = "BH")
+```
+
+
+
+# Analyzing data with Heatmap 
+
+## Identifying the 2 samples that cluster alone in the Heatmaps 
+```{r}
+MOBEAST_nmds_24h_bis <- MOBEAST_nmds_24h %>% 
+  mutate(treatment_bis = treatment) %>% 
+  mutate(treatment_bis = ifelse(id_number == "MOBEAST010" |id_number == "MOBEAST060", "weird", treatment_bis ))
+```
+
+```{r, fig.width=16, fig.height= 6}
+# Plot
+MOBEAST_nmds_24h_bis %>%  
+  mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment_bis, fill= treatment_bis))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  facet_wrap(~time_string, ncol = 4)+
+  labs(title= "24h samples, ellipse by treatment")+
+  scale_color_manual(values= c("Inflow"="#00838F", "Control"="grey", "Coral"="#03A9F4", "CCA"="#EF5350", "Algae"="#4CAF50","weird"= "yellow"))+
+  scale_fill_manual(values= c("Inflow"="#00838F", "Control"="grey", "Coral"="#03A9F4", "CCA"="#EF5350", "Algae"="#4CAF50","weird"= "yellow")) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+
+```
+
+#### Plotting by heatmap cluster
+
+Note: cluster numbers are inaccurate and do not match what is seen in the heatmap. Problem with the distance matrix or clutering method or both...
+
+```{r, fig.width=16, fig.height= 10}
+# Plot
+MOBEAST_nmds_24h %>%   
+  mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  #stat_ellipse(aes(colour = cluster, fill = cluster),
+               #alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  facet_wrap(~time_string, ncol = 2)+
+  labs(title= "24h samples, ellipse by treatment")+
+  scale_color_manual(values=treatment_colors)+
+  scale_fill_manual(values=treatment_colors) +
+  ggforce::geom_mark_ellipse(aes(color = cluster, fill = cluster), alpha = 0.3)+
+  #nunu_theme+
+  theme_bw()
+#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+```{r, fig.width=10, fig.height= 6}
+# raw NMDS plot with all the samples
+MOBEAST_nmds_24h %>%  
+  mutate(time_string = factor(time_string, 
+                              levels = c("12:00:00","18:00:00","00:00:00","06:00:00" ))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment))+
+  stat_ellipse(aes(colour = time_string, fill = time_string), 
+               alpha = 0.2, geom = "polygon", level = 0.95)+
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  labs(title= "24h samples, ellipse by time")+
+  scale_color_manual(values=treatment_colors)+
+  #scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("24h_time.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+### Stats on treatment only
+
+```{r}
+# Tranform the distance matrix into a df that I can use adonis on 
+id_number_24h <- meta %>% filter(date_string == "2024-06-02" |date_string == "2024-06-03") %>% pull(id_number)
+
+distance_24h <- MOBEAST_dist_24h %>% as.matrix() %>% as.data.frame() %>% 
+  mutate(id_number = id_number_24h)%>% 
+  relocate(id_number, .before = MOBEAST001)
+
+rownames(distance_24h) <- NULL
+```
+
+```{r}
+meta_distance_24h <- inner_join(meta, distance_24h, by = "id_number") %>% 
+  select(-long_name, -date_string, -time_string, -date_time_string,-cluster)
+meta_distance_24h 
+
+all_dist <- meta_distance_24h %>% 
+  select(all_of(meta_distance_24h[["id_number"]])) %>% 
+  as.dist()
+```
+
+```{r}
+# Note : Version 2 of adonis 
+perma_24h <- adonis2(all_dist ~ treatment + date_time + treatment:date_time, 
+                     data = meta_distance_24h,
+                     #permutations = 1000, 
+                     strata = meta_distance_24h$tank_number)
+perma_24h
+
+## Random effect (strata) should be applied on the tank because we sample repeatedly in the tank.
+## We don't sample the same tank multiple times at a time point. 
+## We may have a time interaction tho, so I added the date_time in the model formula. 
+### Note: why is the output of the model not show fixed effects and random effects like lmer()? 
+
+
+```
+
+
+```{r}
+# Note : Version 1 of adonis
+## the results are the same between adonis stats V1 and V2
+perma_24h <- adonis2(MOBEAST_dist_24h ~ treatment*date_time, 
+                     data = MOBEAST_nmds_24h, 
+        # formula to calculate p-value for treatments
+        strata = MOBEAST_nmds_24h$date_time) # accounts for repeated measures
+
+perma_24h
+```
+
+# Ordination of individual time points
+
+## 12:00:00
+
+```{r}
+otu_ord <- OTU %>% t() %>% as.data.frame() 
+
+# Make the sample ID the rownames of the data frame
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
+# only select 12PM samples 
+samples_12PM <- meta %>% mutate(time_string = as.character(time_string),) %>% 
+  filter(time_string == "12:00:00" & date == ymd("2024-06-02")) %>% pull(id_number)
+
+otu_ord_12PM <- otu_ord %>% filter(id_number %in% samples_12PM)
+
+
+```
+
+```{r}
+# only keep the OTU numbers in the matrix and remove the id_number column
+## ID numbers are now rownames. then convert the df in a matrix.
+otu_ord_mat_12PM <- otu_ord_12PM %>%  select(-id_number) %>%  as.matrix()
+
+```
+
+### Calculate distances
+
+```{r}
+# metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
+set.seed(2000)
+
+# calcultat the distance matrix with bray-curtis method
+MOBEAST_dist_12PM <- vegdist(otu_ord_mat_12PM, method = "bray")
+
+#calculate the MDS scores such that it converges to a solutions. 
+## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
+nmds <- metaMDS(MOBEAST_dist_12PM, trymax = 10000)
+
+# save the NMDS scores in a tibble with the ID numbers. 
+MOBEAST_nmds_12PM <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+### Plotting NMDS
+
+```{r}
+# add the metadata to the NMDS tibble to make plots 
+MOBEAST_nmds_12PM <- left_join(MOBEAST_nmds_12PM, meta)
+```
+
+```{r, fig.width=16, fig.height= 12}
+# Plot
+MOBEAST_nmds_12PM %>%   
+  # mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      # "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  #facet_wrap(~time_string, ncol = 2)+
+  labs(title= "12:00 samples")+
+  scale_color_manual(values=treatment_colors)+
+  scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+### Stats on treatment only
+
+```{r}
+perma_12PM <- adonis2(MOBEAST_dist_12PM ~ MOBEAST_nmds_12PM$treatment) #, 
+        # formula to calculate p-value for treatments
+        #strata = MOBEAST_nmds_12PM$tank_number) # accounts for repeated measures
+
+perma_12PM
+```
+
+## 06:00:00
+
+```{r}
+otu_ord <- OTU %>% 
+  t() %>% 
+  as.data.frame() 
+
+# Make the sample ID the rownames of the data frame
+otu_ord<- otu_ord %>% mutate(id_number = rownames(otu_ord)) 
+
+# only select 12PM samples 
+samples_6AM <- meta %>% mutate(time_string = as.character(time_string)) %>% 
+  filter(time_string == "06:00:00") %>% pull(id_number)
+
+otu_ord_6AM <- otu_ord %>% filter(id_number %in% samples_6AM)
+
+
+```
+
+```{r}
+# only keep the OTU numbers in the matrix and remove the id_number column
+## ID numbers are now rownames. then convert the df in a matrix.
+otu_ord_mat_6AM <- otu_ord_6AM %>%  select(-id_number) %>%  as.matrix()
+
+```
+
+### Calculate distances
+
+```{r}
+# metaMDS uses a random number to calculate the distance matrix. Need to set a "seed" to get the consistent results. 
+set.seed(2000)
+
+# calcultat the distance matrix with bray-curtis method
+MOBEAST_dist_6AM <- vegdist(otu_ord_mat_6AM, method = "bray")
+
+#calculate the MDS scores such that it converges to a solutions. 
+## trymax was randomly set to 10000 (based on the internet), because solutions did not converge on the initial trials.
+nmds <- metaMDS(MOBEAST_dist_6AM, trymax = 10000)
+
+# save the NMDS scores in a tibble with the ID numbers. 
+MOBEAST_nmds_6AM <- scores(nmds) %>% as_tibble(rownames = "id_number")
+  
+```
+
+### Plotting NMDS
+
+```{r}
+# add the metadata to the NMDS tibble to make plots 
+MOBEAST_nmds_6AM <- left_join(MOBEAST_nmds_6AM, meta)
+```
+
+```{r, fig.width=16, fig.height= 12}
+# Plot
+MOBEAST_nmds_6AM %>%   
+  # mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                      # "00:00:00", "06:00:00"))) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  stat_ellipse(#aes(colour = cluster, fill = cluster),
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+  
+  geom_point(size = 4) +
+  geom_point(shape = 1, color = "black",size = 4) +
+  #geom_label_repel(aes(label = date_string))+
+  #facet_wrap(~time_string, ncol = 2)+
+  labs(title= "12:00 samples")+
+  scale_color_manual(values=treatment_colors)+
+  scale_fill_manual(values=treatment_colors) +
+  #nunu_theme+
+  theme_bw()
+#ggsave("12PM_24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+```
+
+### Stats on treatment only
+
+```{r}
+perma_6AM <- adonis2(MOBEAST_dist_6AM ~ MOBEAST_nmds_6AM$treatment)#, 
+        # formula to calculate p-value for treatments
+        #strata = MOBEAST_nmds_6AM$tank_number) no need strata here because it restricts the permutations
+perma_6AM
+```
+
+#### Accounting for uneven variation in the data.
+
+If the variation is uneven without the groups, adonis may come up with a significant result, although it's not. We can control for that using betdisper() and permutest()
+
+```         
+# beta dispertion
+bd_12 <- betadisper(MOBEAST_dist_12, MOBEAST_nmds_12$treatment)
+
+anova(bd_12) 
+permutest(bd_12) 
+bd_12
+```
