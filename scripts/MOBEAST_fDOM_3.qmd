@@ -302,7 +302,7 @@ for (var in fDOM_loop) {
   #facet_wrap(~date_string, scales = "free")+
     labs(title = paste("12PM", var, "concentrations"),
        x= "Treatment",
-       y = "Concentration (µmol/L)")+
+       y = "Concentration (R.U.)")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   nunu_theme +
@@ -421,7 +421,10 @@ emmeans(models_12PM[["m_to_c"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r,fig.width= 12, fig.height = 6 }
 resid_panel(models_12PM[["m_to_c"]])
-graphs_12PM[["m_to_c"]]
+graphs_12PM[["m_to_c"]]+
+  labs(y = "Marine:Colored Humics Ratio")
+
+ggsave("MtoC_12PM.png", width = 16, height = 8, path = here("outputs"))
 ```
 
 ##### T-test Sig 
@@ -627,7 +630,7 @@ graphs_12PM[["fpeak"]]
 ## HA: mean is different from 0 
 fDOM_12PM %>%
   filter(fdom == "fpeak") %>% 
-  group_by(treatment) %>%
+  group_by( treatment) %>%
   summarize(
     t_test = list(t.test(conc_norm, mu = 0)),
     mean = t_test[[1]]$estimate,
@@ -651,7 +654,7 @@ fDOM_12PM %>%
   #facet_wrap(~date_string, scales = "free")+
     labs(title = paste("12PM concentrations"),
        x= "Treatment",
-       y = "X")+
+       y = "Concentration (R.U.")+
     facet_grid(fdom~., scales = "free")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
@@ -660,6 +663,61 @@ fDOM_12PM %>%
 
 ```
 
+
+### Heatmap summary 
+
+```{, fig.width= 14, fig.height= 8}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_12PM %>%
+  
+  group_by(fdom_alt_name, treatment) %>%
+  reframe(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value,
+    fdom_cat=fdom_cat) %>% distinct() %>% 
+  select(-t_test) %>% 
+  
+  mutate(significance = ifelse(p_value <0.05, "Enrichment", "No Difference"),
+         significance = ifelse(mean <0 & p_value <0.05, "Depletion", significance)#,
+         #significance = as.character(significance)
+         ) %>% 
+    ungroup() %>% 
+  
+  arrange(fdom_cat, fdom_alt_name) %>%   # ensures ordering in the data frame
+  mutate(fdom_alt_name = factor(fdom_alt_name, levels = c("UV-Humic", "Marine Humic","Visible-Humic", "m_to_c", "Fluvic Acid", "bix", "hix", "Tyrosine", "Tryptophan", "Phenylalanine", "lignin")),
+         fdom_alt_name = fct_rev(fdom_alt_name)# lock that order in y-axis
+  ) %>% 
+   mutate(fdom_cat = factor(fdom_cat, levels = c("Other", "Proteinaceous", "Humic"))) %>% 
+  filter(fdom_alt_name != "m_to_c",
+         fdom_alt_name != "lignin") %>% 
+         #fdom_alt_name != "bix",
+         #fdom_alt_name != "hix") %>% 
+  
+  ggplot(aes(x = treatment, y= fdom_alt_name, fill = significance))+
+  #geom_tile(aes(color = fdom_cat), size = 1)+
+  geom_tile(color = "white", size = 1)+
+  labs(title = "fDOM Concentration Change in Mesocosms",
+       x= "Treatment",
+       y = "fDOM Type")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  #scale_fill_distiller(palette = "RdBu", direction = 1)+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"))
+
+ggsave("fdom_tiles_12PM.png",width = 14, height = 8, path = here("outputs"))
+```
 
 ## 24h data 
 ```{r}
@@ -726,7 +784,7 @@ for (var in fDOM_loop) {
   #facet_wrap(~date_string, scales = "free")+
     labs(title = paste("24h", var, "concentrations"),
        x= "Treatment",
-       y = "Concentration (µmol/L)")+
+       y = "Concentration (R.U.)")+
     facet_wrap(~time_fac, ncol = 4 )+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
@@ -842,7 +900,7 @@ graphs_24h[["coble_a"]]
 ```{r}
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_a")
 
-nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_a")
+pairwise_summary <- nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_a")
 ```
 
 
@@ -868,6 +926,8 @@ graphs_24h[["coble_m"]]
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_m")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_m")
+
+pairwise_summary<- rbind(pairwise_summary, nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_m"))
 ```
 
 #### Sig! CobleC 
@@ -890,6 +950,9 @@ graphs_24h[["coble_c"]]
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_c")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_c")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_c"))
 ```
 
 #### Sig! M to C 
@@ -904,7 +967,11 @@ emmeans(models_24h[["m_to_c"]], specs = trt.vs.ctrl ~ treatment)
 
 ```{r,fig.width= 12, fig.height = 6}
 resid_panel(models_24h[["m_to_c"]])
-graphs_24h[["m_to_c"]]
+graphs_24h[["m_to_c"]]+
+  labs(y = "Marine:Colored Humics Ratio")
+
+ggsave("MtoC_24h.png", width = 16, height = 8, path = here("outputs"))
+```
 ```
 
 ##### Pairwise
@@ -913,6 +980,9 @@ graphs_24h[["m_to_c"]]
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "m_to_c")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "m_to_c")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "m_to_c"))
 ```
 
 #### Sig! FI  
@@ -937,6 +1007,9 @@ graphs_24h[["fi"]]+
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "fi")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "fi")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "fi"))
 ```
 
 #### BIX
@@ -959,6 +1032,9 @@ graphs_24h[["bix"]]
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "bix")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "bix")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "bix"))
 ```
 
 
@@ -997,16 +1073,19 @@ t.test(HIX_pairwise$T06, HIX_pairwise$T18, paired = TRUE, na.action = na.pass)
 ```
 
 ```{r}
-nunu_pairwise(data = fDOM_24h, time_point = 6, type = "hix")
+#nunu_pairwise(data = fDOM_24h, time_point = 6, type = "hix")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "hix")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "hix"))
 ```
 
 ### Graphs 24h fDOM 
 
 ```{r,  fig.width=6, fig.height = 10}
 fDOM_24h %>%  
-  filter(fdom_cat == "Proteinaceous") %>% 
+  filter(fdom_cat == "Humic") %>% 
   filter(time_string == "06:00:00"| time_string == "18:00:00") %>% 
     ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
     geom_violin()+
@@ -1049,6 +1128,9 @@ graphs_24h[["coble_b"]]
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_b")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_b")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_b"))
 ```
 
 #### CobleT
@@ -1071,6 +1153,9 @@ graphs_24h[["coble_t"]]
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "coble_t")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_t")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "coble_t"))
 ```
 
 #### Fpeak
@@ -1093,7 +1178,112 @@ graphs_24h[["fpeak"]]
 nunu_pairwise(data = fDOM_24h, time_point = 6, type = "fpeak")
 
 nunu_pairwise(data = fDOM_24h, time_point = 12, type = "fpeak")
+
+pairwise_summary<- rbind(pairwise_summary, 
+                         nunu_pairwise(data = fDOM_24h, time_point = 12, type = "fpeak"))
 ```
 
 
+## Heat map summary of 12PM pairwise
+
+
+```{}
+fdom_desc <- fDOM_24h %>% select(fdom, fdom_alt_name, fdom_cat) %>% distinct()
+pairwise_summary <- left_join(pairwise_summary,fdom_desc)
+```
+
+```{, fig.width= 14, fig.height= 8}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+fDOM_24h %>%
+  filter(fdom_alt_name != "hix") %>% # remove hix bcs at 6AM, only 1 observation in CCA can't do t-test on that
+  
+  group_by(fdom_alt_name, treatment, time_fac) %>%
+  reframe(
+    t_test = list(t.test(conc_norm, mu = 0, na.action= na.pass)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value,
+    fdom_cat=fdom_cat) %>% distinct() %>% 
+  select(-t_test) %>% 
+  
+  mutate(significance = ifelse(p_value <0.05, "Enrichment", "No Difference"),
+         significance = ifelse(mean <0 & p_value <0.05, "Depletion", significance)#,
+         #significance = as.character(significance)
+         ) %>% 
+    ungroup() %>% 
+  
+  arrange(fdom_cat, fdom_alt_name) %>%   # ensures ordering in the data frame
+  mutate(fdom_alt_name = factor(fdom_alt_name, levels = c("UV-Humic", "Marine Humic","Visible-Humic", "m_to_c", "Fluvic Acid", "bix", "hix", "Tyrosine", "Tryptophan", "Phenylalanine", "lignin")),
+         fdom_alt_name = fct_rev(fdom_alt_name)# lock that order in y-axis
+  ) %>% 
+   mutate(fdom_cat = factor(fdom_cat, levels = c("Other", "Proteinaceous", "Humic"))) %>% 
+  filter(fdom_alt_name != "m_to_c",
+         fdom_alt_name != "lignin") %>% 
+         #fdom_alt_name != "bix",
+         #fdom_alt_name != "hix") %>% 
+  
+  ggplot(aes(x = treatment, y= fdom_alt_name, fill = significance))+
+  #geom_tile(aes(color = fdom_cat), size = 1)+
+  geom_tile(color = "white", size = 1)+
+  facet_wrap(.~time_fac, nrow = 1)+
+  labs(title = " 24h fDOM Variations",
+       x= "Treatment",
+       y = "fDOM Type")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  #scale_fill_distiller(palette = "RdBu", direction = 1)+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+ggsave("fdom_tiles_24h_t_test.png",width = 16, height = 8, path = here("outputs"))
+```
+
+```{}
+pairwise_summary %>%
+  mutate(fdom_cat = factor(fdom_cat, levels = c("Other", "Proteinaceous", "Humic"))) %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  mutate(significance = ifelse(p_value <0.05, "Diel Variations", "No Variations")#,
+         #significance = as.character(significance)
+         ) %>% 
+    ungroup() %>% 
+  
+  arrange(fdom_cat, fdom_alt_name) %>%   # ensures ordering in the data frame
+  mutate(fdom_alt_name = factor(fdom_alt_name, levels = c("UV-Humic", "Marine Humic","Visible-Humic", "m_to_c", "Fluvic Acid", "bix", "hix", "Tyrosine", "Tryptophan", "Phenylalanine", "lignin")),
+         fdom_alt_name = fct_rev(fdom_alt_name)# lock that order in y-axis
+  ) %>% 
+    
+  filter(fdom_alt_name != "m_to_c",
+         fdom_alt_name != "lignin") %>%
+  
+  ggplot(aes(x = treatment, y= fdom_alt_name, fill = significance))+
+  #geom_tile(aes(color = fdom_cat), size = 1)+
+  geom_tile(color = "white", size = 1)+
+  labs(title= "fDOM Diel Variations", 
+       x= "Treatment",
+       y = "fDOM Type")+
+  scale_fill_manual(breaks = c("No Variations", "Diel Variations"),
+                    values = c( "#90CAF9", "#43A047"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+ggsave("fdom_tiles_24h_pairwise.png",width = 10, height = 8, path = here("outputs"))
+```
 

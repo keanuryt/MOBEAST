@@ -25,6 +25,7 @@ library(ghibli)
 library(gt)
 library(patchwork)
 library(RColorBrewer)
+library(measurements)
 
 library(car) # ANOVA package
 library(ggeffects)
@@ -76,12 +77,12 @@ treatment_colors = c("Inflow"="#00838F",
 ## Data Clean Up
 
 ```{r}
-mobeast %>% select(id_number:date_time, npoc_u_m, avg_res_time, avg_flow_rate)
+DOC <- mobeast %>% select(id_number:date_time, npoc_u_m, avg_res_time, avg_flow_rate)
 ```
 
 
 ### Outlier detection on bulk data
-```{r}
+```{}
 # this data is log transformed
 ## flagging outliers from the data set
 raw_flagged_outliers <- DOC %>%
@@ -94,7 +95,7 @@ raw_flagged_outliers <- DOC %>%
   # flagging outliers
   ## grouping by date, time and treatment
   group_by(nutrient, treatment) %>% 
-  ## caluculating the Interquantile range and of the raw data
+  ##calculating the Interquantile range and of the raw data
   mutate(quant1 = quantile(log10(conc), probs = 0.25, na.rm = T),
          quant3 = quantile(log10(conc), probs = 0.75, na.rm = T),
          IQR = quant3-quant1) %>% 
@@ -114,13 +115,13 @@ raw_flagged_outliers <- DOC %>%
 - Avg inflow
 - Norm = [Tank] - [Avg Inflow]
 
-```{r}
+```{}
 # Normalization version 2
 ## averaging the inflows for normalization 
 ## remove the outliers a right before the normalization 
 
 ## Normalization of the data to the inflow 
-#nutrients_norm <- 
+
 DOC_norm <- raw_flagged_outliers %>% 
   mutate(time_string = as.character(time),
          date_string = as.character(date),
@@ -153,67 +154,164 @@ DOC_norm <- raw_flagged_outliers %>%
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
 ```
 
-```{r}
-DOC_norm <- DOC_norm %>% mutate(nutrient = ifelse(nutrient == "npoc_u_m", "DOC", "TN"))
-```
 
-```{}
-# Dataset sent to Craig 
-DOC_craig <- DOC_norm %>% filter(outlier != "outlier") %>% 
-  filter(nutrient == "DOC") %>% select(-inflow)
 
-#write_csv(DOC_craig, here("data","craig_data", "DOC_Craig.csv"))
-```
+## Areal Flux Rate 
+(([aquarium]-[inflow])*Vol) / (RT*SA ) in [umol/SA/time]. 
+
 
 ```{r}
-#Verifying that the outliers have been removed 
-DOC_norm %>% filter(nutrient != "TN") %>% 
-  #filter(outlier == "outlier") %>% 
-  filter(time_string == "00:00:00") %>% 
-  select(id_number, tank_number, treatment, date_time_string, conc, conc_norm) 
+DOC_norm <- DOC %>% filter(!is.na(id_number)) %>% 
+  mutate(time_string = as.character(time),
+         date_string = as.character(date),
+         date_time_string = paste(date_string, time_string),
+         date_time = ymd_hms(date_time_string)) %>% 
+  
+  filter(treatment != "Rain") %>% 
+  filter(treatment != "Endmember") %>% 
+  
+  # Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table) %>%
+  mutate(inflow = npoc_u_m[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time) %>% 
+  #mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = npoc_u_m - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+## Calculating DOC fluxes
+
+```{r}
+tank_area = conv_unit(506.25, from = "cm2", to = "m2") # convert area cm2 to m2
+tank_vol = 10 # liters
+# DOC in uM, i.e. umol/L
+# avg flow rate in mL/min converted to L/sec
+# residence time in sec
+# areal_flux in umol/s/m2
+
+
+DOC_flux <- DOC_norm %>% 
+  # calculate res time but convert flow rate units to L/sec
+  mutate(resid_time = tank_vol/(avg_flow_rate*0.001/60)) %>%
+  # Unsure why we still normalize to the inflow so calculated both 
+  # fluxes with raw data and normalized data.
+  mutate(areal_flux_norm = conc_norm*tank_vol/ (resid_time*tank_area),
+         areal_flux = npoc_u_m*tank_vol/ (resid_time*tank_area)) %>% 
+  filter(treatment != "Inflow") 
+```
+
+### Removing outlier values 
+```{r}
+# Outlier detection on normalize fluxes 
+## Norm = Tank-Inflow Avg
+
+DOC_flux_clean  <- DOC_flux %>% 
+  # flagging outliers
+  group_by(treatment) %>% 
+  ## calculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(areal_flux_norm, probs = 0.25, na.rm = T),
+         quant3 = quantile(areal_flux_norm, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse(areal_flux_norm > quant3 + (IQR*1.5) | areal_flux_norm < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup()
+  
+DOC_flux_clean %>% #filter(time_string == "12:00:00") %>% 
+  group_by( outlier) %>% 
+  summarise(count = n()) 
+
+# There are a lot of data points that are flagged as outliers, specifically at 00:00.
+
+```
+
+```{r}
+# Outlier detection on non-normalized fluxes 
+
+DOC_flux_clean <- DOC_flux %>%  
+  # flagging outliers
+  group_by(treatment) %>% 
+  ## calculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(areal_flux, probs = 0.25, na.rm = T),
+         quant3 = quantile(areal_flux, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse(areal_flux > quant3 + (IQR*1.5) | areal_flux < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() 
+
+DOC_flux_clean %>% #filter(time_string == "12:00:00") %>% 
+  group_by( outlier) %>% 
+  summarise(count = n()) 
+  
+DOC_flux_clean %>% 
+  filter(outlier != "outlier") %>% 
+  ggplot(aes(x = treatment, y = areal_flux, fill = treatment))+
+  geom_violin()
+  
+
+# There are a lot less data points that are flagged as outliers
 ```
 
 
 ## 12PM data
 ```{r}
-# Version 2
-## removing outliers from the data set
-DOC_12PM <- DOC_norm %>%
+# removing outliers from the data set
+DOC_12PM <- DOC_flux_clean %>%
   filter(time_string == "12:00:00") %>% 
   filter(treatment != "Inflow") %>% 
+  select(-quant1, -quant3, -IQR) %>% 
   
   ## remove the outliers 
   filter(outlier == "not outlier") 
 
 ```
 
-
 ```{r}
-DOC_12PM %>% 
-  filter(nutrient == "DOC") %>% 
-  select(tank_number, treatment, date_time, conc, inflow, conc_norm)
+mod_12PM <- lmer(areal_flux_norm~ treatment + (1|tank_number), data = DOC_12PM)
 ```
 
-### Iterative statistical modeling
+```{r}
+summary(mod_12PM)
+anova(mod_12PM, type = 2)
+emmeans(mod_12PM, specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_12PM[[1]], ~ treatment)
+```
 
 ```{r}
-# Loop Function:
-## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
-## Create a list where the loop results will be save, named after the nutrients of the df
-## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
-## Save the outputs of the model in the list such that each nutrient has its stats
-
-DOC_loop <- DOC_12PM %>% select(nutrient) %>% distinct() %>% pull()
-
-models_12PM <- vector(mode = "list", length = length(DOC_loop))
-names(models_12PM) <- DOC_loop
-
-for (var in DOC_loop) {
-  df <- DOC_12PM %>% filter(nutrient == var)
-  models_12PM[[var]] <- lmer(conc_norm~ treatment + (1|tank_number), data = df)
-}
+resid_panel(mod_12PM)
 
 ```
+
+```{r}
+ DOC_12PM %>%  
+    ggplot(aes(x= treatment, y= areal_flux_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("12PM", "DOC", "Production"),
+       x= "Treatment",
+       y = "Areal Flux (µmol/s/m2)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+```
+
 
 ### Iterative graphing
 

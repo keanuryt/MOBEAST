@@ -301,7 +301,7 @@ ht_drawn <- draw(ht)
 
 ```{r, fig.height = 10, fig.width = 16}
 # Version 2
-#png(width=1800, height=1000, file= here("outputs", "zscore_24hdata.png"))
+#png(width=1600, height=1000, file= here("outputs", "zscore_24hdata.png"))
 
 ht = Heatmap(mat_ordered, name = "z-scored", 
              #rect_gp = gpar(col = "white", lwd = 0.1),
@@ -313,7 +313,7 @@ ht = Heatmap(mat_ordered, name = "z-scored",
         cluster_columns =  FALSE,
         row_title = "Bacterial Families",
         row_title_gp = gpar(fontsize = 14, fontface = "bold"),
-        row_names_gp = gpar(fontsize = 10),
+        row_names_gp = gpar(fontsize = 11),
         row_dend_width = unit(1.5, "cm"),
         #column_names_gp = gpar(fontsize = 10),
         show_column_names = FALSE,

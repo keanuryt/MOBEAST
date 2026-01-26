@@ -63,13 +63,13 @@ nunu_theme <- theme_bw() +
 
 ```{r}
 nunu_theme <- theme_bw()+ 
-  theme(plot.title = element_text(size=24, face = "bold"), 
-        plot.subtitle = element_text(size=20),
-        axis.title = element_text(size = 18, face = "bold"),
-        axis.text = element_text(size = 16),
-        strip.text.x = element_text(size = 16, face = "bold"),
-        legend.title=element_text(size=18, face = "bold"),
-        legend.text=element_text(size=16),
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=26),
+        axis.title = element_text(size = 24, face = "bold"),
+        axis.text = element_text(size = 20),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=20, face = "bold"),
+        legend.text=element_text(size=20),
         strip.background = element_rect(fill = "white"))
 ```
 
@@ -296,21 +296,17 @@ resid_panel(models_12PM[["DOC"]])
 #### Data Visualization 
 
 ```{r, fig.width= 12, fig.height = 6}
-graphs_12PM[["DOC"]]#+ 
+DOC_plot <- graphs_12PM[["DOC"]]#+ 
   #geom_jitter(aes(color = inflow_table), size = 2)+
   #scale_color_manual(values = c("red", "blue"))+
   #facet_wrap(date~.)+
   #theme(legend.position = "right")
+DOC_plot
 
-#ggsave(DOC_12PM.png, path = here("outputs", "Nov_com_meeting", "DOC_12PM.png"))
+ggsave("DOC_plot_12PM.png",width = 16, height = 8, path = here("outputs"))
 ```
 
-#### one-sample t-test
-
-```{r}
-qqnorm(DOC_12PM$conc_norm)
-qqline(DOC_12PM$conc_norm)
-```
+####  t-test
 
 ```{r}
 # We are testing if the average of the treatments at 12PM is significantly different to 0
@@ -334,13 +330,14 @@ DOC_12PM %>%
 ## removing outliers from the data set
 DOC_24h <- DOC_norm %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  filter(nutrient == "DOC") %>% 
   filter(treatment != "Inflow") %>% 
   ## remove the outliers 
   filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
                                                    "00:00:00","06:00:00"))) %>% 
-  filter(time_string != "00:00:00") %>% 
-  filter(nutrient == "DOC")
+  filter(time_string != "00:00:00") 
+  
 ```
 
 
@@ -382,8 +379,54 @@ DOC_24h %>%
   #geom_jitter(aes(color = inflow_table), size = 2)+
   #scale_color_manual(values = c("red", "blue"))+
   #theme(legend.position = "right")
+
+ggsave("DOC_24h.png",width = 16, height = 8, path = here("outputs"))
 ```
 
+### T-test 
+
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+DOC_24h %>%
+  group_by(treatment, time_fac) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value) %>% 
+  select(-t_test) %>% 
+  
+  mutate(significance = ifelse(p_value <0.05, "Enrichment", "No Difference"),
+         significance = ifelse(mean <0 & p_value <0.05, "Depletion", significance)#,
+         #significance = as.character(significance)
+         ) %>% 
+    ungroup() %>% 
+  
+  ggplot(aes(x = treatment, y= time_fac, fill = significance))+
+  geom_tile(color = "white", size = 1)+
+  #facet_wrap(.~time_fac, nrow = 1)+
+  labs(title = " 24h DOC Variations",
+       x= "Treatment",
+       y = "fDOM Type")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+#ggsave("fdom_tiles_24h_t_test.png",width = 16, height = 8, path = here("outputs"))
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
 
 
 ### Pairwise comparison
@@ -397,10 +440,8 @@ t.test(t_test_test$conc_norm , mu=0)
 ```
 
 ```{r}
-DOC_12PM %>% 
-  filter(time_string == "12:00:00") %>% 
-  #mutate(time_string = a)
-  group_by(treatment) %>%
+DOC_24h %>% 
+  group_by(treatment, time_fac) %>%
   summarize(
     t_test = list(t.test(conc_norm, mu = 0)),
     mean = t_test[[1]]$estimate,

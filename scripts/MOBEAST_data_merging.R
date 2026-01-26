@@ -1,5 +1,6 @@
 # Title: Merging all data
 # Date: November 18, 2025
+# Edited: 20 January 2025
 # Author: Keanu Rochette-Yu Tsuen 
 #################
 
@@ -20,6 +21,7 @@ FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
 nutrients <- read_delim(here("data", "Nutrients", "MOBEAST_nutrients.csv"))
 meta2 <- read_csv(here("data", "MOBEAST_metadata.csv"))
 res_time <- read_csv(here("data", "tank_residence_time.csv"))
+chla <- read_csv(here("data", "chlorophyll_a.csv"))
 
 
 ## Data Clean up 
@@ -117,6 +119,10 @@ fcm_list <- colnames(FCM_pre[,c(7:12)])
 carbonate <- carbonate %>% select(-ph_inflow, -ta_inflow) 
 carbonate_list <- colnames(carbonate[,c(7:10)])
 
+## Chlorophyll 
+chla <- chla %>% clean_names() %>% 
+  rename(id_number = sample_id)
+
 ## Merging the data 
 ### Merging FCM data with meta data
 merged <- meta %>% full_join(FCM_pre, by = c("tank_number", "treatment", "date_time", 
@@ -128,6 +134,10 @@ merged <- meta %>% full_join(FCM_pre, by = c("tank_number", "treatment", "date_t
   mutate(time.y = ifelse(is.na(time.y), as.character(time.x), time.y)) %>% 
   select(-time.x) %>% 
   rename(time = time.y) %>% select(-long_name) 
+
+
+### Merging chla data with previous data 
+merged <- merged %>% left_join(chla, by = "id_number") 
 
 ### Merging previous data with DOC data 
 merged <- merged %>% left_join(DOC, by = "id_number") %>% 
@@ -174,8 +184,10 @@ merged_long <- merged_data %>%
                                 ifelse(variable %in% fcm_list, "FCM", 
                                        ifelse(variable %in% nutrient_list, "nutrients", 
                                               ifelse(variable %in% res_time_list, "residence time",
-                                                     "AAAHHH"))))))) 
+                                                     "chla"))))))) 
 
 #write_csv(merged_long, here("data", "MOBEAST_full_merged_data_long.csv"))
+
+
 
 

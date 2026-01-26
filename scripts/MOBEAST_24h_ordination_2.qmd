@@ -140,11 +140,12 @@ nmds_merged %>%
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = date_string))+
   facet_wrap(~time_string, ncol = 4)+
-  labs(title= "24h samples, ellipse by treatment")+
+  labs(title= "Ordination of 24h samples")+
   scale_color_manual(values=treatment_colors )+
   scale_fill_manual(values= treatment_colors) +
-  nunu_theme
-#ggsave("24h_treatment.png", width = 16, height = 10, path = here("outputs", "DNA"))
+  nunu_theme+
+  theme(legend.position = "top")
+#ggsave("24h_treatment.png", width = 16, height = 6, path = here("outputs", "DNA"))
 
 ```
 ## PERMANOVA 

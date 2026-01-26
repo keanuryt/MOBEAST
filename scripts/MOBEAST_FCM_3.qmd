@@ -46,13 +46,13 @@ library(performance)
 
 ```{r}
 nunu_theme <- theme_bw()+ 
-  theme(plot.title = element_text(size=24, face = "bold"), 
-        plot.subtitle = element_text(size=20),
-        axis.title = element_text(size = 18, face = "bold"),
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
         axis.text = element_text(size = 16),
-        strip.text.x = element_text(size = 16, face = "bold"),
-        legend.title=element_text(size=18, face = "bold"),
-        legend.text=element_text(size=16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
         strip.background = element_rect(fill = "white"))
 ```
 
@@ -304,6 +304,20 @@ emmeans(models_12PM[["het_bact"]], specs = trt.vs.ctrl ~ treatment)
 ```{r, fig.height=6, fig.width=12}
 resid_panel(models_12PM[["het_bact"]])
 graphs_12PM[["het_bact"]]
+  
+ggsave("het_bact_12PM.png",width = 16, height = 8, path = here("outputs"))
+```
+
+### t-test 
+```{r}
+FCM_12PM %>%
+  filter(org == "het_bact") %>% 
+  group_by(treatment) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  )
 ```
 
 
@@ -425,10 +439,190 @@ anova(models_24h[["het_bact"]], type = 2)
 emmeans(models_24h[["het_bact"]], specs = trt.vs.ctrl ~ treatment)
 ```
 
+
 ```{r, fig.width=12, fig.height=6}
 resid_panel(models_24h[["het_bact"]])
 graphs_24h[["het_bact"]]
 ```
+
+#### Selected time to display 
+
+```{r}
+df <- FCM_24h %>% filter(org == "het_bact")%>% 
+  filter(time_string == "12:00:00"| time_string == "00:00:00"| time_string == "06:00:00")
+
+mod <- lmer(conc_norm ~ treatment*time_fac + (1|tank_number), data = df)
+```
+
+```{r}
+summary(mod)
+anova(mod, type = 2)
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+```
+
+```{r}
+FCM_24h %>% filter(org == "het_bact") %>% 
+  filter(time_string == "12:00:00"| time_string == "00:00:00"| time_string == "06:00:00") %>% 
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("24h Bacterial Abundance"),
+       x= "Treatment",
+       y = "Concentration (ind/µL)")+
+    facet_wrap(~time_fac, ncol = 3 )+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+
+ggsave("het_bact_24h_2.png",width = 16, height = 8, path = here("outputs"))
+```
+
+
+#### T-test
+```{r}
+
+FCM_24h %>%
+  filter(org == "het_bact") %>% 
+  filter(time_string == "12:00:00"| time_string == "00:00:00"| time_string == "06:00:00") %>%
+  mutate(time_fac = fct_rev(time_fac)) %>% 
+  #filter(time_string == "12:00:00"| time_string == "00:00:00"| time_string == "06:00:00") %>%
+  group_by(time_fac, treatment ) %>%
+  summarize(
+    t_test = list(t.test(conc_norm, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value) %>% 
+   mutate(significance = ifelse(p_value <0.05, "Enrichment", "No Difference"),
+         significance = ifelse(mean <0 & p_value <0.05, "Depletion", significance)#,
+         #significance = as.character(significance)
+         ) %>% 
+    ungroup() %>% 
+  
+  ggplot(aes(x = treatment, y= time_fac, fill = significance))+
+  geom_tile(color = "white", size = 1)+
+  #facet_wrap(.~time_fac, nrow = 1)+
+  labs(title = " 24h DOC Variations",
+       x= "Treatment",
+       y = "Sample Collection Time")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+#ggsave("fdom_tiles_24h_t_test.png",width = 16, height = 8, path = here("outputs"))
+```
+
+#### Pairwise
+
+```{r}
+nunu_pairwise_FCM <- function(data, time_1 = "12:00:00", time_2 = "00:00:00"){
+
+  ## Get a list of the treatments for the for loop   
+  treatment <- data %>% mutate(treatment = as.character(treatment)) %>%
+  select(treatment) %>% distinct() %>% pull()
+  
+  ## Create un empty data frame
+pairwise_results <- tibble(
+  time_point = vector(),
+  treatment= vector(),
+  mean = vector(),
+  p_value = vector())
+
+# this is the pairwise comparison for the 6 pairs (6AM-6PM)
+    for(var in treatment){
+      
+      ## only keep the 6AM and 6PM
+      df <- data %>% 
+        mutate(treatment = factor(treatment, 
+                                  levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+        filter(org == "het_bact") %>% 
+        filter(treatment == var) %>% 
+  filter(time_string == time_1 | time_string == time_2) %>% 
+        ## Rename the times so they can become column names
+  mutate(time_US = ifelse(time_string == time_1, "T01", "T02")) %>% 
+        ## Only keep the column of interest for the stats
+  select(tank_number, time_US, conc_norm) %>% 
+  pivot_wider(names_from = time_US, values_from = conc_norm) 
+      
+      ## Pairwise function 
+      paired <- t.test(df$T01, df$T02, paired = TRUE, na.action = na.pass)
+      
+      ## Save the result in at data frame
+      df2 <- tibble(
+        time_point = paste0(time_1, "-", time_2),
+        treatment = var,
+        mean = paired$estimate, 
+        p_value = paired$p.value)
+      
+      # Code will loop oveer all treatments and save the results in a data frame
+      pairwise_results <-rbind(pairwise_results,df2)
+      
+      # Save the results in RStudio
+      pairwise_results <<- pairwise_results
+    }  
+print(pairwise_results)
+}
+```
+
+```{r}
+pairwise_heatmap <- nunu_pairwise_FCM(data = FCM_24h, time_1 = "12:00:00", time_2 = "00:00:00")
+
+pairwise_heatmap 
+```
+
+
+```{r}
+nunu_pairwise_FCM(data = FCM_24h, time_1 = "03:00:00", time_2 = "15:00:00")
+
+pairwise_heatmap <- rbind(pairwise_heatmap, nunu_pairwise_FCM(data = FCM_24h, time_1 = "03:00:00", time_2 = "15:00:00"))
+```
+
+
+```{r}
+pairwise_heatmap %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  mutate(significance = ifelse(p_value <0.05, "Diel Variations", "No Variations")#,
+         #significance = as.character(significance)
+         ) %>% 
+    ungroup() %>% 
+  
+  ggplot(aes(x = treatment, y= time_point, fill = significance))+
+  #geom_tile(aes(color = fdom_cat), size = 1)+
+  geom_tile(color = "white", size = 1)+
+  labs(title= "FCM Diel Variations", 
+       x= "Treatment",
+       y = "fDOM Type")+
+  scale_fill_manual(breaks = c("No Variations", "Diel Variations"),
+                    values = c( "#90CAF9", "#43A047"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+ggsave("fdom_tiles_24h_pairwise.png",width = 10, height = 8, path = here("outputs"))
+
+```
+
+
 
 ### Synechococcus
 ```{r}
