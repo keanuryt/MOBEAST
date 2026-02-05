@@ -1,6 +1,6 @@
 # Title: Merging all data
 # Date: November 18, 2025
-# Edited: 20 January 2025
+# Edited: 04 February 2025
 # Author: Keanu Rochette-Yu Tsuen 
 #################
 
@@ -31,7 +31,9 @@ DOC<- DOC %>%  select(id_number, date, time, npoc_u_m, tn_u_m)
 DOC_list <- colnames(DOC[,c(4,5)])
 
 ### fDOM 
-fDOM<- fDOM %>% select(id_number, date_time, coble_a:lignin) 
+fDOM<- fDOM %>% select(id_number, date_time, coble_a:lignin) %>% 
+  # error in data treatment script, M:C needs to be recalculated manually 
+  mutate(m_to_c2 = coble_m/coble_c) 
 
 fDOM_list <- colnames(fDOM[,c(3:13)])
 

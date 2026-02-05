@@ -1,7 +1,8 @@
 ---
 author: 'Keanu Rochette'
-title: "MOBEAST DOC V3"
+title: "MOBEAST DOC V4"
 created: '2025-11-10'
+edited: 2026-01-30
 format: 
   html:
     toc: true
@@ -82,38 +83,87 @@ DOC <- mobeast %>% select(id_number:date_time, npoc_u_m, avg_res_time, avg_flow_
 
 
 ### Outlier detection on bulk data
-```{}
+```{r}
 # this data is log transformed
 ## flagging outliers from the data set
-raw_flagged_outliers <- DOC %>%
-  select(-npoc_mg_l, -tn_mg_l, -long_name, -sample) %>% 
-  pivot_longer(cols = npoc_u_m:tn_u_m,
-               names_to = "nutrient",
-               values_to = "conc") %>% 
+
+#raw_flagged_outliers <- 
+DOC_flagged_outlier <- DOC %>%
   filter(treatment != "Endmember") %>% 
-  filter(nutrient != "TN") %>% 
+
   # flagging outliers
   ## grouping by date, time and treatment
-  group_by(nutrient, treatment) %>% 
+  group_by(treatment) %>% 
   ##calculating the Interquantile range and of the raw data
-  mutate(quant1 = quantile(log10(conc), probs = 0.25, na.rm = T),
-         quant3 = quantile(log10(conc), probs = 0.75, na.rm = T),
+  mutate(quant1 = quantile(npoc_u_m, probs = 0.25, na.rm = T),
+         quant3 = quantile(npoc_u_m, probs = 0.75, na.rm = T),
          IQR = quant3-quant1) %>% 
   ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
   ## Important to filter later to understand why they are outliers. 
-  mutate(outlier = ifelse( log10(conc) > quant3 + (IQR*1.5) | log10(conc) < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
-  ungroup() #%>% 
-  
-  ## remove the outliers 
-  #filter(outlier != "outlier") 
+  mutate(outlier = ifelse(npoc_u_m > quant3 + (IQR*1.5) | npoc_u_m < quant1 - (IQR*1.5),
+                           "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  filter(!is.na(id_number))
+
 
 ```
 
 
-### Normalizing the data
+### Calculating Fluxes 
+(([aquarium]-[inflow])*Vol) / (RT*SA ) in [umol/SA/time]. 
+```{r}
+tank_area = conv_unit(506.25, from = "cm2", to = "m2") # convert area cm2 to m2
+tank_vol = 10 # liters
+# DOC in uM, i.e. umol/L
+# avg flow rate in mL/min converted to L/sec
+# residence time in sec
+# areal_flux in umol/s/m2
 
-- Avg inflow
-- Norm = [Tank] - [Avg Inflow]
+
+DOC_flux <- DOC_flagged_outlier %>%  
+  
+  filter(treatment != "Rain") %>% 
+  filter(treatment != "Endmember") %>% 
+  
+  
+  mutate(time_string = as.character(time),
+         date_string = as.character(date),
+         date_time_string = paste(date_string, time_string),
+         date_time = ymd_hms(date_time_string)) %>%
+  
+# Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table) %>%
+  mutate(inflow = npoc_u_m[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time) %>% 
+  #mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = npoc_u_m - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  # calculate res time but convert flow rate units to L/sec
+  mutate(resid_time = tank_vol/(avg_flow_rate*0.001/60)) %>%
+  # Unsure why we still normalize to the inflow so calculated both 
+  # fluxes with raw data and normalized data.
+  mutate(areal_flux = conc_norm*tank_vol/ (resid_time*tank_area)) %>% 
+  filter(treatment != "Inflow") %>% 
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) 
+
+```
+
+
+
+### XXX Normalizing the data
+
+
 
 ```{}
 # Normalization version 2
@@ -156,11 +206,11 @@ DOC_norm <- raw_flagged_outliers %>%
 
 
 
-## Areal Flux Rate 
+## XXX Areal Flux Rate 
 (([aquarium]-[inflow])*Vol) / (RT*SA ) in [umol/SA/time]. 
 
 
-```{r}
+```{}
 DOC_norm <- DOC %>% filter(!is.na(id_number)) %>% 
   mutate(time_string = as.character(time),
          date_string = as.character(date),
@@ -192,7 +242,7 @@ DOC_norm <- DOC %>% filter(!is.na(id_number)) %>%
 
 ## Calculating DOC fluxes
 
-```{r}
+```{}
 tank_area = conv_unit(506.25, from = "cm2", to = "m2") # convert area cm2 to m2
 tank_vol = 10 # liters
 # DOC in uM, i.e. umol/L
@@ -211,8 +261,8 @@ DOC_flux <- DOC_norm %>%
   filter(treatment != "Inflow") 
 ```
 
-### Removing outlier values 
-```{r}
+### XXX Removing outlier values 
+```{}
 # Outlier detection on normalize fluxes 
 ## Norm = Tank-Inflow Avg
 
@@ -236,7 +286,7 @@ DOC_flux_clean %>% #filter(time_string == "12:00:00") %>%
 
 ```
 
-```{r}
+```{}
 # Outlier detection on non-normalized fluxes 
 
 DOC_flux_clean <- DOC_flux %>%  
@@ -268,18 +318,18 @@ DOC_flux_clean %>%
 ## 12PM data
 ```{r}
 # removing outliers from the data set
-DOC_12PM <- DOC_flux_clean %>%
+DOC_12PM <- DOC_flux %>%
   filter(time_string == "12:00:00") %>% 
   filter(treatment != "Inflow") %>% 
-  select(-quant1, -quant3, -IQR) %>% 
+  select(-quant1, -quant3, -IQR) #%>% 
   
   ## remove the outliers 
-  filter(outlier == "not outlier") 
+  #filter(outlier == "not outlier") 
 
 ```
 
 ```{r}
-mod_12PM <- lmer(areal_flux_norm~ treatment + (1|tank_number), data = DOC_12PM)
+mod_12PM <- lmer(areal_flux~ treatment + (1|tank_number), data = DOC_12PM)
 ```
 
 ```{r}
@@ -296,9 +346,9 @@ resid_panel(mod_12PM)
 
 ```{r}
  DOC_12PM %>%  
-    ggplot(aes(x= treatment, y= areal_flux_norm, fill = treatment))+
+    ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
     geom_violin()+
-    geom_point()+
+    geom_jitter(aes(color = outlier), size = 2)+
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
     #coord_trans(y="log10")+
@@ -308,14 +358,16 @@ resid_panel(mod_12PM)
        y = "Areal Flux (µmol/s/m2)")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-  nunu_theme +
-  theme(legend.position = "none")
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
+  nunu_theme #+
+  #theme(legend.position = "none")
 ```
 
 
 ### Iterative graphing
 
-```{r}
+```{}
 # Loop Function:
 ## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
 ## Create a list where the loop results will be save, named after the nutrients of the df
@@ -348,26 +400,20 @@ for (var in DOC_loop) {
   theme(legend.position = "none")
 }
 
-```
-
-
-#### 12PM DOC concentrations
-
-```{r}
 summary(models_12PM[["DOC"]])
 anova(models_12PM[["DOC"]], type = 2)
 emmeans(models_12PM[["DOC"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_12PM[[1]], ~ treatment)
-```
 
-```{r}
 resid_panel(models_12PM[["DOC"]])
 
+
 ```
+
 
 #### Data Visualization 
 
-```{r, fig.width= 12, fig.height = 6}
+```{, fig.width= 12, fig.height = 6}
 graphs_12PM[["DOC"]]#+ 
   #geom_jitter(aes(color = inflow_table), size = 2)+
   #scale_color_manual(values = c("red", "blue"))+
@@ -377,12 +423,7 @@ graphs_12PM[["DOC"]]#+
 #ggsave(DOC_12PM.png, path = here("outputs", "Nov_com_meeting", "DOC_12PM.png"))
 ```
 
-#### one-sample t-test
 
-```{r}
-qqnorm(DOC_12PM$conc_norm)
-qqline(DOC_12PM$conc_norm)
-```
 
 ```{r}
 # We are testing if the average of the treatments at 12PM is significantly different to 0
@@ -391,10 +432,10 @@ qqline(DOC_12PM$conc_norm)
 DOC_12PM %>%
   group_by(treatment) %>%
   summarize(
-    t_test = list(t.test(conc_norm, mu = 0)),
+    t_test = list(t.test(areal_flux, mu = 0)),
     mean = t_test[[1]]$estimate,
     p_value = t_test[[1]]$p.value
-  )
+  ) %>%  select(-t_test)
 
 # p<0.05, reject the null hypothesis, the difference in mean is not due to chance
 ```
@@ -404,22 +445,21 @@ DOC_12PM %>%
 
 ```{r}
 ## removing outliers from the data set
-DOC_24h <- DOC_norm %>%
+DOC_24h <- DOC_flux %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  filter(treatment != "Inflow") %>% 
+  #filter(treatment != "Inflow") %>% 
   ## remove the outliers 
-  filter(outlier == "not outlier") %>% 
+  #filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) %>% 
-  filter(time_string != "00:00:00") %>% 
-  filter(nutrient == "DOC")
+                                                   "00:00:00","06:00:00"))) #%>% 
+  #filter(time_string != "00:00:00") 
 ```
 
 
 
 #### 24h Model setup and results
 ```{r}
-mod <- lmer(conc_norm ~ treatment*time_fac + (1|tank_number), data = DOC_24h)
+mod <- lmer(areal_flux ~ treatment*time_fac + (1|tank_number), data = DOC_24h)
 ```
 
 ```{r}
@@ -434,11 +474,11 @@ resid_panel(mod)
 ```
 
 #### Data Visualization 
-```{r, fig.width= 12, fig.height = 6}
+```{r}
 DOC_24h %>% 
-    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
     geom_violin()+
-    geom_point()+
+    geom_jitter(aes(color = outlier), size = 2)+
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
     facet_wrap(~time_fac, ncol = 4 )+
@@ -446,11 +486,13 @@ DOC_24h %>%
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
        y = "Production (µmol/L)")+
-    scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
     nunu_theme + 
-    theme(axis.text = element_text(size = 18),
-        legend.position = "none") #+
+    theme(axis.text = element_text(size = 18))#,
+        #legend.position = "none") #+
   #geom_jitter(aes(color = inflow_table), size = 2)+
   #scale_color_manual(values = c("red", "blue"))+
   #theme(legend.position = "right")
@@ -459,29 +501,6 @@ DOC_24h %>%
 
 
 ### Pairwise comparison
-
-```{r}
-t_test_test <- DOC_12PM %>% 
-  filter(time_string == "12:00:00",
-         treatment == "Coral") 
-
-t.test(t_test_test$conc_norm , mu=0)
-```
-
-```{r}
-DOC_12PM %>% 
-  filter(time_string == "12:00:00") %>% 
-  #mutate(time_string = a)
-  group_by(treatment) %>%
-  summarize(
-    t_test = list(t.test(conc_norm, mu = 0)),
-    mean = t_test[[1]]$estimate,
-    p_value = t_test[[1]]$p.value
-  ) %>% 
-  select(-t_test) %>% 
-  ungroup() 
-
-```
 
 
 ```{}
@@ -522,8 +541,8 @@ pairwise_results <- tibble(
         ## Rename the times so they can become column names
   mutate(time_US = ifelse(time_string == "18:00:00", "T18", "T06")) %>% 
         ## Only keep the column of interest for the stats
-  select(tank_number, time_US, conc_norm) %>% 
-  pivot_wider(names_from = time_US, values_from = conc_norm) 
+  select(tank_number, time_US, areal_flux) %>% 
+  pivot_wider(names_from = time_US, values_from = areal_flux) 
       
       ## Pairwise function 
       paired <- t.test(df$T18, df$T06, paired = TRUE, na.action = na.pass)
@@ -551,8 +570,8 @@ pairwise_results <- tibble(
       df <- data %>% filter(treatment == var) %>% 
   filter(time_string == "12:00:00" | time_string == "00:00:00") %>% 
   mutate(time_US = ifelse(time_string == "12:00:00", "T12", "T00")) %>% 
-  select(tank_number, time_US, conc_norm) %>% 
-  pivot_wider(names_from = time_US, values_from = conc_norm) 
+  select(tank_number, time_US, areal_flux) %>% 
+  pivot_wider(names_from = time_US, values_from = areal_flux) 
       
       paired <- t.test(df$T12, df$T00, paired = TRUE, na.action = na.pass)
       
@@ -575,10 +594,41 @@ print(pairwise_results)
 
 
 ```{r}
-nunu_pairwise(data = DOC_24h, time_point = 6) 
+nunu_pairwise(data = DOC_24h, time_point = 12) 
 ```
 
 
+## Test to deal with 12AM samples 
+
+```{r}
+DOC_flagged_outlier %>% 
+  
+  mutate(time_string = as.character(time)) %>% 
+  filter(time_string == "00:00:00") %>% 
+  mutate(npoc_u_m_diff = npoc_u_m - 119.84561, 
+         resid_time = tank_vol/(avg_flow_rate*0.001/60),
+         areal_flux = npoc_u_m_diff*tank_vol/ (resid_time*tank_area)) %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) %>% 
+  filter(npoc_u_m<300) %>% 
+  group_by(treatment) %>% 
+  ggplot(aes(treatment, areal_flux, fill = treatment))+
+  geom_violin()+
+  geom_jitter(color = "black")+
+  stat_summary(color = "yellow", alpha =0.5)+
+  labs(title = "00:00:00 DOC Flux")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  geom_hline(yintercept=0, linetype='dashed')+
+  nunu_theme
+```
+
+
+```{r}
+DOC_flagged_outlier %>% 
+  filter(npoc_u_m<300) %>% 
+  group_by(treatment) %>% 
+  reframe(mean = mean(npoc_u_m, na.rm = T))
+```
 
 
 
