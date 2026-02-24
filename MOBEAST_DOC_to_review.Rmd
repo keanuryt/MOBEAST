@@ -1,0 +1,334 @@
+---
+title: "MOBEAST - DOC (Advisors)"
+author: "Keanu Rochette-Yu Tsuen"
+date: "2025-11-17"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(emmeans)
+library(performance)
+library(multcompView)
+
+
+
+```
+
+## Load Data
+
+```{r}
+DOC <- read_csv(here("data", "DOC", "DOC_clean.csv"))
+table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
+```
+
+## Data visualization theme
+
+```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+
+
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
+## Data Clean Up
+
+```{r}
+table_id <- clean_names(table_id)
+
+table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+  mutate(tank_number = paste0("T", tank_number)) %>% 
+  mutate(inflow_table = paste("Table", inflow_table))
+DOC <- left_join(DOC, table_id, by= "tank_number")
+```
+
+```{r}
+DOC <- DOC %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, inflow_table)) %>% 
+   mutate(inflow_table = ifelse(inflow_table == "F1", "Table 1", 
+                                ifelse(inflow_table == "F2", "Table 2", inflow_table))) %>% 
+  mutate(inflow_table = factor(inflow_table),
+         tank_number = factor(tank_number)) %>% 
+  relocate(inflow_table, .after = "treatment")
+```
+
+
+### Outlier detection on raw data
+
+
+```{r}
+# This data set has concentrations for TN and DOC. 
+## flagging outliers from the data set
+raw_flagged_outliers <- DOC %>%
+  select(-npoc_mg_l, -tn_mg_l, -long_name, -sample) %>%  # remove columns I won't use 
+  pivot_longer(cols = npoc_u_m:tn_u_m,
+               names_to = "nutrient",
+               values_to = "conc") %>% 
+  filter(treatment != "Endmember") %>% 
+  # flagging outliers
+  ## grouping by date, time and treatment
+  group_by(nutrient, treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(conc, probs = 0.25, na.rm = T),
+         quant3 = quantile(conc, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## detecting data that are under Q1-1.5*IQR or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## filter outliers later to understand why they are outliers. 
+  mutate(outlier = ifelse(conc > quant3 + (IQR*1.5) | conc < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() 
+
+```
+
+### Normalizing the data
+
+- Avg inflow
+- Norm = [Tank] - [Avg Inflow]
+
+```{r}
+# Normalization version 2
+## averaging the inflows for normalization 
+## remove the outliers a right before the normalization 
+
+## Normalization of the data to the inflow 
+
+DOC_norm <- raw_flagged_outliers %>% 
+  mutate(time_string = as.character(time),
+         date_string = as.character(date),
+         date_time_string = paste(date_string, time_string),
+         date_time = ymd_hms(date_time_string)) %>% 
+  select(-IQR, -quant1, -quant3) %>% 
+  
+  filter(treatment != "Rain") %>% 
+  
+  # Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table, nutrient) %>%
+  mutate(inflow = conc[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time, nutrient) %>% 
+  mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = conc - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+```{r}
+DOC_norm <- DOC_norm %>% mutate(nutrient = ifelse(nutrient == "npoc_u_m", "DOC", "TN"))
+```
+
+```{r}
+# Dataset sent to Craig 
+DOC_craig <- DOC_norm %>% filter(outlier != "outlier") %>% 
+  filter(nutrient == "DOC") %>% select(-inflow)
+
+#write_csv(DOC_craig, here("data","craig_data", "DOC_Craig.csv"))
+```
+
+
+## 12PM data
+```{r}
+# Version 2
+## removing outliers from the data set
+DOC_12PM <- DOC_norm %>%
+  filter(time_string == "12:00:00") %>% 
+  filter(treatment != "Inflow") %>% 
+  
+  ## remove the outliers 
+  filter(outlier == "not outlier") 
+
+```
+
+
+```{r}
+DOC_12PM %>% 
+  filter(nutrient == "DOC") %>% 
+  select(tank_number, treatment, date_time, conc, inflow, conc_norm)
+```
+
+### Iterative statistical modeling
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+DOC_loop <- DOC_12PM %>% select(nutrient) %>% distinct() %>% pull()
+
+models_12PM <- vector(mode = "list", length = length(DOC_loop))
+names(models_12PM) <- DOC_loop
+
+for (var in DOC_loop) {
+  df <- DOC_12PM %>% filter(nutrient == var)
+  models_12PM[[var]] <- lmer(conc_norm ~ treatment + (1|tank_number), data = df)
+}
+
+```
+
+### Iterative graphing
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## --> In the for-loop, filter the df by nutrient and make a graph that will display nutrient data
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+DOC_loop <- DOC_12PM %>% select(nutrient) %>% distinct() %>% pull()
+
+graphs_12PM <- vector(mode = "list", length = length(DOC_loop))
+names(graphs_12PM) <- DOC_loop
+
+for (var in DOC_loop) {
+  
+  df <- DOC_12PM %>% filter(nutrient == var)
+  
+  graphs_12PM[[var]] <- df %>%  
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #coord_trans(y="log10")+
+  #facet_wrap(~date_string, scales = "free")+
+    labs(title = paste("12PM", var, "Production"),
+       x= "Treatment",
+       y = "Production (µmol/L)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  nunu_theme +
+  theme(legend.position = "none")
+}
+
+```
+
+
+#### 12PM DOC concentrations
+
+```{r}
+summary(models_12PM[["DOC"]])
+anova(models_12PM[["DOC"]], type = 2)
+emmeans(models_12PM[["DOC"]], specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_12PM[[1]], ~ treatment)
+```
+
+```{r}
+resid_panel(models_12PM[["DOC"]])
+
+```
+
+#### Data Visualization 
+
+```{r, fig.width= 12, fig.height = 6}
+graphs_12PM[["DOC"]]#+ 
+  #geom_jitter(aes(color = inflow_table), size = 2)+
+  #scale_color_manual(values = c("red", "blue"))+
+  #facet_wrap(date~.)+
+  #theme(legend.position = "right")
+
+#ggsave(DOC_12PM.png, path = here("outputs", "Nov_com_meeting", "DOC_12PM.png"))
+```
+
+
+## Hypothesis 2: There are variation in exudation on a diel cycle 24h
+
+```{r}
+## removing outliers from the data set
+DOC_24h <- DOC_norm %>%
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  filter(treatment != "Inflow") %>% 
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                   "00:00:00","06:00:00"))) %>% 
+  filter(time_string != "00:00:00") %>% 
+  filter(nutrient == "DOC")
+```
+
+#### 24h Model setup and results
+```{r}
+mod <- lmer(conc_norm ~ treatment*time_fac + (1|tank_number), data = DOC_24h)
+```
+
+```{r}
+summary(mod)
+anova(mod, type = 2)
+emmeans(mod, specs = trt.vs.ctrl ~ treatment)
+#emmeans(models_24h[["DOC"]], ~ treatment)
+```
+
+```{r}
+resid_panel(mod)
+```
+
+#### Data Visualization 
+```{r, fig.width= 12, fig.height = 6}
+DOC_24h %>% 
+    ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_point()+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap(~time_fac, ncol = 4 )+
+    labs(title = paste("24h DOC Production"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Production (µmol/L)")+
+    scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18),
+        legend.position = "none") #+
+  #geom_jitter(aes(color = inflow_table), size = 2)+
+  #scale_color_manual(values = c("red", "blue"))+
+  #theme(legend.position = "right")
+```
+
+
+

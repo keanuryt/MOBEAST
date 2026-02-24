@@ -1,0 +1,101 @@
+---
+author: 'Keanu Rochette '
+date: '`r format(Sys.Date())`'
+title: Correlation Data Exploration
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Library 
+```{r}
+library(tidyverse)
+library(janitor)
+library(here)
+```
+
+## Load Data 
+```{r}
+biogeochem <- read_csv(here("data", "MOBEAST_full_merged_data.csv"))
+
+```
+
+## Data clean up 
+```{r}
+DOC <- biogeochem %>% select(id_number:date_time, npoc_u_m, avg_res_time, avg_flow_rate) %>% 
+  filter(treatment != "Endmember") %>% 
+  
+  # flagging outliers
+  ## grouping by date, time and treatment
+  group_by( treatment) %>% 
+  ## caluculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(log10(npoc_u_m), probs = 0.25, na.rm = T),
+         quant3 = quantile(log10(npoc_u_m), probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse( log10(npoc_u_m) > quant3 + (IQR*1.5) | log10(npoc_u_m) < quant1 - (IQR*1.5), "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  mutate(time_string = as.character(time),
+         date_string = as.character(date),
+         date_time_string = paste(date_string, time_string),
+         date_time = ymd_hms(date_time_string)) %>% 
+  select(-IQR, -quant1, -quant3) %>% 
+  
+  filter(treatment != "Rain") %>% 
+  
+  # Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table) %>%
+  mutate(inflow = npoc_u_m[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time) %>% 
+  mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = npoc_u_m - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) %>% 
+  select(id_number,treatment, tank_number, inflow_table, date_time, date, time,DOC_conc =conc_norm)
+```
+
+```{r}
+DOC_chla <- biogeochem %>% select(id_number, chla_conc) %>% 
+  drop_na() %>% 
+  right_join(DOC, by = "id_number") 
+```
+
+## 
+```{r}
+DOC_chla %>% 
+  ggplot(aes(x= DOC_conc, y = chla_conc))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  facet_wrap(.~treatment, scales = "free")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

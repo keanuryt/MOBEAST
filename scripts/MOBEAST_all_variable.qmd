@@ -1,0 +1,181 @@
+---
+title: "MOBEAST_all_variables"
+created: 5 Fev 2025
+edited: 5 Fev 2025
+format: html
+editor: source
+
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+library(measurements)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(emmeans)
+library(performance)
+library(multcompView)
+```
+
+## Load Data
+
+```{r}
+) <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
+```
+
+## Data visualization theme
+
+```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+
+
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
+## Data Clean Up
+```{r}
+mobeast %>% select(tank_number, inflow_table) %>% distinct()
+```
+
+
+### Outlier detection on bulk data
+```{r}
+## flagging outliers from the data set
+ 
+mobeast_flagged_outlier <- mobeast %>%
+  filter(treatment != "Endmember") %>% 
+
+  # flagging outliers
+  ## grouping by date, time and treatment
+  group_by(treatment, variable) %>% 
+  ##calculating the Interquantile range and of the raw data
+  mutate(quant1 = quantile(value, probs = 0.25, na.rm = T),
+         quant3 = quantile(value, probs = 0.75, na.rm = T),
+         IQR = quant3-quant1) %>% 
+  ## removing data that are under Q1-1.5* or over 1.5+Q3*IQR, and labeling them outlier/not outliers
+  ## Important to filter later to understand why they are outliers. 
+  mutate(outlier = ifelse(value > quant3 + (IQR*1.5) | value < quant1 - (IQR*1.5),
+                           "outlier", "not outlier")) %>% 
+  ungroup() 
+
+
+```
+
+### Calculating Fluxes 
+(([aquarium]-[inflow])*Vol) / (RT*SA ) in [umol/SA/time]. 
+```{r}
+tank_area = conv_unit(506.25, from = "cm2", to = "m2") # convert area cm2 to m2
+tank_vol = 10 # liters
+# DOC in uM, i.e. umol/L
+# avg flow rate in mL/min converted to L/sec
+# residence time in sec
+# areal_flux in umol/s/m2
+
+
+#NEED TO EDIT THIS BIT TO APPLY TO ALL VARIABLES !
+
+
+#mobeast_flux <- 
+mobeast_flagged_outlier %>%  
+  
+  filter(treatment != "Rain") %>% 
+  filter(treatment != "Endmember") %>% 
+  
+  
+  mutate(time_string = as.character(time),
+         date_string = as.character(date),
+         date_time_string = paste(date_string, time_string),
+         date_time = ymd_hms(date_time_string)) %>%
+  
+# Isolate inflow for each date_time and table
+  group_by(date_time, inflow_table, variable) %>%
+  mutate(inflow = value[treatment == "Inflow"]) %>%  
+  ungroup() %>%
+  
+  # averaging the inflow values 
+  group_by(date_time, variable) %>% 
+  #mutate(inflow = ifelse(outlier == "outlier", inflow == NA, inflow)) %>% 
+  mutate(inflow = mean(inflow, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # Normalize for treatments
+  mutate(conc_norm = value - inflow)  %>%  
+  relocate(inflow, .after = "conc_norm") %>% 
+  relocate(date_time, .before = "date") %>%
+  
+  # calculate res time but convert flow rate units to L/sec
+  mutate(resid_time = tank_vol/(avg_flow_rate*0.001/60)) %>%
+  # Unsure why we still normalize to the inflow so calculated both 
+  # fluxes with raw data and normalized data.
+  mutate(areal_flux = conc_norm*tank_vol/ (resid_time*tank_area)) %>% 
+  filter(treatment != "Inflow") %>% 
+  
+  #organize the treatment levels
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) 
+
+```
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

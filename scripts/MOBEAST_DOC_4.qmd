@@ -161,6 +161,17 @@ DOC_flux <- DOC_flagged_outlier %>%
 
 
 
+
+```{r}
+tank_vol = 10 #liter 
+DOC_flagged_outlier %>%  
+  mutate(resid_time = tank_vol/(avg_flow_rate)) %>% 
+  select(tank_number, treatment, 
+         laurel_res_time = avg_res_time, keannu_res_time =resid_time)
+  
+```
+
+
 ### XXX Normalizing the data
 
 
@@ -327,6 +338,12 @@ DOC_12PM <- DOC_flux %>%
   #filter(outlier == "not outlier") 
 
 ```
+
+```{r}
+DOC_12PM %>% filter(areal_flux>0.15) %>% 
+  select(id_number, treatment, npoc_u_m,outlier, conc_norm, areal_flux) 
+```
+
 
 ```{r}
 mod_12PM <- lmer(areal_flux~ treatment + (1|tank_number), data = DOC_12PM)

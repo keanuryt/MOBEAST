@@ -111,8 +111,9 @@ DOC <- DOC %>% mutate(inflow_table = ifelse(is.na(inflow_table), tank_number, in
 # this data is log transformed
 ## flagging outliers from the data set
 raw_flagged_outliers <- DOC %>%
-  select(-npoc_mg_l, -tn_mg_l, -long_name, -sample) %>% 
-  pivot_longer(cols = npoc_u_m:tn_u_m,
+  #select(-npoc_mg_l, -tn_mg_l, -long_name, -sample) %>% 
+  select( -long_name, -sample) %>% 
+  pivot_longer(cols = npoc_mg_l:tn_u_m,
                names_to = "nutrient",
                values_to = "conc") %>% 
   filter(treatment != "Endmember") %>% 
@@ -179,17 +180,10 @@ DOC_norm <- raw_flagged_outliers %>%
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
 ```
 
-```{r}
+```{}
 DOC_norm <- DOC_norm %>% mutate(nutrient = ifelse(nutrient == "npoc_u_m", "DOC", "TN"))
 ```
 
-```{}
-# Dataset sent to Craig 
-DOC_craig <- DOC_norm %>% filter(outlier != "outlier") %>% 
-  filter(nutrient == "DOC") %>% select(-inflow)
-
-#write_csv(DOC_craig, here("data","craig_data", "DOC_Craig.csv"))
-```
 
 ```{r}
 #Verifying that the outliers have been removed 
@@ -330,13 +324,13 @@ DOC_12PM %>%
 ## removing outliers from the data set
 DOC_24h <- DOC_norm %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  filter(nutrient == "DOC") %>% 
+  filter(nutrient == "npoc_mg_l") %>% 
   filter(treatment != "Inflow") %>% 
   ## remove the outliers 
   filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) %>% 
-  filter(time_string != "00:00:00") 
+                                                   "00:00:00","06:00:00"))) #%>% 
+  #filter(time_string != "00:00:00") 
   
 ```
 

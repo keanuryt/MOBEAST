@@ -1,6 +1,6 @@
 # Title: Merging all data
 # Date: November 18, 2025
-# Edited: 04 February 2025
+# Edited: 23 February 2026
 # Author: Keanu Rochette-Yu Tsuen 
 #################
 
@@ -20,7 +20,8 @@ fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
 FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
 nutrients <- read_delim(here("data", "Nutrients", "MOBEAST_nutrients.csv"))
 meta2 <- read_csv(here("data", "MOBEAST_metadata.csv"))
-res_time <- read_csv(here("data", "tank_residence_time.csv"))
+#res_time <- read_csv(here("data", "tank_residence_time.csv"))
+res_time <- read_csv(here("data", "Laurel", "Full_Carb_Chem_Data.csv"),locale=locale(encoding="latin1"))
 chla <- read_csv(here("data", "chlorophyll_a.csv"))
 
 
@@ -33,7 +34,7 @@ DOC_list <- colnames(DOC[,c(4,5)])
 ### fDOM 
 fDOM<- fDOM %>% select(id_number, date_time, coble_a:lignin) %>% 
   # error in data treatment script, M:C needs to be recalculated manually 
-  mutate(m_to_c2 = coble_m/coble_c) 
+  mutate(m_to_c = coble_m/coble_c) 
 
 fDOM_list <- colnames(fDOM[,c(3:13)])
 
@@ -80,7 +81,15 @@ FCM_pre <- FCM %>% filter(str_detect(sample, pattern = "MOBEAST")) %>%
   filter(sample!= "2_MOBEAST_T4_A_2024-06-02_18:00", 
          sample!= "3_MOBEAST_T4_A_2024-06-02_18:00") %>% 
   separate_wider_delim(sample, names= c("project", "tank", "treatment", "date","time"), 
-                       delim = "_") 
+                       delim = "_") %>% 
+  ## Misaligned data made it difficult to analyze and compare
+  ### 18:00 is duplicated because one batch is actually 21:00
+  ### there is also multiple samples for 1 tank (T4?)
+  ### 3PM and 6PM data were close enough so we used the 3PM as our 6PM data 
+  ### to have a complete data set. (Feb 23 2026)
+  ## Removed 34 samples: 18 samples (batch 1) + 16 samples (batch 2, missing T4 and T6 values)
+  filter(time != "18:00") %>% 
+  mutate(time = str_replace_all(time,"15:00", "18:00")) 
 
 ## Merging preliminatry meta data to add with the bigger data file later
 FCM_pre <- left_join(FCM_pre, treat_code, by= "treatment")
@@ -96,10 +105,6 @@ FCM_pre <- FCM_pre %>% left_join(table_id, by = "tank_number") %>%
   mutate(inflow_table = ifelse(is.na(inflow_table), "Endmember", inflow_table))
 
 FCM_pre <- FCM_pre %>% 
-  ## 18:00 is duplicated because one batch is actually 21:00
-  ## there is also multiple samples for 1 tank (T4?)
-  ## removed for simplicity (Nov 11 2025)
-  filter(time != "18:00") %>% 
   mutate(date_time = ymd_hms(paste0(date," ", time,":00"))) %>% 
   select(tank_number, treatment, inflow_table, date_time, date, time, 
          het_bact = het_bact_events_u_l,
@@ -124,6 +129,21 @@ carbonate_list <- colnames(carbonate[,c(7:10)])
 ## Chlorophyll 
 chla <- chla %>% clean_names() %>% 
   rename(id_number = sample_id)
+
+## Residence time and flowrate 
+
+res_time <- res_time %>% clean_names() %>% 
+  mutate(date = ymd(date),
+         date_string= as.character(date),
+         time_string =  paste0(time), 
+         tank_num = paste0("T", tank_num), 
+         treatment = str_remove(treatment, "_Dom"), 
+         treatment= ifelse(treatment =="Rubble", "CCA", treatment)) %>%
+  rename(tank_number = tank_num) %>% 
+  select(date_string, time_string, tank_number, treatment, do_mg_l, ta, p_h,
+         dic_mmol_kg, residence_time, flowrate) 
+
+res_time_list <- colnames(res_time[,c(2:10)])
 
 ## Merging the data 
 ### Merging FCM data with meta data
@@ -159,12 +179,13 @@ merged <- merged %>% mutate(time = as_hms(time)) %>%
   full_join(carbonate) 
 
 ### merge residence time with meta data
-res_time<- res_time %>% clean_names() %>% 
-  rename(tank_number = tank_num) %>% 
-  mutate(tank_number = paste0("T",tank_number)) 
+#res_time <- res_time %>% clean_names() %>% 
+#  rename(tank_number = tank_num) %>% 
+#  mutate(tank_number = paste0("T",tank_number)) 
 
-res_time_list <- colnames(res_time[,c(2:5)])
-merged<- merged %>% left_join(res_time) 
+merged<- merged %>% mutate(date_string = as.character(date_string),
+                    time_string = as.character(time_string)) %>% 
+    left_join(res_time) 
 
 ## Data clean up
 merged_data <- merged %>% 
