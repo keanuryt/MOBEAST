@@ -70,7 +70,7 @@ treat_code <- tibble(
 table_id <- read_csv(here("data", "Laurel", "TableID.csv"))
 table_id <- clean_names(table_id)
 
-table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+table_id <- table_id %>% rename(tank_number=tank_num) %>% select(-treatment) %>% 
   mutate(tank_number = paste0("T", tank_number)) %>% 
   mutate(inflow_table = paste("Table", inflow_table))
 
@@ -193,7 +193,7 @@ merged_data <- merged %>%
          date_string = as.character(date),
          date_time_string = as.character(date_time)) 
 
-#write_csv(merged_data, here("data", "MOBEAST_full_merged_data.csv"))
+write_csv(merged_data, here("data", "MOBEAST_full_merged_data.csv"))
 
 ## Creating long format data 
 merged_long <- merged_data %>% 
