@@ -339,7 +339,7 @@ DOC_12PM <- DOC_flux %>%
 
 ```
 
-```{r}
+```{}
 DOC_12PM %>% filter(areal_flux>0.15) %>% 
   select(id_number, treatment, npoc_u_m,outlier, conc_norm, areal_flux) 
 ```

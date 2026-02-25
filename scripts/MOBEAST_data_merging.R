@@ -20,7 +20,6 @@ fDOM <- read_csv(here("data", "fDOM", "fDOM_sorted.csv"))
 FCM <- read_csv(here("data", "MOBEAST_FCM.csv"))
 nutrients <- read_delim(here("data", "Nutrients", "MOBEAST_nutrients.csv"))
 meta2 <- read_csv(here("data", "MOBEAST_metadata.csv"))
-#res_time <- read_csv(here("data", "tank_residence_time.csv"))
 res_time <- read_csv(here("data", "Laurel", "Full_Carb_Chem_Data.csv"),locale=locale(encoding="latin1"))
 chla <- read_csv(here("data", "chlorophyll_a.csv"))
 
@@ -138,10 +137,11 @@ res_time <- res_time %>% clean_names() %>%
          time_string =  paste0(time), 
          tank_num = paste0("T", tank_num), 
          treatment = str_remove(treatment, "_Dom"), 
-         treatment= ifelse(treatment =="Rubble", "CCA", treatment)) %>%
+         treatment= ifelse(treatment =="Rubble", "CCA", treatment)) %>% 
   rename(tank_number = tank_num) %>% 
   select(date_string, time_string, tank_number, treatment, do_mg_l, ta, p_h,
          dic_mmol_kg, residence_time, flowrate) 
+
 
 res_time_list <- colnames(res_time[,c(2:10)])
 
@@ -185,19 +185,21 @@ merged <- merged %>% mutate(time = as_hms(time)) %>%
 
 merged<- merged %>% mutate(date_string = as.character(date_string),
                     time_string = as.character(time_string)) %>% 
-    left_join(res_time) 
-
+    left_join(res_time, by = c("date_string", "time_string", "treatment", "tank_number")) %>% 
+  mutate(ta.y= ifelse(is.na(ta.y), ta.x, ta.y)) %>% 
+  select(-ta.x) %>%  rename(ta = ta.y) 
+         
 ## Data clean up
 merged_data <- merged %>% 
   mutate(time_string = as.character(time),
          date_string = as.character(date),
          date_time_string = as.character(date_time)) 
 
-write_csv(merged_data, here("data", "MOBEAST_full_merged_data.csv"))
+#write_csv(merged_data, here("data", "MOBEAST_full_merged_data.csv"))
 
 ## Creating long format data 
 merged_long <- merged_data %>% 
-  pivot_longer(cols = het_bact:flow_error,
+  pivot_longer(cols = het_bact:dic_mmol_kg,
                names_to = "variable",
               values_to = "value") %>% 
   mutate(variable_cat =
@@ -207,7 +209,7 @@ merged_long <- merged_data %>%
                                 ifelse(variable %in% fcm_list, "FCM", 
                                        ifelse(variable %in% nutrient_list, "nutrients", 
                                               ifelse(variable %in% res_time_list, "residence time",
-                                                     "chla"))))))) 
+                                                     "chla")))))))
 
 #write_csv(merged_long, here("data", "MOBEAST_full_merged_data_long.csv"))
 
