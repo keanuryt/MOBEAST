@@ -1,7 +1,7 @@
 ---
 title: "MOBEAST_all_variables"
 created: 5 Fev 2025
-edited: 5 Fev 2025
+edited: 25 Fev 2025
 format: html
 editor: source
 
@@ -70,42 +70,36 @@ treatment_colors = c("Inflow"="#00838F",
 mobeast <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
 ```
 
-```{r}
-DOC <- mobeast %>% filter(variable == "npoc_u_m")
 
-```
 
 ## Data Clean Up
-```{r}
-DOC <- DOC %>% mutate(time_string = as.character(time_string),
-              date_string = as.character(date_string),
-              date_time_string = paste(date_string,time_string))
-```
-
 
 ### Outlier detection on bulk data
 ```{r}
 ## flagging outliers from the data set
  
-DOC <- DOC %>%
-  #filter(treatment != "Endmember") %>% 
+mobeast_flagged <- mobeast %>%
+  mutate(time_string = as.character(time_string),
+              date_string = as.character(date_string),
+              date_time_string = paste(date_string,time_string))%>% 
+  #filter(treatment != "Endmember") 
 
   # flagging outliers
-  ## grouping by date, time and treatment
+  ## grouping by treatment, variable 
   group_by(treatment, variable) %>% 
-  ## XX
+  ## get the mean and the sd to calculate mean +/- 2sd
   mutate(mean =mean(value, na.rm = T), 
          stand_dev = sd(value, na.rm = T)) %>% 
-  ## XXX
-  ## Important to filter later to understand why they are outliers. 
+  ## Values outside of the mean +/- 2sd range are flagged as outliers
+  ## Important to filter outliers later to understand why they are outliers. 
   mutate(outlier = ifelse(value > mean +2*stand_dev | value < mean -2*stand_dev,
                            "outlier", "not outlier")) %>% 
   ungroup() 
   
 
-
-
 ```
+
+
 
 ### Calculating Fluxes 
 (([aquarium]-[inflow])*Vol) / (RT*SA ) in [umol/SA/time]. 
@@ -119,10 +113,8 @@ tank_vol = 10 # liters
 ```
 
 ```{r}
-#NEED TO EDIT THIS BIT TO APPLY TO ALL VARIABLES !
 
-
-DOC_flux <- DOC %>%  
+mobeast_flux <- mobeast_flagged %>%  
   
   filter(treatment != "Rain") %>% 
   filter(treatment != "Endmember") %>% 
@@ -157,12 +149,19 @@ DOC_flux <- DOC %>%
 
 ```
 
-# Who are the outliers ???
+```{r}
+exclude_var <- c("carbonate", "residence time")
+exclude_time <- c("03:00:00","09:00:00","15:00:00","21:00:00")
+mobeast_flux <- mobeast_flux %>% filter(!variable_cat %in%  exclude_var,
+                        !time_string %in% exclude_time) 
+```
+
+
 
 ## 12PM data
 ```{r}
 # removing outliers from the data set
-DOC_12PM <- DOC_flux %>%
+mobeast_12PM <- mobeast_flux %>%
   filter(time_string == "12:00:00") #%>% 
   
   ## remove the outliers 
@@ -170,9 +169,26 @@ DOC_12PM <- DOC_flux %>%
 
 ```
 
-```{}
-DOC_12PM %>% filter(areal_flux>0.15) %>% 
-  select(id_number, treatment, npoc_u_m,outlier, conc_norm, areal_flux) 
+
+## Iterative  coding 
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+mobeast_loop <- mobeast_12PM %>% select(nutrient) %>% distinct() %>% pull()
+
+models_12PM <- vector(mode = "list", length = length(DOC_loop))
+names(models_12PM) <- DOC_loop
+
+for (var in DOC_loop) {
+  df <- DOC_12PM %>% filter(nutrient == var)
+  models_12PM[[var]] <- lmer(conc_norm~ treatment + (1|tank_number), data = df)
+}
+
 ```
 
 

@@ -4,13 +4,13 @@ format: html
 editor: visual
 ---
 
-
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE)
 ```
 
 ## Load Libraries
+
 ```{r}
 library(tidyverse)
 library(lubridate)
@@ -25,6 +25,7 @@ library(rlang)
 ```
 
 ## Data visualization theme
+
 ```{r}
 nunu_theme <- theme_bw() + 
   theme(plot.title = element_text(size=14, face = "bold"), 
@@ -38,8 +39,8 @@ nunu_theme <- theme_bw() +
         panel.background = element_rect(fill = "azure1"))
 ```
 
-
 ## Function
+
 ```{r}
 nunu_plot <- function(data = DNA, OTU_filter, time = 12){
   
@@ -72,22 +73,21 @@ nunu_plot <- function(data = DNA, OTU_filter, time = 12){
 
 ```
 
-```{r}
-nunu_plot(data = DNA, otu_number == "Otu0006" , time = 12)
-```
-
-
 
 
 ## Load Data
+
 ```{r}
 DNA <- read_csv(here("data", "MOBEAST_DNA_long.csv"))
 meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
 ```
+
 ## Data Clean Up
+
 ```{r}
 DNA <- DNA %>% rename(id_number = SampleID)
 ```
+
 
 ```{r}
 DNA_raw <- left_join(DNA, meta)
@@ -154,7 +154,6 @@ DNA %>% filter(otu_number == "Otu0006") %>%
   theme(legend.position = "none")
 ```
 
-
 ```{r, OTU_0006_24h}
 DNA %>% filter(otu_number == "Otu0006") %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
@@ -178,8 +177,8 @@ DNA %>% filter(otu_number == "Otu0006") %>%
 
 ```
 
-
 ## OTU 002: Cyanobacteria, Prochlorococcus
+
 ```{r, OTU_0002_all}
 DNA %>% filter(otu_number == "Otu0002") %>% 
   ggplot(aes(x= treatment, y= abund, fill = treatment))+
@@ -217,7 +216,6 @@ DNA %>% filter(otu_number == "Otu0002") %>%
   theme(legend.position = "none")
 ```
 
-
 ```{r, OTU_0002_24h}
 DNA %>% filter(otu_number == "Otu0002") %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
@@ -242,6 +240,7 @@ DNA %>% filter(otu_number == "Otu0002") %>%
 ```
 
 ## OTU 004: Alphaproteobacteria, SAR11
+
 ```{r, OTU_0004_all}
 DNA %>% filter(otu_number == "Otu0004") %>% 
   ggplot(aes(x= treatment, y= abund, fill = treatment))+
@@ -279,7 +278,6 @@ DNA %>% filter(otu_number == "Otu0004") %>%
   theme(legend.position = "none")
 ```
 
-
 ```{r, OTU_0004_24h}
 DNA %>% filter(otu_number == "Otu0004") %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
@@ -303,8 +301,8 @@ DNA %>% filter(otu_number == "Otu0004") %>%
 
 ```
 
-
 ## OTU 007: Gammaproteobacteria, SAR86
+
 ```{r, OTU_0007_all}
 DNA %>% filter(otu_number == "Otu0007") %>% 
   ggplot(aes(x= treatment, y= abund, fill = treatment))+
@@ -342,7 +340,6 @@ DNA %>% filter(otu_number == "Otu0007") %>%
   theme(legend.position = "none")
 ```
 
-
 ```{r, OTU_0007_24h}
 DNA %>% filter(otu_number == "Otu0007") %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
@@ -366,8 +363,8 @@ DNA %>% filter(otu_number == "Otu0007") %>%
 
 ```
 
-
 ## OTU 008: Alphaproteobacteria, SAR116
+
 ```{r, OTU_0008_all}
 DNA %>% filter(otu_number == "Otu0008") %>% 
   ggplot(aes(x= treatment, y= abund, fill = treatment))+
@@ -405,7 +402,6 @@ DNA %>% filter(otu_number == "Otu0008") %>%
   theme(legend.position = "none")
 ```
 
-
 ```{r, OTU_0008_24h}
 DNA %>% filter(otu_number == "Otu0008") %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
@@ -428,8 +424,6 @@ DNA %>% filter(otu_number == "Otu0008") %>%
   theme(legend.position = "none")  
 
 ```
-
-
 
 ## OTU 0031: Espilonbacteraeota, Arcobacter
 
@@ -470,7 +464,6 @@ DNA %>% filter(otu_number == "Otu0031") %>%
   theme(legend.position = "none")
 ```
 
-
 ```{r, OTU_0031_24h}
 DNA %>% filter(otu_number == "Otu0031") %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
@@ -493,8 +486,6 @@ DNA %>% filter(otu_number == "Otu0031") %>%
   theme(legend.position = "none")  
 
 ```
-
-
 
 ## OTU 0044: Espilonbacteraeota, Arcobacter
 
@@ -535,7 +526,6 @@ DNA %>% filter(otu_number == "Otu0044") %>%
   theme(legend.position = "none")
 ```
 
-
 ```{r, OTU_0044_24h}
 DNA %>% filter(otu_number == "Otu0044") %>% 
   filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
@@ -559,12 +549,6 @@ DNA %>% filter(otu_number == "Otu0044") %>%
 
 ```
 
-
 ```{r}
 
 ```
-
-
-
-
-

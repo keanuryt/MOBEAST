@@ -1,6 +1,6 @@
 # Title: Merging all data
 # Date: November 18, 2025
-# Edited: 23 February 2026
+# Edited: 24 February 2026
 # Author: Keanu Rochette-Yu Tsuen 
 #################
 
@@ -22,6 +22,7 @@ nutrients <- read_delim(here("data", "Nutrients", "MOBEAST_nutrients.csv"))
 meta2 <- read_csv(here("data", "MOBEAST_metadata.csv"))
 res_time <- read_csv(here("data", "Laurel", "Full_Carb_Chem_Data.csv"),locale=locale(encoding="latin1"))
 chla <- read_csv(here("data", "chlorophyll_a.csv"))
+DNA <- read_csv(here("data", "MOBEAST_DNA_long.csv"))
 
 
 ## Data Clean up 
@@ -145,6 +146,18 @@ res_time <- res_time %>% clean_names() %>%
 
 res_time_list <- colnames(res_time[,c(2:10)])
 
+### Cleaning DNA data 
+
+DNA <- DNA %>% rename(id_number = SampleID) %>% 
+  clean_names() %>% 
+  mutate(bact_tax = paste0(order,"_",family,"_",genus)) %>% 
+  group_by(id_number, bact_tax) %>% 
+  summarise(sum_abun = sum(abund)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = bact_tax, values_from = sum_abun)
+
+DNA_list <- colnames(DNA[,-1])
+
 ## Merging the data 
 ### Merging FCM data with meta data
 merged <- meta %>% full_join(FCM_pre, by = c("tank_number", "treatment", "date_time", 
@@ -187,7 +200,15 @@ merged<- merged %>% mutate(date_string = as.character(date_string),
                     time_string = as.character(time_string)) %>% 
     left_join(res_time, by = c("date_string", "time_string", "treatment", "tank_number")) %>% 
   mutate(ta.y= ifelse(is.na(ta.y), ta.x, ta.y)) %>% 
-  select(-ta.x) %>%  rename(ta = ta.y) 
+  select(-ta.x) %>%  rename(ta = ta.y) %>% 
+  rowwise() %>%
+  mutate(pH = mean(c(ph,p_h), na.rm = TRUE)) %>%
+  ungroup() %>% 
+  select(-p_h, -ph) %>% 
+  rename(ph = pH) 
+
+### merge DNA data 
+merged<- merged %>% left_join(DNA, by = "id_number") %>% view()
          
 ## Data clean up
 merged_data <- merged %>% 
@@ -199,7 +220,7 @@ merged_data <- merged %>%
 
 ## Creating long format data 
 merged_long <- merged_data %>% 
-  pivot_longer(cols = het_bact:dic_mmol_kg,
+  pivot_longer(cols = c(het_bact:dic_mmol_kg, ph, 44:178),
                names_to = "variable",
               values_to = "value") %>% 
   mutate(variable_cat =
@@ -209,7 +230,8 @@ merged_long <- merged_data %>%
                                 ifelse(variable %in% fcm_list, "FCM", 
                                        ifelse(variable %in% nutrient_list, "nutrients", 
                                               ifelse(variable %in% res_time_list, "residence time",
-                                                     "chla")))))))
+                                                     ifelse(variable %in% DNA_list, "DNA",
+                                                     "chla")))))))) 
 
 #write_csv(merged_long, here("data", "MOBEAST_full_merged_data_long.csv"))
 

@@ -33,23 +33,11 @@ library(performance)
 
 ```
 
-## Data visualization theme
-```{r}
-nunu_theme <- theme_bw() + 
-  theme(plot.title = element_text(size=14, face = "bold"), 
-        plot.subtitle = element_text(size=12),
-        axis.title = element_text(size = 12, face = "bold"),
-        axis.text = element_text(size = 12),
-        strip.text.x = element_text(size = 12, face = "bold"),
-        legend.title=element_text(size=12, face = "bold"),
-        legend.text=element_text(size=12),
-        axis.text.x = element_text(angle= 45, hjust= 1),
-        panel.background = element_rect(fill = "azure1"))
-```
 
 ## Load Data 
 ```{r}
 DNA <- read_csv(here("data", "MOBEAST_DNA_raw.csv"))
+
 #DNA <- clean_names(DNA)
 tax <- DNA[,c(193:195)]
 ```
@@ -123,6 +111,7 @@ rownames(culled.abund.asv.transposed.w.taxonomy) = culled.abund.asv.transposed.w
 ```{r}
 culled.long.table %>% filter(Family == "Bacillaceae")
 ```
+
 
 ```{}
 write_csv(culled.long.table, here("data", "MOBEAST_DNA_long.csv"))
