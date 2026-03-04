@@ -16,8 +16,10 @@ knitr::opts_chunk$set(echo = TRUE,
 
 ```{r}
 library(tidyverse)
-library(here)
 library(janitor)
+
+library(here)
+
 library(ggrepel)
 library(ghibli)
 library(gt)
@@ -35,6 +37,7 @@ library(sjPlot)
 library(emmeans)
 library(performance)
 library(multcompView)
+library(broom.mixed)
 ```
 
 
@@ -68,8 +71,8 @@ treatment_colors = c("Inflow"="#00838F",
 
 ```{r}
 mobeast <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
+#mobeast <- read_csv(here("data", "MOBEAST_full_merged_data.csv"))
 ```
-
 
 
 ## Data Clean Up
@@ -135,8 +138,11 @@ mobeast_flux <- mobeast_flagged %>%
   relocate(inflow, .after = "conc_norm") %>% 
   relocate(date_time, .before = "date") %>%
   
-  # convert res time to sec
+  # convert res time from h to sec
   mutate(residence_time = residence_time*3600) %>%
+  
+  # There is no residence time in 
+  mutate(residence_time = ifelse(date_time_string == "2024-06-04 12:00:00", (residence_time[date_time_string == "2024-06-02 12:00:00"] + residence_time[date_time_string == "2024-06-06 12:00:00"])*0.5, residence_time)) %>% 
 
   # Unsure why we still normalize to the inflow so calculated both 
   # fluxes with raw data and normalized data.
@@ -157,20 +163,34 @@ mobeast_flux <- mobeast_flux %>% filter(!variable_cat %in%  exclude_var,
 ```
 
 
-
 ## 12PM data
 ```{r}
 # removing outliers from the data set
 mobeast_12PM <- mobeast_flux %>%
-  filter(time_string == "12:00:00") #%>% 
+  filter(time_string == "12:00:00") %>% 
   
   ## remove the outliers 
-  #filter(outlier == "not outlier") 
+  filter(outlier == "not outlier") 
 
+```
+
+```{}
+mobeast_12PM %>%  select(id_number, tank_number, date_time_string, residence_time) %>% 
+  distinct() %>% 
+  ggplot(aes(x= date_time_string, y= residence_time, color = tank_number)) +
+  geom_jitter()+
+  stat_summary(color = "yellow", alpha =0.5)
 ```
 
 
 ## Iterative  coding 
+
+```{r}
+models_12PM <- mobeast_12PM %>%
+  group_by(variable) %>%
+  group_map(~ lmer(value ~ treatment + (1|tank_number), data = .x))
+```
+
 
 ```{r}
 # Loop Function:
@@ -179,22 +199,133 @@ mobeast_12PM <- mobeast_flux %>%
 ## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
 ## Save the outputs of the model in the list such that each nutrient has its stats
 
-mobeast_loop <- mobeast_12PM %>% select(nutrient) %>% distinct() %>% pull()
+mobeast_loop <- mobeast_12PM %>% select(variable) %>% distinct() %>% pull()
 
-models_12PM <- vector(mode = "list", length = length(DOC_loop))
-names(models_12PM) <- DOC_loop
+models_12PM <- vector(mode = "list", length = length(mobeast_loop))
+names(models_12PM) <- mobeast_loop
 
-for (var in DOC_loop) {
-  df <- DOC_12PM %>% filter(nutrient == var)
-  models_12PM[[var]] <- lmer(conc_norm~ treatment + (1|tank_number), data = df)
+#fit_12PM <- vector(mode = "list", length = length(mobeast_loop))
+#names(fit_12PM) <- mobeast_loop
+
+for (var in mobeast_loop) {
+  df <- mobeast_12PM %>% filter(variable == var)
+  models_12PM[[var]] <- lmer(areal_flux~ treatment + (1|tank_number), data = df)
+  #fit_12PM[[var]] <- allFit(models_12PM[[var]])
 }
 
+```
+```{r}
+#fit_12PM
+
+## Counted 61 instances where max and std dev not 0
+```
+
+
+
+```{r}
+
+models <- mobeast_12PM %>%
+  group_by(variable) %>%
+  group_map(~ {
+    mod <- lmer(areal_flux ~ treatment + (1|tank_number), data = .x)
+    
+    tibble(
+      model = list(mod),
+      singular = isSingular(mod),
+      converged = is.null(mod@optinfo$conv$lme4$messages)
+    )
+  }) %>%
+  bind_rows() %>% 
+  filter(singular == TRUE | converged == FALSE)
+
+models <- mobeast_12PM %>%group_by(variable) %>%
+  group_modify(~ {
+    mod <- lmer(areal_flux ~ treatment + (1|tank_number), data = .x)
+
+    tibble(
+      model = list(mod),
+      singular = isSingular(mod),
+      converged = is.null(mod@optinfo$conv$lme4$messages)
+    )
+  }) %>%
+  ungroup() %>% filter(singular == TRUE)
 ```
 
 
 ```{r}
-mod_12PM <- lmer(areal_flux~ treatment + (1|tank_number), data = DOC_12PM)
+results <- imap_dfr(models_12PM, ~ tidy(.x) %>%
+                     dplyr::mutate(variable = .y)) %>% 
+  relocate(variable, .before = "effect")
 ```
+
+
+```{r, warning= FALSE}
+# So many Warnings! 
+## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
+
+anova_results <- imap_dfr(models_12PM, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) %>% 
+  filter(p.value <0.05)
+```
+
+```{r}
+# "estimate" are negative somehow. Why? 
+## in manual models for DOC, estimate >0, here it's <0
+## t.ratio is "statistics", and negative instead of positive
+## p.values not shown, only p.adjusted. 
+emmeans_results <- imap_dfr(models_12PM, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
+```
+
+```{r}
+emmeans_results_sig <- emmeans_results %>% 
+  filter(adj.p.value <0.05)
+```
+
+
+```{r}
+emmean_sig <- emmeans_results_sig %>% pull(variable)
+```
+
+```{r, warning=FALSE}
+mobeast_12PM %>% filter(variable %in% emmean_sig) %>% 
+  ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
+    geom_violin()+
+    geom_jitter(aes(color = outlier), alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap(~variable, scales = "free")+
+    labs(title = paste("12PM Biogeochem Changes"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Flux XXX")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18))
+```
+
+
+```{r}
+DOC_12PM <- mobeast_12PM %>% filter(variable == "het_bact")
+mod_12PM <- lmer(areal_flux~ treatment + (1|tank_number), data = DOC_12PM,
+                 REML = FALSE, 
+          control = lmerControl(optimizer ="Nelder_Mead"))
+```
+
+```{}
+allFit(mod_12PM)
+```
+
 
 ```{r}
 summary(mod_12PM)
