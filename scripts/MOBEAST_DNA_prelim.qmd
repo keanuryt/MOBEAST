@@ -1,7 +1,7 @@
 ---
 title: "DNA prelim"
 format: html
-editor: visual
+editor: source
 ---
 
 ```{r setup, include = FALSE}
@@ -73,8 +73,6 @@ nunu_plot <- function(data = DNA, OTU_filter, time = 12){
 
 ```
 
-
-
 ## Load Data
 
 ```{r}
@@ -87,7 +85,6 @@ meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
 ```{r}
 DNA <- DNA %>% rename(id_number = SampleID)
 ```
-
 
 ```{r}
 DNA_raw <- left_join(DNA, meta)
