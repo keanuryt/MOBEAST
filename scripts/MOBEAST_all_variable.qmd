@@ -164,14 +164,37 @@ mobeast_flux <- mobeast_flux %>% filter(!variable_cat %in%  exclude_var,
 
 
 ```{r}
-mobeast %>% filter(treatment == "Inflow", variable == "syn") %>% 
-  group_by(date_time_string, tank_number) %>% reframe(mean = mean(value)) %>% drop_na() %>% 
+mobeast %>% filter(inflow_table != "Endmember", variable == "syn") %>% 
+  group_by(inflow_table, date_time_string, tank_number) %>% reframe(mean = mean(value)) %>% drop_na() %>% 
   ggplot(aes(x= date_time_string, y = mean, group = tank_number, color = tank_number))+
-  geom_point(size = 2)+
-  geom_line()+ 
-  labs(title = "Synechococcus Variation in the Inflow Pipe", 
+  geom_point(aes(size = tank_number))+
+  geom_line(aes(linetype = tank_number, linewidth = tank_number))+ 
+  facet_wrap(.~ inflow_table)+
+  labs(title = "Synechococcus Variation", 
        x= "Date", y = "Average Cell Count")+
-  theme_bw()
+  scale_size_manual(
+    values = c("F1" = 4, "F2" = 4, 
+               "T1"= 2, 
+               "T2"=2, 
+               "T10"= 2,
+               "T11"= 2,
+               "T5" = 2)) +
+  scale_linetype_manual(values = c("F1" = "solid", 
+                                   "F2" = "solid",
+                                   "T1"= "dashed", 
+                                   "T2"= "dashed",
+                                   "T10"= "dashed",
+                                   "T11"= "dashed",
+                                   "T5" = "dashed"))+
+  scale_linewidth_manual(
+    values = c("F1" = 1.5, "F2" = 1.5, 
+               "T1"= 0.5, 
+               "T2"=0.5, 
+               "T10"= 0.5,
+               "T11"= 0.5,
+               "T5" = 0.5))+
+  theme_bw()+
+  theme(legend.position = "none")
 ```
 
 ```{r}
@@ -345,8 +368,9 @@ emmeans(test_12PM_mod,specs = trt.vs.ctrl ~ treatment)
 emmean_sig <- emmeans_results_sig %>% pull(variable)
 ```
 
-```{r, warning=FALSE}
+```{, warning=FALSE}
 mobeast_12PM %>% filter(variable %in% emmean_sig) %>% 
+  #filter(variable == "SiO2") %>% 
   ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
     geom_violin()+
     geom_jitter(aes(color = outlier), alpha = 0.5)+
@@ -380,7 +404,7 @@ t_test_12PM <- mobeast_12PM %>%
   ) %>% ungroup()
 
 sig_var_12PM <- t_test_12PM %>% 
-  filter(p_value <0.05) %>% filter() %>% 
+  filter(p_value <0.05) %>%  
   select(variable) %>% distinct() %>% pull()
 
 # p<0.05, reject the null hypothesis, the difference in mean is not due to chance
@@ -400,7 +424,7 @@ graphs_12PM <- sig_var_12PM %>%
       stat_summary(color = "yellow", alpha = 0.5) +
       labs(title = paste("12PM", .x, "Production"),
            x = "Treatment",
-          y = "Production (µmol/L)") +
+          y = "Areal Flux (µmol/(s.m2)") +
       scale_fill_manual(
         breaks = c("Control", "Coral", "CCA", "Algae"),
         values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
@@ -409,7 +433,40 @@ graphs_12PM <- sig_var_12PM %>%
       theme(legend.position = "none")
   })
 
+graphs_12PM[["m_to_c"]] / graphs_12PM[["bix"]] / graphs_12PM[["hix"]]/ graphs_12PM[["coble_b"]] + plot_layout(axes = "collect")
+
+graphs_12PM[["syn"]]+ labs(y = "Areal Flux (indiv/(s.m2))")
+
+
 ```
+##### Clean Plots for t-test results
+
+```{r}
+variable_meta <- mobeast_12PM %>% 
+  select(variable, variable_cat) %>%  distinct()
+t_test_12PM %>%  left_join(variable_meta) %>%  filter(variable_cat == "fDOM") %>% 
+  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
+                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  arrange(variable) %>%   # ensures ordering in the data frame
+  mutate(variable = factor(variable, levels = c(
+    "coble_a","coble_c","coble_m", "m_to_c","bix","hix","fi",
+    "coble_b", "coble_t","fpeak","lignin")),
+    variable = fct_rev(variable)) %>% 
+  
+  ggplot(aes(x= treatment, y= variable, fill = sig))+
+  geom_tile(color = "black")+
+  labs(title = "fDOM Enrichment and Depletion Pattern (p-value) ")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()
+  
+```
+
+
+
 
 
 ## 24h data
@@ -487,7 +544,6 @@ names(models_24h) <- mobeast_loop
 for (var in mobeast_loop) {
   df <- mobeast_24h %>% filter(variable == var)
   models_24h[[var]] <- lmer(areal_flux~ treatment*time_fac + (1|tank_number), data = df)
-  #fit_12PM[[var]] <- allFit(models_12PM[[var]])
 }
 
 
@@ -522,7 +578,7 @@ DOC_anova <- anova(DOC_24h_mod, type = 2) %>%  tidy() %>% mutate(variable = "npo
 
 anova_results <- rbind(anova_results, DOC_anova)
 
-anova_results %>% filter(p.value <0.05) %>%  filter(term == "treatment")
+anova_results %>% filter(p.value <0.05) 
 ```
 
 ```{r}
@@ -557,70 +613,62 @@ emmeans_results_sig <- emmeans_results %>%
 emmean_sig <- emmeans_results_sig %>% pull(variable)
 ```
 
+
+```{r}
+mobeast_24h %>% filter(variable_cat== "fDOM") %>%  select(variable) %>%  distinct()
+```
+
+
 ```{r, warning=FALSE}
-mobeast_24h %>% filter(variable %in% emmean_sig) %>% 
+mobeast_24h %>% 
+  filter(variable == "syn") %>% 
   ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
     geom_violin()+
-    geom_jitter(aes(color = outlier), alpha = 0.5)+
+    #geom_jitter(aes(color = outlier), alpha = 0.5)+
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
-    facet_wrap(~variable)+
-    labs(title = paste("24h Biogeochem Changes"),
+    facet_wrap( .~ time_fac, ncol = 4 )+
+    labs(title = paste("24h Synechococcus Changes"),
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
-       y = "Flux XXX")+
+       y = "Areal Flux (indiv/(s.m2)")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   scale_color_manual(breaks = c("outlier", "not outlier"), 
                        values=c("red", "black"))+
     nunu_theme + 
-    theme(axis.text = element_text(size = 18))
+    theme(axis.text = element_text(size = 18),
+          legend.position = "none")
 ```
 
-
-
-#### 24h Model setup and results
-```{r}
-summary(mod)
-anova(mod, type = 2)
-emmeans(mod, specs = trt.vs.ctrl ~ treatment)
-#emmeans(models_24h[["DOC"]], ~ treatment)
-```
-
-```{r}
-resid_panel(mod)
-```
-
-
-#### Data Visualization 
-```{r}
-DOC_24h %>% 
-    ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
+```{r, warning=FALSE}
+mobeast_24h %>% 
+  filter(variable == "SiO2") %>% 
+  ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
     geom_violin()+
-    geom_jitter(aes(color = outlier), size = 2)+
+    #geom_jitter(aes(color = outlier), alpha = 0.5)+
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
-    facet_wrap(~time_fac, ncol = 4 )+
-    labs(title = paste("24h DOC Production"),
+    facet_wrap( ~ time_fac, nrow = 1)+
+    labs(title = paste("24h SiO2 Changes"),
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
-       y = "Production (µmol/L)")+
+       y = "Areal Flux (µmol/(s.m2)")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   scale_color_manual(breaks = c("outlier", "not outlier"), 
                        values=c("red", "black"))+
     nunu_theme + 
-    theme(axis.text = element_text(size = 18))#,
-        #legend.position = "none") #+
-  #geom_jitter(aes(color = inflow_table), size = 2)+
-  #scale_color_manual(values = c("red", "blue"))+
-  #theme(legend.position = "right")
+    theme(axis.text = element_text(size = 18), 
+          legend.position = "none")
 ```
+
 
 ### DNA 
 
 ```{r}
 mobeast_DNA_24h <- mobeast_DNA %>% filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  filter(treatment != "Inflow") %>% 
   filter(!is.na(id_number)) %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
                                                    "00:00:00","06:00:00")))
@@ -671,7 +719,7 @@ anova_results <- imap_dfr(models_DNA_24h, ~ {
     mutate(variable = .y)}) %>%
   relocate(variable) 
 
-anova_results %>% filter(p.value <0.05) %>%  filter(term == "treatment")
+DNA_anova_sig <- anova_results %>% filter(p.value <0.05) %>% select(variable, anova_term = term, anova_p_val = p.value)
 ```
 
 ```{r}
@@ -690,9 +738,85 @@ emmeans_results <- imap_dfr(models_DNA_24h, ~ {
 ```
 
 ```{r}
-emmeans_results_sig <- emmeans_results %>% 
-  filter(adj.p.value <0.05)
+emmeans_results_sig <- emmeans_results %>% filter(adj.p.value <0.05) %>% 
+  select(variable, emmean_term = term, contrast, emmeans_p_val = adj.p.value) 
+
+## Families that have a time:treatment interactions in ANOVA
+interaction_family <- c("Francisellales_Francisellaceae_Francisella",
+"Fusobacteriales_Leptotrichiaceae_Hypnocyclicus",
+"Oceanospirillales_Saccharospirillaceae_Oleibacter",
+"Synechococcales_Cyanobiaceae_Prochlorococcus_MIT9313")
+
+emmeans_results_sig %>% left_join(DNA_anova_sig) %>% filter(!variable %in% interaction_family) %>% select(variable) %>%  distinct()
+
 ```
+
+```{r, warning=FALSE}
+DNA_sig_var <- emmeans_results %>% 
+  filter(adj.p.value <0.05) %>% 
+  select(variable) %>% distinct() %>% pull()
+
+graphs_DNA_24h <- DNA_sig_var %>%
+  set_names() %>%
+  map(~ {
+    df <- mobeast_DNA_24h %>% filter(variable == .x)
+    
+    ggplot(df, aes(x = treatment, y = value, fill = treatment)) +
+      geom_violin() +
+      geom_point() +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      stat_summary(color = "yellow", alpha = 0.5) +
+      labs(title = paste("12PM", .x, "Production"),
+           x = "Treatment",
+          y = "Areal Flux (µmol/(s.m2)") +
+      scale_fill_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae", "Inflow"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50", "orange")
+      ) +
+      nunu_theme +
+      theme(legend.position = "none")
+  })
+
+
+```
+
+
+
+
+```{r}
+emmeans_results %>%   
+  mutate(sig = ifelse(adj.p.value<0.05 & estimate < 0, "Enrichment", 
+                                         ifelse(adj.p.value<0.05 & estimate > 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  filter(variable %in% DNA_sig_var)  %>%
+  filter(!variable %in% interaction_family) %>% 
+  mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>% 
+  ggplot()+
+  geom_tile(aes(x= contrast, y= variable, fill = sig), color = "black")+
+  #facet_wrap(.~variable_cat)+
+  labs(title = "24h Contrast (Emmeans): Control vs. Treatment",
+       x= "Treatment",
+       y = " Variables")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw() +
+  theme(legend.position = "top",
+        plot.title = element_text(face = "bold"))# + 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+  
+```
+
+
 
 ### Pairwise comparison 
 
@@ -799,8 +923,12 @@ pairwise_summary <- map_dfr(mobeast_loop, ~ {
 ```
 
 ```{r}
-sig_var <- pairwise_summary %>%  filter(p_value <0.05) %>% select(variable) %>% distinct() %>% pull()
+pairwise_summary %>% filter(p_value <0.05)
+```
 
+
+```{r}
+sig_var <- pairwise_summary %>%  filter(p_value <0.05) %>% select(variable) %>% distinct() %>% pull()
 pairwise_summary %>% mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
                                          ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
   mutate(sig = factor(sig, levels = c("Enrichment","No Difference", "Depletion"))) %>% 
@@ -827,6 +955,86 @@ pairwise_summary %>% mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment",
         strip.background = element_rect(fill = "white"),
         legend.position = "top")
 ```
+
+
+```{r}
+sig_var <- pairwise_summary %>%  filter(p_value <0.05) %>% select(variable) %>% distinct() %>% pull()
+
+pairwise_summary %>% mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
+                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  filter(variable %in% sig_var) %>% 
+  filter(variable != "pro", 
+         variable != "pico_euk",
+         variable != "NO2", 
+         variable != "tn_u_m") %>% 
+  mutate(variable = factor(variable, levels = c(
+    "coble_a","coble_c","coble_m", "m_to_c","bix","hix","fi",
+    "coble_b", "coble_t","fpeak","lignin")),
+    variable = fct_rev(variable)) %>%
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  ggplot()+
+  geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
+  #facet_wrap(.~variable_cat)+
+  labs(title = "Pairwise comparison 12PM vs. 12AM",
+       x= "Treatment",
+       y = " Variables")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+```
+
+```{r}
+sig_fdom <-  pairwise_summary %>%  filter(p_value <0.05) %>% 
+  filter(variable %in% sig_var) %>% 
+  filter(variable != "pro", 
+         variable != "pico_euk",
+         variable != "NO2", 
+         variable != "tn_u_m") %>% select(variable) %>% distinct() %>% pull()
+ 
+```
+
+```{r}
+mobeast_24h %>% 
+  filter(variable %in% sig_fdom) %>% 
+  filter(time_string == "00:00:00"|time_string == "12:00:00") %>% 
+  mutate(variable = factor(variable, levels = c(
+    "coble_a","coble_c","coble_m", "m_to_c","bix","hix","fi",
+    "coble_b", "coble_t","fpeak","lignin"))) %>% 
+  ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
+    geom_violin()+
+    #geom_jitter(aes(color = outlier), alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_grid(variable ~ time_fac, scales = "free")+
+    labs(title = paste("24h fDOM Changes"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Areal Flux (raman unit/(s.m2)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18), 
+          legend.position = "none")
+  
+```
+
+
+
+
+
 
 #### DNA Pairwise
 ```{r}
