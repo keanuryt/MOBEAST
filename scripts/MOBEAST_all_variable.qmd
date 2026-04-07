@@ -197,13 +197,16 @@ mobeast %>% filter(inflow_table != "Endmember", variable == "syn") %>%
   theme(legend.position = "none")
 ```
 
+
+
+
 ```{r}
 # checking the residence time variations 
 resid_time_plot_12PM <- mobeast_flux %>% select(date_time, time_string, treatment, residence_time, flowrate) %>% distinct() %>% 
   group_by(date_time, treatment) %>% 
-  reframe(time_string, avg_flow = mean(residence_time, na.rm = TRUE)) %>% 
+  reframe(time_string, avg_flow = mean(flowrate, na.rm = TRUE)) %>% 
   ungroup() %>% 
-  filter(time_string =="12:00:00") %>% 
+  #filter(time_string =="12:00:00") %>% 
   ggplot(aes(x= date_time, y = avg_flow, color = treatment))+
   geom_point()+
   geom_line(aes(group= treatment))+
@@ -263,10 +266,45 @@ mobeast_12PM <- mobeast_flux %>%
   
   ## remove the outliers 
   filter(outlier == "not outlier") 
+
+
+
+```
+### Summary stats
+
+```{r}
+mobeast_12PM %>% group_by(variable,treatment) %>% 
+  reframe(max = max(areal_flux, na.rm = TRUE),
+          min = min(areal_flux, na.rm = TRUE),
+    mean = mean(areal_flux, na.rm = TRUE),
+          sd = sd(areal_flux, na.rm = TRUE))
 ```
 
+```{r}
+## removing the calculated outliers from the areal flux numbers 
+mobeast_12PM %>% group_by(treatment, variable) %>% 
+  mutate(mean = mean(areal_flux, na.rm = TRUE),
+    sd = sd(areal_flux, na.rm = TRUE)) %>% 
+  mutate(flux_outlier = ifelse(areal_flux > mean +2*sd | areal_flux < mean -2*sd,"outlier", "not outlier")) %>% 
+  filter(variable == "het_bact") %>% 
+  filter(flux_outlier != "outlier") %>% 
+  ggplot(aes(x = treatment, y = areal_flux, fill = treatment)) +
+      geom_violin() +
+      geom_point() +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      stat_summary(color = "yellow", alpha = 0.5) +
+      labs(title = paste("12PM Heterotrophic Bacteria Production"),
+           x = "Treatment",
+          y = "Areal Flux (indiv/(s.m2)") +
+      scale_fill_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
+      ) +
+      nunu_theme +
+      theme(legend.position = "none")
+```
 
-### Biogeochem - Iterative  coding 
+### Lmer models  - Iterative  coding 
 
 ```{r}
 # Loop Function:
@@ -288,7 +326,7 @@ for (var in mobeast_loop) {
 
 ```
 
-
+#### singularity test 
 ```{r}
 ## check if the model soliution is singular and/or converges
 models <- mobeast_12PM %>% group_by(variable) %>%
@@ -304,7 +342,7 @@ models <- mobeast_12PM %>% group_by(variable) %>%
   ungroup() %>% filter(singular == TRUE)
 ```
 
-
+#### model results (fixed/random)
 ```{r}
 # save the outputs of the model in a dataframe (fixed and random effects)
 results <- imap_dfr(models_12PM, ~ tidy(.x) %>%
@@ -312,7 +350,7 @@ results <- imap_dfr(models_12PM, ~ tidy(.x) %>%
   relocate(variable, .before = "effect")
 ```
 
-
+#### ANOVA results
 ```{r, warning= FALSE}
 # So many Warnings! 
 ## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
@@ -337,7 +375,7 @@ test_12PM_mod <- lmer(areal_flux ~ treatment + (1|tank_number), data = test_12PM
 anova(test_12PM_mod, type = 2)
 ```
 
-
+#### emmeans results 
 ```{r}
 # "estimate" are negative somehow. Why? 
 ## in manual models for DOC, estimate >0, here it's <0
@@ -389,8 +427,150 @@ mobeast_12PM %>% filter(variable %in% emmean_sig) %>%
     theme(axis.text = element_text(size = 18))
 ```
 
+### Lmer flux outliers 
+```{r}
+## removing the calculated outliers from the areal flux numbers 
+mobeast_12PM_flux <- mobeast_12PM %>% group_by(treatment, variable) %>% 
+  mutate(mean = mean(areal_flux, na.rm = TRUE),
+    sd = sd(areal_flux, na.rm = TRUE)) %>% 
+  mutate(flux_outlier = ifelse(areal_flux > mean +2*sd | areal_flux < mean -2*sd,"outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  filter(flux_outlier != "outlier")
+```
 
-####  t-test
+
+#### Lmer models  - Iterative  coding 
+
+```{r}
+# Loop Function:
+## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+mobeast_loop <- mobeast_12PM_flux %>% select(variable) %>% distinct() %>% pull()
+
+models_12PM_2 <- vector(mode = "list", length = length(mobeast_loop))
+names(models_12PM_2) <- mobeast_loop
+
+for (var in mobeast_loop) {
+  df <- mobeast_12PM_flux %>% filter(variable == var)
+  models_12PM_2[[var]] <- lmer(areal_flux~ treatment + (1|tank_number), data = df)
+
+}
+
+```
+
+#### singularity test
+```{}
+## check if the model soliution is singular and/or converges
+models <- mobeast_12PM %>% group_by(variable) %>%
+  group_modify(~ {
+    mod <- lmer(areal_flux ~ treatment + (1|tank_number), data = .x)
+
+    tibble(
+      model = list(mod),
+      singular = isSingular(mod),
+      converged = is.null(mod@optinfo$conv$lme4$messages)
+    )
+  }) %>%
+  ungroup() %>% filter(singular == TRUE)
+```
+
+#### model results 
+```{r}
+# save the outputs of the model in a dataframe (fixed and random effects)
+results <- imap_dfr(models_12PM, ~ tidy(.x) %>%
+                     dplyr::mutate(variable = .y)) %>% 
+  relocate(variable, .before = "effect")
+```
+
+##### model verification
+```{r}
+DOC_12PM_flux <- mobeast_12PM_flux %>%  filter(variable == "npoc_u_m")
+
+mod_DOC_12_flux <- lmer(areal_flux ~ treatment + (1|tank_number), data = DOC_12PM_flux)
+
+anova(mod_DOC_12_flux, type = 2)
+
+emmeans(mod_DOC_12_flux, specs = pairwise ~ treatment)
+```
+
+
+#### ANOVA results 
+```{r, warning= FALSE}
+# So many Warnings! 
+## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
+
+# run anova on the models 
+anova_results <- imap_dfr(models_12PM_2, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+## which variables have significant anova results
+anova_results %>% filter(p.value <0.05)
+# tot-bact, syn, fpeak and npoc are significant. 
+```
+
+
+#### Emmeans results 
+```{r}
+# "estimate" are negative somehow. Why? 
+## in manual models for DOC, estimate >0, here it's <0
+## t.ratio in "statistics", and negative instead of positive
+## p.values not shown, only p.adjusted. 
+emmeans_results <- imap_dfr(models_12PM_2, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
+
+
+emmeans_results_sig <- emmeans_results %>% 
+  filter(adj.p.value <0.05)
+
+emmeans_results
+emmeans_results_sig # there are no significant variables....
+```
+
+```{}
+## making sure that the code produces accurate outputs
+emmeans(test_12PM_mod,specs = trt.vs.ctrl ~ treatment)
+```
+
+#### Graphing the significant variables
+```{r}
+emmean_sig <- emmeans_results_sig %>% pull(variable)
+```
+
+```{, warning=FALSE}
+mobeast_12PM %>% filter(variable %in% emmean_sig) %>% 
+  #filter(variable == "SiO2") %>% 
+  ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
+    geom_violin()+
+    geom_jitter(aes(color = outlier), alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap(~variable, scales = "free")+
+    labs(title = paste("12PM Biogeochem Changes"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Flux XXX")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18))
+```
+
+
+
+
+###  T-test
 ```{r}
 # We are testing if the average of the treatments at 12PM is significantly different to 0
 ## H0 : mean of treatments is equal to 0
@@ -410,6 +590,7 @@ sig_var_12PM <- t_test_12PM %>%
 # p<0.05, reject the null hypothesis, the difference in mean is not due to chance
 ```
 
+#### Graphing variables with significant results
 ```{r, warning=FALSE}
 
 graphs_12PM <- sig_var_12PM %>%
@@ -436,9 +617,10 @@ graphs_12PM <- sig_var_12PM %>%
 graphs_12PM[["m_to_c"]] / graphs_12PM[["bix"]] / graphs_12PM[["hix"]]/ graphs_12PM[["coble_b"]] + plot_layout(axes = "collect")
 
 graphs_12PM[["syn"]]+ labs(y = "Areal Flux (indiv/(s.m2))")
-
+graphs_12PM[["het_bact"]]+ labs(title = "12PM Heterotrophic bacteria production", y = "Areal Flux (indiv/(s.m2))")
 
 ```
+
 ##### Clean Plots for t-test results
 
 ```{r}
@@ -466,6 +648,83 @@ t_test_12PM %>%  left_join(variable_meta) %>%  filter(variable_cat == "fDOM") %>
 ```
 
 
+###  T-test flux outliers 
+```{r}
+# We are testing if the average of the treatments at 12PM is significantly different to 0
+## H0 : mean of treatments is equal to 0
+## HA: mean is different from 0 
+t_test_12PM <- mobeast_12PM_flux %>%
+  group_by(variable, treatment) %>%
+  summarize(
+    t_test = list(t.test(areal_flux, mu = 0)),
+    mean = t_test[[1]]$estimate,
+    p_value = t_test[[1]]$p.value
+  ) %>% ungroup()
+
+sig_var_12PM <- t_test_12PM %>% 
+  filter(p_value <0.05) %>%  
+  select(variable) %>% distinct() %>% pull()
+
+# p<0.05, reject the null hypothesis, the difference in mean is not due to chance
+```
+
+```{r, warning=FALSE}
+
+graphs_12PM <- sig_var_12PM %>%
+  set_names() %>%
+  map(~ {
+    df <- mobeast_12PM_flux %>% filter(variable == .x)
+    
+    ggplot(df, aes(x = treatment, y = areal_flux, fill = treatment)) +
+      geom_violin() +
+      geom_point() +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      stat_summary(color = "yellow", alpha = 0.5) +
+      labs(title = paste("12PM", .x, "Production"),
+           x = "Treatment",
+          y = "Areal Flux (µmol/(s.m2)") +
+      scale_fill_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
+      ) +
+      nunu_theme +
+      theme(legend.position = "none")
+  })
+
+#graphs_12PM[["m_to_c"]] / graphs_12PM[["bix"]] / graphs_12PM[["hix"]]/ #graphs_12PM[["coble_b"]] + plot_layout(axes = "collect")
+
+#graphs_12PM[["syn"]]+ labs(y = "Areal Flux (indiv/(s.m2))")
+graphs_12PM[["het_bact"]]+ labs(title = "12PM Heterotrophic bacteria production", y = "Areal Flux (indiv/(s.m2))")
+
+graphs_12PM[["npoc_u_m"]]
+```
+
+
+##### Clean Plots for t-test results
+
+```{r}
+variable_meta <- mobeast_12PM_flux %>% 
+  select(variable, variable_cat) %>%  distinct()
+
+variable_meta %>% select(variable_cat) %>%  distinct()
+t_test_12PM %>%  left_join(variable_meta) %>%  #filter(variable_cat == "fDOM") %>% 
+  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
+                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>%
+  arrange(variable_cat, variable) %>%
+  mutate(variable = factor(variable, levels = unique(variable))) %>% 
+  
+  ggplot(aes(x= treatment, y= variable, fill = sig))+
+  geom_tile(color = "black")+
+  facet_grid(variable_cat ~ ., scales = "free_y", space = "free_y")+
+  labs(title = "fDOM Enrichment and Depletion Pattern (p-value) ")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()
+  
+```
 
 
 
@@ -483,24 +742,50 @@ mobeast_24h <- mobeast_flux %>%
   filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
                                                    "00:00:00","06:00:00"))) 
-DOC_24h <- mobeast_24h %>% 
-  filter(variable != "npoc_u_m") %>% 
+DOC_24h <- mobeast_flux %>%
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  filter(!is.na(id_number)) %>% 
+  # remove the the DOC data because something happened  at 00:00. 
+  filter(variable == "npoc_u_m") %>%  
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                   "00:00:00","06:00:00"))) %>% 
   filter(time_string != "00:00:00") 
 ```
 
+### Summary Stats 
+```{r}
+mobeast_flux %>%
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  filter(!is.na(id_number)) %>% 
+  # remove the the DOC data because something happened  at 00:00. 
+  #filter(variable == "npoc_u_m") %>%  
+  ## remove the outliers 
+  filter(outlier == "not outlier") %>% 
+  group_by(variable,time_string, treatment ) %>% 
+  reframe(max = max(areal_flux, na.rm = TRUE),
+          min = min(areal_flux, na.rm = TRUE),
+    mean = mean(areal_flux, na.rm = TRUE),
+          sd = sd(areal_flux, na.rm = TRUE)) %>% 
+  filter(variable == "npoc_u_m") %>%  
+  arrange(mean)
+```
+
+### Data verifications
 ```{r}
 # chekcing out the residence time variation over 24h 
 resid_time_plot_24h <- mobeast_24h %>% select(date_time, time_string, treatment, residence_time, flowrate) %>% distinct() %>% 
   group_by(date_time, treatment) %>% 
-  reframe(time_string, avg_flow = mean(residence_time, na.rm = TRUE)) %>% 
+  reframe(time_string, avg_flow = mean(flowrate, na.rm = TRUE)) %>% 
   ungroup() %>% 
 
   ggplot(aes(x= date_time, y = avg_flow, color = treatment))+
   geom_point()+
   geom_line(aes(group= treatment))+
-  labs(title = "Avg Residence Time",
+  labs(title = "Avg Flow Rate",
        x= "date time",
-       y = "avg residence time (h)")+
+       y = "avg flow rate")+
   scale_color_manual(values = treatment_colors)+ theme_bw()
 resid_time_plot_24h
 ```
@@ -526,7 +811,7 @@ resid_time_plot_24h + flux_24h_plot
 ```
 
 
-### Biogeochem - Iterative  coding 
+### LMER models
 
 ```{r}
 # Loop Function:
@@ -552,7 +837,7 @@ DOC_24h_mod <- lmer(areal_flux~ treatment*time_fac + (1|tank_number), data = DOC
 
 ```
 
-
+#### model results (fixed and random)
 ```{r}
 results <- imap_dfr(models_24h, ~ tidy(.x) %>%
                      dplyr::mutate(variable = .y)) %>% 
@@ -563,7 +848,7 @@ DOC_24h_results <- tidy(DOC_24h_mod) %>% mutate(variable = "npoc_u_m") %>% reloc
 results <- rbind(results, DOC_24h_results)
 ```
 
-
+#### ANOVA results
 ```{r, warning= FALSE}
 # So many Warnings! 
 ## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
@@ -581,6 +866,7 @@ anova_results <- rbind(anova_results, DOC_anova)
 anova_results %>% filter(p.value <0.05) 
 ```
 
+#### emmeans results
 ```{r}
 # "estimate" are negative somehow. Why? 
 ## in manual models for DOC, estimate >0, here it's <0
@@ -606,19 +892,11 @@ emmeans_results <- rbind(emmeans_results, DOC_emmeans)
 ```{r}
 emmeans_results_sig <- emmeans_results %>% 
   filter(adj.p.value <0.05)
-```
-
-
-```{r}
 emmean_sig <- emmeans_results_sig %>% pull(variable)
 ```
 
 
-```{r}
-mobeast_24h %>% filter(variable_cat== "fDOM") %>%  select(variable) %>%  distinct()
-```
-
-
+##### Violin plots
 ```{r, warning=FALSE}
 mobeast_24h %>% 
   filter(variable == "syn") %>% 
@@ -641,28 +919,129 @@ mobeast_24h %>%
           legend.position = "none")
 ```
 
+
+### Lmer Flux outliers 
+
+```{r}
+mobeast_24h_flux <- mobeast_24h %>%  group_by(treatment, variable) %>% 
+  mutate(mean = mean(areal_flux, na.rm = TRUE),
+    sd = sd(areal_flux, na.rm = TRUE)) %>% 
+  mutate(flux_outlier = ifelse(areal_flux > mean +2*sd | areal_flux < mean -2*sd,"outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  filter(flux_outlier != "outlier")
+
+DOC_24h_flux <- DOC_24h %>%  group_by(treatment, variable) %>% 
+  mutate(mean = mean(areal_flux, na.rm = TRUE),
+    sd = sd(areal_flux, na.rm = TRUE)) %>% 
+  mutate(flux_outlier = ifelse(areal_flux > mean +2*sd | areal_flux < mean -2*sd,"outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  filter(flux_outlier != "outlier")
+```
+
+```{r}
+# Loop Function:
+## Take the 24h samples and isolate the types of nutrient  present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+mobeast_loop <- mobeast_24h_flux %>% select(variable) %>% distinct() %>% pull()
+
+models_24h_flux <- vector(mode = "list", length = length(mobeast_loop))
+names(models_24h_flux) <- mobeast_loop
+
+
+for (var in mobeast_loop) {
+  df <- mobeast_24h_flux %>% filter(variable == var)
+  models_24h_flux[[var]] <- lmer(areal_flux~ treatment*time_fac + (1|tank_number), data = df)
+}
+
+
+## separate model for DOC because 00:00 removed 
+DOC_24h_mod_flux <- lmer(areal_flux~ treatment*time_fac + (1|tank_number), data = DOC_24h_flux)
+
+```
+
+#### model results (fixed and random)
+```{r}
+results <- imap_dfr(models_24h_flux, ~ tidy(.x) %>%
+                     dplyr::mutate(variable = .y)) %>% 
+  relocate(variable, .before = "effect")
+
+DOC_24h_results <- tidy(DOC_24h_mod_flux) %>% mutate(variable = "npoc_u_m") %>% relocate(variable, .before = "effect")
+
+results <- rbind(results, DOC_24h_results)
+```
+
+#### ANOVA results
+```{r, warning= FALSE}
+# So many Warnings! 
+## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
+
+anova_results <- imap_dfr(models_24h_flux, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+DOC_anova <- anova(DOC_24h_mod_flux, type = 2) %>%  tidy() %>% mutate(variable = "npoc_u_m") %>% relocate(variable, .before = "term")
+
+anova_results <- rbind(anova_results, DOC_anova)
+
+anova_results %>% filter(p.value <0.05) 
+```
+
+#### emmeans results
+```{r}
+# "estimate" are negative somehow. Why? 
+## in manual models for DOC, estimate >0, here it's <0
+## t.ratio in "statistics", and negative instead of positive
+## p.values not shown, only p.adjusted. 
+emmeans_results <- imap_dfr(models_24h_flux, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
+
+DOC_emmeans <- emmeans(DOC_24h_mod_flux, spec= pairwise ~ treatment)$contrast %>% 
+  tidy() %>% 
+  mutate(variable = "npoc_u_m") %>% 
+  relocate(variable, .before = "term") %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
+
+emmeans_results <- rbind(emmeans_results, DOC_emmeans)
+
+```
+
+```{r}
+emmeans_results_sig <- emmeans_results %>% 
+  filter(adj.p.value <0.05)
+emmean_sig <- emmeans_results_sig %>% select(variable) %>% 
+  distinct() %>% pull(variable)
+```
+##### Violin plots
 ```{r, warning=FALSE}
-mobeast_24h %>% 
-  filter(variable == "SiO2") %>% 
+mobeast_24h_flux %>% 
+  filter(variable == "chla_conc") %>% 
   ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
     geom_violin()+
     #geom_jitter(aes(color = outlier), alpha = 0.5)+
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
-    facet_wrap( ~ time_fac, nrow = 1)+
-    labs(title = paste("24h SiO2 Changes"),
+    facet_wrap( .~ time_fac, ncol = 4 )+
+    labs(title = paste("24h Synechococcus Changes"),
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
-       y = "Areal Flux (µmol/(s.m2)")+
+       y = "Areal Flux (indiv/(s.m2)")+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   scale_color_manual(breaks = c("outlier", "not outlier"), 
                        values=c("red", "black"))+
     nunu_theme + 
-    theme(axis.text = element_text(size = 18), 
+    theme(axis.text = element_text(size = 18),
           legend.position = "none")
 ```
-
 
 ### DNA 
 
@@ -720,6 +1099,8 @@ anova_results <- imap_dfr(models_DNA_24h, ~ {
   relocate(variable) 
 
 DNA_anova_sig <- anova_results %>% filter(p.value <0.05) %>% select(variable, anova_term = term, anova_p_val = p.value)
+
+
 ```
 
 ```{r}
@@ -747,9 +1128,23 @@ interaction_family <- c("Francisellales_Francisellaceae_Francisella",
 "Oceanospirillales_Saccharospirillaceae_Oleibacter",
 "Synechococcales_Cyanobiaceae_Prochlorococcus_MIT9313")
 
-emmeans_results_sig %>% left_join(DNA_anova_sig) %>% filter(!variable %in% interaction_family) %>% select(variable) %>%  distinct()
+emmeans_results_sig %>% left_join(DNA_anova_sig) %>% filter(!variable %in% interaction_family) %>% select(variable) %>%  distinct() %>% pull()
 
 ```
+
+```{r}
+DNA_anova_sig %>% filter(!variable %in% interaction_family,
+                         anova_p_val <0.05, 
+                         anova_term == "treatment") %>% 
+  select(variable) %>% distinct()
+
+DNA_anova_sig %>% filter(!variable %in% interaction_family,
+                         anova_p_val <0.05, 
+                         anova_term == "treatment") %>% 
+  select(variable) %>% distinct()
+```
+
+
 
 ```{r, warning=FALSE}
 DNA_sig_var <- emmeans_results %>% 
@@ -790,7 +1185,7 @@ emmeans_results %>%
   mutate(sig = factor(sig, 
                       levels = c("Enrichment","No Difference", "Depletion"))) %>% 
   filter(variable %in% DNA_sig_var)  %>%
-  filter(!variable %in% interaction_family) %>% 
+  filter(variable %in% interaction_family) %>% 
   mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>% 
   ggplot()+
   geom_tile(aes(x= contrast, y= variable, fill = sig), color = "black")+
@@ -903,6 +1298,7 @@ return(pairwise_results)
 
 ```
 
+#### Results just fluxes
 
 ```{r}
 # Loop Function:
@@ -926,18 +1322,34 @@ pairwise_summary <- map_dfr(mobeast_loop, ~ {
 pairwise_summary %>% filter(p_value <0.05)
 ```
 
+```{r}
+nunu_pairwise(DOC_24h, type = "npoc_u_m",time_point = 6)
+
+```
+
+
 
 ```{r}
+variable_meta <- mobeast_24h %>% 
+  select(variable, variable_cat) %>%  distinct()
+
 sig_var <- pairwise_summary %>%  filter(p_value <0.05) %>% select(variable) %>% distinct() %>% pull()
-pairwise_summary %>% mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
+
+pairwise_summary %>% 
+  right_join(variable_meta) %>% 
+  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
                                          ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
-  mutate(sig = factor(sig, levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  arrange(variable_cat, variable) %>%
+  mutate(variable = factor(variable, levels = unique(variable))) %>%
   filter(variable %in% sig_var) %>% filter(variable != "NO2", 
                                            variable != "tn_u_m") %>% 
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
   ggplot()+
   geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
   #facet_wrap(.~variable_cat)+
+  facet_grid(variable_cat ~ ., scales = "free_y", space = "free_y")+
   labs(title = "Pairwise comparison 12AM-12PM",
        x= "Treatment",
        y = " Variables")+
@@ -1033,90 +1445,105 @@ mobeast_24h %>%
 
 
 
+#### Results outlier fluxes
 
+
+```{r}
+# Loop Function:
+
+mobeast_loop <- mobeast_24h_flux %>% select(variable) %>% distinct() %>% pull()
+
+pairwise_summary <- map_dfr(mobeast_loop, ~ {
+  
+  nunu_pairwise(
+    data = mobeast_24h,
+    time_point = 12,
+    type = .x
+  ) %>%
+    dplyr::mutate(variable = .x)
+  
+})
+
+```
+
+
+```{r}
+pairwise_summary %>% filter(p_value <0.05)
+```
+
+```{r}
+nunu_pairwise(DOC_24h_flux, type = "npoc_u_m",time_point = 6)
+
+DOC_24h_flux %>% 
+  ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
+    geom_violin()+
+    #geom_jitter(aes(color = outlier), alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap( .~ time_fac, ncol = 4 )+
+    labs(title = paste("24h DOC Changes"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "Areal Flux (indiv/(s.m2)")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18),
+          legend.position = "none")
+
+```
+
+
+
+```{r}
+## Note: There are no differences in the pattern of the heatmap with/without the calculated outliers 
+
+variable_meta <- mobeast_24h_flux %>% 
+  select(variable, variable_cat) %>%  distinct()
+
+sig_var <- pairwise_summary %>%  filter(p_value <0.05) %>% select(variable) %>% distinct() %>% pull()
+
+pairwise_summary %>% 
+  right_join(variable_meta) %>% 
+  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
+                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  arrange(variable_cat, variable) %>%
+  mutate(variable = factor(variable, levels = unique(variable))) %>%
+  filter(variable %in% sig_var) %>% filter(variable != "NO2", 
+                                           variable != "tn_u_m") %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  ggplot()+
+  geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
+  #facet_wrap(.~variable_cat)+
+  facet_grid(variable_cat ~ ., scales = "free_y", space = "free_y")+
+  labs(title = "Pairwise comparison 12AM-12PM",
+       x= "Treatment",
+       y = " Variables")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+
+
+```
 
 
 #### DNA Pairwise
-```{r}
-nunu_pairwise <- function(data, type = "coble_a", time_point = 6, value= areal_flux){
 
-  ## Get a list of the treatments for the for loop   
-  treatment <- data %>% mutate(treatment = as.character(treatment)) %>%
-  select(treatment) %>%  distinct() %>% pull()
-  
-  ## Create un empty data frame
-pairwise_results <- tibble(
-  time_point = vector(),
-  treatment= vector(),
-  mean = vector(),
-  p_value = vector())
-
-# this is the pairwise comparison for the 6 pairs (6AM-6PM)
-  if(time_point == 6){
-    for(var in treatment){
-      
-      ## only keep the 6AM and 6PM
-      df <- data %>% 
-        filter(variable == type) %>% 
-        filter(treatment == var) %>% 
-  filter(time_string == "18:00:00" | time_string == "06:00:00") %>% 
-        ## Rename the times so they can become column names
-  mutate(time_US = ifelse(time_string == "18:00:00", "T18", "T06")) %>% 
-        ## Only keep the column of interest for the stats
-  select(tank_number, time_US, value) %>% 
-  pivot_wider(names_from = time_US, values_from = value) 
-      
-      ## Pairwise function 
-      paired <- t.test(df$T18, df$T06, paired = TRUE, na.action = na.pass)
-      
-      ## Save the result in at data frame
-      df2 <- tibble(
-        time_point = "06AM-06PM",
-        variable = type,
-        treatment = var,
-        mean = paired$estimate, 
-        p_value = paired$p.value)
-      
-      # Code will loop oveer all treatments and save the results in a data frame
-      pairwise_results <-rbind(pairwise_results,df2)
-      
-      # Save the results in RStudio
-      pairwise_results <<- pairwise_results
-    }  
-  
-
-# This is for the 12 samples (12AM-12PM)
-  }else if(time_point == 12){
-    for(var in treatment){
-      
-      ## Same as before but for the 12AM-12PM
-      df <- data %>% 
-        filter(variable == type) %>% 
-        filter(treatment == var) %>% 
-  filter(time_string == "12:00:00" | time_string == "00:00:00") %>% 
-  mutate(time_US = ifelse(time_string == "12:00:00", "T12", "T00")) %>% 
-  select(tank_number, time_US, value) %>% 
-  pivot_wider(names_from = time_US, values_from = value) 
-      
-      paired <- t.test(df$T12, df$T00, paired = TRUE, na.action = na.pass)
-      
-      df2 <- tibble(
-        time_point = "12AM-12PM",
-        variable = type,
-        treatment = var,
-        mean = paired$estimate, 
-        p_value = paired$p.value)
-      
-      pairwise_results <- rbind(pairwise_results, df2)
-      pairwise_results <<- pairwise_results
-    }
-}
-
-# Display the results of the code 
-return(pairwise_results)
-}
-
-```
 
 ```{r}
 # Loop Function:
@@ -1138,3 +1565,43 @@ pairwise_summary <- map_dfr(mobeast_loop, ~ {
 })
 
 ```
+
+```{r}
+sig_var <- pairwise_summary %>% filter(p_value <0.05) %>% 
+  select(variable) %>% distinct() %>% pull()
+```
+
+```{r}
+pairwise_summary %>% 
+  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
+                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  #mutate(variable = factor(variable, levels = unique(variable))) %>%
+  filter(variable %in% sig_var) %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  ggplot()+
+  geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
+  #facet_grid(variable_cat ~ ., scales = "free_y", space = "free_y")+
+  labs(title = "Pairwise comparison 12AM-12PM",
+       x= "Treatment",
+       y = " Variables")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()
+
++ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+```
+
+
