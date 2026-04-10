@@ -329,6 +329,7 @@ ht_drawn <- draw(ht)
 #dev.off()
 
 ```
+
 ### Cluster membership
 
 ```{r}

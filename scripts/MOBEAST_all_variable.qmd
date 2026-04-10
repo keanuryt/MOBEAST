@@ -82,12 +82,18 @@ mobeast_flagged <- mobeast %>%
   mutate(time_string = as.character(time_string),
               date_string = as.character(date_string),
               date_time_string = paste(date_string,time_string))%>% 
+  filter(!is.na(id_number)) %>% 
   # remove the DNA data because they should be treated differently
   filter(variable_cat != "DNA" ) %>% 
+  filter(treatment != "Rain") %>% 
+  filter(treatment != "Endmember") %>% 
+  
+  ## remove DOC values greater than 208
+  #mutate(value = ifelse(variable == "npoc_u_m" & value >208, NA , value)) %>%
 
   # flagging outliers
   ## grouping by treatment, variable 
-  group_by(treatment, variable) %>% 
+  group_by(variable) %>% 
   ## get the mean and the sd to calculate mean +/- 2sd
   mutate(mean =mean(value, na.rm = T), 
          stand_dev = sd(value, na.rm = T)) %>% 
@@ -116,9 +122,6 @@ tank_vol = 10 # liters
 ```{r}
 
 mobeast_flux <- mobeast_flagged %>%  
-  
-  filter(treatment != "Rain") %>% 
-  filter(treatment != "Endmember") %>% 
   
 # Isolate inflow for each date_time and table
   group_by(date_time, inflow_table, variable) %>%
@@ -240,6 +243,30 @@ flux_12PM_plot
 ```{r}
 resid_time_plot_12PM +flux_12PM_plot
 ```
+
+```{r}
+mobeast_flux %>% #select(tank_number, inflow_table) %>% 
+  filter(tank_number == "T8" | tank_number == "T1", 
+         inflow_table == "Table 1")
+
+mobeast_flagged %>% mutate(time_string = as.character(time_string)) %>% 
+  #filter(#treatment == "Inflow", 
+         #variable == "NH3") %>%  
+  select(id_number, treatment, tank_number,inflow_table, time_string, flowrate,
+         value, variable) %>% 
+  filter(!is.na(id_number), 
+         inflow_table != "Environmental data", 
+         inflow_table != "Endmember", 
+         time_string == "06:00:00") %>% 
+  ggplot(aes(x= flowrate, value))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  facet_wrap(.~variable, scales = "free")
+
+
+```
+
+
 
 ### DNA data 
 ```{r}
@@ -430,12 +457,13 @@ mobeast_12PM %>% filter(variable %in% emmean_sig) %>%
 ### Lmer flux outliers 
 ```{r}
 ## removing the calculated outliers from the areal flux numbers 
-mobeast_12PM_flux <- mobeast_12PM %>% group_by(treatment, variable) %>% 
+mobeast_12PM_flux <- mobeast_12PM %>% group_by(variable) %>% 
   mutate(mean = mean(areal_flux, na.rm = TRUE),
     sd = sd(areal_flux, na.rm = TRUE)) %>% 
   mutate(flux_outlier = ifelse(areal_flux > mean +2*sd | areal_flux < mean -2*sd,"outlier", "not outlier")) %>% 
   ungroup() %>% 
-  filter(flux_outlier != "outlier")
+  filter(flux_outlier != "outlier") 
+  
 ```
 
 
@@ -576,7 +604,7 @@ mobeast_12PM %>% filter(variable %in% emmean_sig) %>%
 ## H0 : mean of treatments is equal to 0
 ## HA: mean is different from 0 
 t_test_12PM <- mobeast_12PM %>%
-  group_by(treatment, variable) %>%
+  group_by(variable, treatment) %>%
   summarize(
     t_test = list(t.test(areal_flux, mu = 0)),
     mean = t_test[[1]]$estimate,
@@ -653,7 +681,7 @@ t_test_12PM %>%  left_join(variable_meta) %>%  filter(variable_cat == "fDOM") %>
 # We are testing if the average of the treatments at 12PM is significantly different to 0
 ## H0 : mean of treatments is equal to 0
 ## HA: mean is different from 0 
-t_test_12PM <- mobeast_12PM_flux %>%
+t_test_12PM <- mobeast_12PM_flux %>% filter(flux_outlier != "outlier") %>% 
   group_by(variable, treatment) %>%
   summarize(
     t_test = list(t.test(areal_flux, mu = 0)),
@@ -693,10 +721,10 @@ graphs_12PM <- sig_var_12PM %>%
 
 #graphs_12PM[["m_to_c"]] / graphs_12PM[["bix"]] / graphs_12PM[["hix"]]/ #graphs_12PM[["coble_b"]] + plot_layout(axes = "collect")
 
-#graphs_12PM[["syn"]]+ labs(y = "Areal Flux (indiv/(s.m2))")
-graphs_12PM[["het_bact"]]+ labs(title = "12PM Heterotrophic bacteria production", y = "Areal Flux (indiv/(s.m2))")
+graphs_12PM[["syn"]] +graphs_12PM[["pro"]]+ graphs_12PM[["het_bact"]] + labs(y = "Areal Flux (indiv/(s.m2))")
+#graphs_12PM[["het_bact"]]+ labs(title = "12PM Heterotrophic bacteria production", y = "Areal Flux (indiv/(s.m2))")
 
-graphs_12PM[["npoc_u_m"]]
+#graphs_12PM[["npoc_u_m"]]
 ```
 
 
@@ -923,14 +951,14 @@ mobeast_24h %>%
 ### Lmer Flux outliers 
 
 ```{r}
-mobeast_24h_flux <- mobeast_24h %>%  group_by(treatment, variable) %>% 
+mobeast_24h_flux <- mobeast_24h %>%  group_by( variable) %>% 
   mutate(mean = mean(areal_flux, na.rm = TRUE),
     sd = sd(areal_flux, na.rm = TRUE)) %>% 
   mutate(flux_outlier = ifelse(areal_flux > mean +2*sd | areal_flux < mean -2*sd,"outlier", "not outlier")) %>% 
   ungroup() %>% 
   filter(flux_outlier != "outlier")
 
-DOC_24h_flux <- DOC_24h %>%  group_by(treatment, variable) %>% 
+DOC_24h_flux <- DOC_24h %>%  group_by( variable) %>% 
   mutate(mean = mean(areal_flux, na.rm = TRUE),
     sd = sd(areal_flux, na.rm = TRUE)) %>% 
   mutate(flux_outlier = ifelse(areal_flux > mean +2*sd | areal_flux < mean -2*sd,"outlier", "not outlier")) %>% 
@@ -989,6 +1017,15 @@ DOC_anova <- anova(DOC_24h_mod_flux, type = 2) %>%  tidy() %>% mutate(variable =
 anova_results <- rbind(anova_results, DOC_anova)
 
 anova_results %>% filter(p.value <0.05) 
+
+sig_anova_flux_var <- anova_results %>% filter(p.value <0.05) %>% 
+  group_by(variable) %>% 
+  filter(
+    !(all(c("time_fac", "treatment:time_fac") %in% term))
+  ) %>% 
+  ungroup() %>% 
+  filter(term == "treatment", variable != "tot_bact") %>% 
+   select(variable) %>% distinct() %>% pull()
 ```
 
 #### emmeans results
@@ -1015,15 +1052,16 @@ emmeans_results <- rbind(emmeans_results, DOC_emmeans)
 ```
 
 ```{r}
-emmeans_results_sig <- emmeans_results %>% 
-  filter(adj.p.value <0.05)
+emmeans_results_sig <- emmeans_results %>% filter(variable %in% sig_anova_flux_var) %>% 
+  filter(adj.p.value <0.05) %>% 
+  select(variable, term, contrast,estimate, adj.p.value)
 emmean_sig <- emmeans_results_sig %>% select(variable) %>% 
   distinct() %>% pull(variable)
 ```
 ##### Violin plots
 ```{r, warning=FALSE}
 mobeast_24h_flux %>% 
-  filter(variable == "chla_conc") %>% 
+  filter(variable == "het_bact") %>% 
   ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
     geom_violin()+
     #geom_jitter(aes(color = outlier), alpha = 0.5)+
@@ -1544,8 +1582,92 @@ pairwise_summary %>%
 
 #### DNA Pairwise
 
+```{r}
+
+## modified function for DNA 
+nunu_pairwise <- function(data, type = "coble_a", time_point = 6, value= areal_flux){
+
+  ## Get a list of the treatments for the for loop   
+  treatment <- data %>% mutate(treatment = as.character(treatment)) %>%
+  select(treatment) %>%  distinct() %>% pull()
+  
+  ## Create un empty data frame
+pairwise_results <- tibble(
+  time_point = vector(),
+  treatment= vector(),
+  mean = vector(),
+  p_value = vector())
+
+# this is the pairwise comparison for the 6 pairs (6AM-6PM)
+  if(time_point == 6){
+    for(var in treatment){
+      
+      ## only keep the 6AM and 6PM
+      df <- data %>% 
+        filter(variable == type) %>% 
+        filter(treatment == var) %>% 
+  filter(time_string == "18:00:00" | time_string == "06:00:00") %>% 
+        ## Rename the times so they can become column names
+  mutate(time_US = ifelse(time_string == "18:00:00", "T18", "T06")) %>% 
+        ## Only keep the column of interest for the stats
+  select(tank_number, time_US, value) %>% 
+  pivot_wider(names_from = time_US, values_from = value) 
+      
+      ## Pairwise function 
+      paired <- t.test(df$T18, df$T06, paired = TRUE, na.action = na.pass)
+      
+      ## Save the result in at data frame
+      df2 <- tibble(
+        time_point = "06AM-06PM",
+        variable = type,
+        treatment = var,
+        mean = paired$estimate, 
+        p_value = paired$p.value)
+      
+      # Code will loop oveer all treatments and save the results in a data frame
+      pairwise_results <-rbind(pairwise_results,df2)
+      
+      # Save the results in RStudio
+      pairwise_results <<- pairwise_results
+    }  
+  
+
+# This is for the 12 samples (12AM-12PM)
+  }else if(time_point == 12){
+    for(var in treatment){
+      
+      ## Same as before but for the 12AM-12PM
+      df <- data %>% 
+        filter(variable == type) %>% 
+        filter(treatment == var) %>% 
+  filter(time_string == "12:00:00" | time_string == "00:00:00") %>% 
+  mutate(time_US = ifelse(time_string == "12:00:00", "T12", "T00")) %>% 
+  select(tank_number, time_US, value) %>% 
+  pivot_wider(names_from = time_US, values_from = value) 
+      
+      paired <- t.test(df$T12, df$T00, paired = TRUE, na.action = na.pass)
+      
+      df2 <- tibble(
+        time_point = "12AM-12PM",
+        variable = type,
+        treatment = var,
+        mean = paired$estimate, 
+        p_value = paired$p.value)
+      
+      pairwise_results <- rbind(pairwise_results, df2)
+      pairwise_results <<- pairwise_results
+    }
+}
+
+# Display the results of the code 
+return(pairwise_results)
+}
+
+```
+
 
 ```{r}
+# Note: relative aboundance was logged to be able to compute the pairwise comparison 
 # Loop Function:
 
 mobeast_loop <- mobeast_DNA_24h %>% select(variable) %>% distinct() %>% pull()
