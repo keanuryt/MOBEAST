@@ -25,6 +25,18 @@ library(vegan)
 library(OmicFlow)
 library(phyloseq)
 #library(GUniFrac)
+
+library(car) # ANOVA package
+#library(ggeffects)
+#library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+#library(sjPlot)
+library(emmeans)
+#library(performance)
+#library(multcompView)
+library(broom.mixed) # for tidy()
 ```
 
 # Data visualization
@@ -59,6 +71,7 @@ unifrac <- read.csv(here("data", "DNA", "unifrac", "unifrac_weighted_97.csv"), r
 
 meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
 
+DNA <- read.csv(here("data", "DNA", "MOBEAST_OTU_culled.csv"), header = 1)
 ```
 
 # Data Clean Up
@@ -481,3 +494,77 @@ anova(bd_12)
 permutest(bd_12) 
 bd_12
 ```
+
+## Microbiome diversity 
+
+```{r}
+div_meta <- meta %>% select(id_number, treatment, date_string)
+
+# formatting the OTU matrix with sample names in the rows and OTU on the columns
+otu <- DNA %>% select(-P1_PCRPos,-P2_PCRPos, -P3_PCRPos, -P4_PCRPos, - P5_PCRPos) %>% relocate(ASV,.before = "MOBEAST001") 
+
+rownames(otu)<- otu$ASV
+
+otu_t <- otu %>%  select(-ASV) %>% t()
+
+otu_t <- otu_t %>% as.data.frame() %>% mutate(id_number = rownames(otu_t)) %>% 
+  left_join(div_meta) %>% relocate(c("id_number", "treatment", "date_string"), .before = "Otu0001")
+
+```
+
+### 24h 
+```{r}
+otu_24h <- otu_t %>% mutate(date_string = as.character(date_string)) %>% 
+  filter(date_string == "2024-06-02" | date_string == "2024-06-03") %>% 
+  filter(treatment != "Inflow") %>% 
+  select(-treatment, -date_string)
+
+rownames(otu_24h)<- otu_24h$id_number
+
+matrix_24h <- otu_24h %>% select(-id_number) %>% as.matrix() 
+
+str(otu_24h)
+```
+
+```{r}
+richness <- specnumber(matrix_24h)
+shannon <- vegan::diversity(matrix_24h, index = "shannon")
+simpson <- vegan::diversity(matrix_24h, index = "simpson")
+evenness <- shannon/log(richness)
+berger_parker <- apply(matrix_24h, 1, function(x) max(x)/sum(x))
+
+
+
+diversity_indices <- tibble(
+  id_number = rownames(matrix_24h),
+  richness = richness, 
+  shannon = shannon, 
+  simpson = simpson, 
+  evenness = evenness, 
+  berger_parker = berger_parker
+)
+```
+
+```{r}
+div_df_24h <- diversity_indices %>% left_join(meta) %>% 
+  select(id_number, tank_number, treatment, inflow_table, time, date_string, time_string,
+         richness,shannon,simpson, berger_parker, evenness) %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+```
+
+
+```{r}
+mod_div <- lmer(shannon ~ treatment*time+ (1|tank_number), data = div_df_24h)
+
+summary(mod_div)
+anova(mod_div, type= 2)
+emmeans(mod_div, specs = trt.vs.ctrl ~ treatment) 
+emmeans(mod_div, pairwise ~ treatment | time)
+```
+
+```{r}
+
+```
+
+
+

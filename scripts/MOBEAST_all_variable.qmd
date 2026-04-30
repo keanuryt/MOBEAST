@@ -35,6 +35,12 @@ library(emmeans)
 library(performance)
 library(multcompView)
 library(broom.mixed)
+
+# PCA packages
+library(corrr)
+library(ggcorrplot)
+library(FactoMineR)
+library(factoextra) 
 ```
 
 
@@ -105,6 +111,10 @@ mobeast_flagged <- mobeast %>%
   
 ```
 
+```{r}
+mobeast_flagged %>% filter(variable_cat == "nutrients") %>% 
+  select(variable) %>% distinct()
+```
 
 
 ### Biogeochemistry 
@@ -244,25 +254,17 @@ flux_12PM_plot
 resid_time_plot_12PM +flux_12PM_plot
 ```
 
+
 ```{r}
-mobeast_flux %>% #select(tank_number, inflow_table) %>% 
-  filter(tank_number == "T8" | tank_number == "T1", 
-         inflow_table == "Table 1")
-
-mobeast_flagged %>% mutate(time_string = as.character(time_string)) %>% 
-  #filter(#treatment == "Inflow", 
-         #variable == "NH3") %>%  
-  select(id_number, treatment, tank_number,inflow_table, time_string, flowrate,
-         value, variable) %>% 
-  filter(!is.na(id_number), 
-         inflow_table != "Environmental data", 
-         inflow_table != "Endmember", 
-         time_string == "06:00:00") %>% 
-  ggplot(aes(x= flowrate, value))+
-  geom_point()+
-  geom_smooth(method = "lm")+
-  facet_wrap(.~variable, scales = "free")
-
+mobeast_flux %>%  select(treatment, inflow_table, tank_number, flowrate) %>% 
+  mutate(mean_all = mean(flowrate, na.rm = T), 
+         sd_all = sd(flowrate, na.rm = T)) %>% 
+  group_by(tank_number) %>% 
+  reframe(mean = mean(flowrate, na.rm = T),
+          sd = sd(flowrate, na.rm = T)#, 
+          #mean_all, sd_all
+          ) %>% 
+  ungroup()
 
 ```
 
@@ -1711,9 +1713,7 @@ pairwise_summary %>%
   guides(fill=guide_legend(title="p-value interpretation"))+
   scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
                     values = c("#43A047", "#90CAF9", "#F44336"))+
-  theme_bw()
-
-+ 
+  theme_bw()#+ 
   theme(plot.title = element_text(size=30, face = "bold"), 
         plot.subtitle = element_text(size=24),
         axis.title = element_text(size = 20, face = "bold"),
@@ -1725,5 +1725,76 @@ pairwise_summary %>%
         legend.position = "top")
 
 ```
+
+## PCA 
+
+```{r}
+## used the areal flux to calculate the PCA here
+## normalization with scale(), but don't actually know what it noarmalizes to...
+pca_12PM_df <- mobeast_12PM_flux %>% select(id_number, tank_number, treatment, inflow_table,
+                             date_string, time_string, variable, areal_flux) %>%
+  filter(variable != "cyano", variable != "tot_bact") %>% 
+  pivot_wider(names_from = variable, values_from = areal_flux) %>% 
+   na.omit()
+
+pca_matrix_12PM_norm <- pca_12PM_df %>% select(pico_euk:hix) %>% scale() 
+
+pca_matrix_12PM_norm %>% cor() %>% 
+  ggcorrplot(
+           hc.order = TRUE,
+           #type = "lower",
+           lab = TRUE)
+```
+
+
+```{r}
+
+as.data.frame(pca_matrix_12PM_norm)
+pca_matrix_12PM_norm<- pca_matrix_12PM_norm %>% as.data.frame() %>% 
+  select(pico_euk, syn, pro, chla_conc,
+                                coble_t, bix, fpeak, fi, PO4, NO3, 
+                                het_bact, npoc_u_m, coble_a, 
+                                coble_c, coble_m, hix) %>% as.matrix()
+```
+
+
+```{r}
+data.pca <- princomp(pca_matrix_12PM_norm, cor = TRUE)
+summary(data.pca)
+
+data.pca$loadings[,1:4]
+
+loading_results <- as.data.frame(data.pca$loadings[,1:4])
+
+fviz_eig(data.pca, addlabels = TRUE)
+
+fviz_pca_var(data.pca, col.var = "black")
+
+fviz_pca_var(data.pca, col.var = "cos2",
+            gradient.cols = c("blue", "lightgrey", "red"),
+            repel = TRUE)
+```
+
+```{r}
+pca_scores <- as.data.frame(data.pca$scores)
+
+ggplot(pca_scores, aes(Comp.1,Comp.2))+
+  geom_point(aes(color = pca_12PM_df$treatment, size= 3))+
+  geom_segment(data = loading_results, 
+               aes(x=0, y=0, xend = Comp.1, yend= Comp.2),
+               arrow = arrow(length = unit(0.5, "cm")),
+               alpha = 0.75, color = "black")+
+  geom_text(data = loading_results, 
+            aes(x = Comp.1, y = Comp.2, 
+                label = rownames(loading_results)),
+            vjust=1, hjust = 1)+
+  theme_bw() +
+      scale_color_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
+      )  
+```
+
+
 
 
