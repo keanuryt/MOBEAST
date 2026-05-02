@@ -14,6 +14,7 @@ library(ggh4x)
 library(bestNormalize)
 library(ggResidpanel)
 library(broom)
+library(ggrepel)
 ```
 
 #theme 
@@ -239,68 +240,49 @@ mobeast %>%
 
 ```
 
-```{r}
-## work in progress : identify the values that are influential to the regression for 1 variable
-mod <- models_delta[["NO3"]]
-
-df_used <- model.frame(mod)
-
-cook <- cooks.distance(mod)
-
-influential_points <- df_used[cook > 4/length(cook), ]
-```
-
-```{r}
-## work in progress : trying to merge the results that to the orginal df to know what points are influential 
-influential_points <- df_used %>%
-  mutate(cook = cook) %>%
-  filter(cook > 4/n())
-```
 
 
 
 ```{r}
-## work in progress : identify the values that are influential to the regression 
+# I ran the lm model, I want to extract the cook distances from the model
+# I associated the cool distances with the corresponding meta data and samples 
+# I also tagged the cook distances that are influential to the regression. 
 
-influential_df <- bind_rows(
-  lapply(names(models_delta), function(var) {
-    
-    mod <- models_delta[[var]]
-    
-    df_var <- mobeast %>%
-      filter(outlier != "outlier", variable == var)
-    
-    cook <- cooks.distance(mod)
-    
-    df_var %>%
-      mutate(cook = cook) %>%
-      filter(cook > 4/n())
-  }),
-  .id = "variable"
-)
+
+cook_df <- map_dfr(names(models_delta), function(var) {
+  
+  mod <- models_delta[[var]]
+  
+  # rows used in model
+  used_rows <- as.numeric(rownames(model.frame(mod)))
+  
+  mobeast_used <- mobeast %>% filter(variable == var)
+  
+  # corresponding original rows with metadata
+  df_used <- mobeast_used[used_rows, ]
+  
+  # diagnostics
+  cook <- cooks.distance(mod)
+  cutoff <- 4 / length(cook)
+  
+  df_used %>%
+    mutate(
+      variable_model = var,
+      cook_distance = cook,
+      influential = cook_distance > cutoff,
+      cook_cutoff = cutoff
+    )
+})
 ```
-
 
 ```{r}
-## work in progress : identify the values that are not influential to the regression 
-clean_df <- bind_rows(
-  lapply(names(models_delta), function(var) {
-    
-    mod <- models_delta[[var]]
-    
-    df_var <- mobeast %>%
-      filter(outlier != "outlier", variable == var)
-    
-    cook <- cooks.distance(mod)
-    
-    df_var %>%
-      mutate(cook = cook) %>%
-      filter(cook <= 4/n())
-  }),
-  .id = "variable"
-)
-```
+cook_df %>% filter(influential == TRUE) %>% 
+  #filter(variable == "npoc_u_m") %>% 
+  arrange(id_number) %>% 
+  select(id_number, treatment, inflow_table, tank_number, date_time, variable_cat, variable, value,flowrate, cook_distance, influential) %>% 
+  filter(variable != "tot_bact", variable != "cyano") 
 
+```
 
 
 
@@ -308,12 +290,14 @@ clean_df <- bind_rows(
 
 mobeast %>% 
   filter(outlier != "outlier") %>% 
-  filter(variable_cat == "DOC"|variable_cat == "chla") %>% 
+  #filter(variable_cat == "DOC"|variable_cat == "chla") %>% 
   #filter(variable =="pro"|variable =="syn"|variable =="pico_euk"|variable =="het_bact") %>%
+  filter(variable =="pico_euk") %>% 
   ggplot(aes(x = flowrate, y = conc_norm, color = treatment)) +
   geom_point(size = 2, alpha = 0.8) +
   geom_point(shape = 21,color = "black", size = 2)+
   geom_smooth(method = "lm", se = TRUE, color = "red") +
+  ggrepel::geom_label_repel(aes(label = time_string)) +
   facet_wrap(~ variable, scales = "free_y", nrow= 3, ncol = 4) +
   theme_bw() +
   labs(
@@ -331,6 +315,7 @@ mobeast %>%
 ```{r, fig.height=50, fig.width=5}
 mobeast %>% 
   filter(outlier != "outlier") %>% 
+  #filter(flowrate <25) %>% 
   ggplot( aes(x = flowrate, y = conc_norm)) +
   geom_point(size = 2, alpha = 0.8) +
   geom_smooth(method = "lm", se = TRUE, color = "blue") +
