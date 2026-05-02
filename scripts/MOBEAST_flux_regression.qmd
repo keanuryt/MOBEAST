@@ -1,0 +1,358 @@
+---
+title: "Linear regression to fix flow issue"
+format: html
+editor: source
+---
+
+# Libraries
+```{r}
+library(tidyverse)
+library(janitor)
+library(here)
+library(ggforce)
+library(ggh4x)
+library(bestNormalize)
+library(ggResidpanel)
+library(broom)
+```
+
+#theme 
+
+```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+# Data
+```{r, message=FALSE}
+mobeast <- read_csv(here("data", "mobeast_flux.csv"))
+```
+
+# Data clean up 
+```{r}
+mobeast<- mobeast %>% mutate(date_string = as.character(date_string), 
+                   time_string = as.character(time_string), 
+                   date_time_string= as.character(date_time_string))
+mobeast %>% select(variable_cat, variable) %>% distinct()
+```
+
+# Flux Linear regression 
+
+
+```{r}
+# test regression
+DOC <- mobeast %>% filter(variable == "npoc_u_m") %>% filter(outlier != "outlier")
+
+DOC_mod <- lm(asinh(areal_flux) ~ flowrate, data = DOC)
+summary(DOC_mod)
+
+resid_panel(DOC_mod)
+
+```
+
+
+```{r}
+
+## we want to know how many NA values are created when data is transformed.
+mobeast %>% 
+  #filter(variable == "npoc_u_m") %>% 
+  mutate(areal_flux_log10 = log10(areal_flux),
+         areal_flux_sqrt = sqrt(areal_flux),
+         areal_flux_log1p = sqrt(areal_flux),
+         areal_flux_asinh = asinh(areal_flux),
+         areal_flux_sign = sign(areal_flux) * log1p(abs(areal_flux))) %>% 
+  select(variable, variable_cat, areal_flux_log10, areal_flux_sqrt,
+         areal_flux_log1p,areal_flux_asinh, areal_flux_sign) %>% 
+  pivot_longer(cols = areal_flux_log10:areal_flux_sign,
+               names_to = "transformation", values_to = "trans_value"
+                ) %>% 
+  group_by(variable, transformation) %>%
+  filter(is.na(trans_value)) %>% 
+  reframe(n=n())
+
+## log10, log1p and sqrt cause a lot of data loss... up to 1/2 of the data set in same cases. 
+## asinh() and sign(x)*log1p(abs(x)) are better alternatives because they limited the data loss but the QQ plots aren't as good...  
+
+```
+
+```{r}
+mobeast %>% 
+  #filter(variable == "npoc_u_m") %>% 
+  ggplot(aes(sample = areal_flux)) +
+  stat_qq() +
+  stat_qq_line( color = "red") +
+  facet_wrap(.~ variable, scales = "free")
+
+```
+
+```{r}
+# automated model computation 
+models <- mobeast %>%
+  filter(outlier != "outlier") %>% 
+  mutate(areal_flux = (areal_flux))%>% 
+  group_by(variable) %>%
+  nest() %>%
+  mutate(
+    model = map(data, ~ lm(areal_flux ~ flowrate, data = .x)),
+    results = map(model, tidy),
+    stats = map(model, glance)
+  )
+```
+
+
+
+```{r}
+lm_results <- models %>% unnest(results) %>% 
+  select(variable, term, estimate, std.error, t_value = statistic, p.value)
+lm_results %>% filter(p.value<0.05, term == "flowrate")
+```
+
+```{r}
+# not all stats are saved in the DF
+lm_stats <- models %>% unnest(stats) %>%  select(variable, r.squared, adj.r.squared,
+                                     RSE = sigma, F_stat = statistic, p.value,  DF = df.residual)
+
+lm_stats %>% filter(p.value <0.05)
+```
+
+
+
+```{r, warning = FALSE, fig.height=12, fig.width=20}
+
+mobeast %>% 
+  filter(outlier != "outlier") %>% 
+  filter(variable_cat == "DOC"|variable_cat == "chla") %>% 
+  #filter(variable =="pro"|variable =="syn"|variable =="pico_euk"|variable =="het_bact") %>% 
+  ggplot(aes(x = flowrate, y = asinh(areal_flux), color = treatment)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_point(shape = 21,color = "black", size = 2)+
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  facet_wrap(~ variable, scales = "free_y", nrow= 2, ncol = 3) +
+  theme_bw() +
+  labs(
+    x = "Flow rate",
+    y = "Flux",
+    title = "Flow rate vs Flux for each variable"
+  )+
+  scale_color_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
+      ) +
+  nunu_theme
+```
+
+```{r, fig.height=50, fig.width=5}
+mobeast %>% 
+  filter(outlier != "outlier") %>% 
+  ggplot( aes(x = flowrate, y = sign(areal_flux) * log1p(abs(areal_flux)))) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  
+  facet_nested(
+    variable_cat + variable~. ,
+    scales = "free_y"
+  ) +
+  
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Flow rate",
+    y = "Flux",
+    title = "Flow rate vs Flux grouped by category"
+  )
+```
+
+
+
+# Delta values Linear regression 
+
+```{r}
+## tidyverse 
+models_delta_tidy <- mobeast %>%
+  filter(outlier != "outlier") %>% 
+  group_by(variable) %>%
+  nest() %>%
+  mutate(
+    model = map(data, ~ lm(asinh(conc_norm) ~ flowrate, data = .x)),
+    results = map(model, tidy),
+    stats = map(model, glance)
+  )
+
+### for loop 
+delta_loop <- mobeast %>% select(variable) %>% distinct() %>% pull()
+
+models_delta <- vector(mode = "list", length = length(delta_loop))
+names(models_delta) <- delta_loop
+
+for (var in delta_loop) {
+  df <- mobeast %>% filter(outlier != "outlier") %>% filter(variable == var)
+  models_delta[[var]] <- lm(asinh(conc_norm) ~ flowrate, data = df)
+}
+```
+
+```{r}
+for (var in names(models_delta)) {
+  
+  mod <- models_delta[[var]]
+  cook <- cooks.distance(mod)
+  
+  if(max(cook) > 4/length(cook)) {
+    cat(var, "has influential point(s)\n")
+  }
+}
+```
+
+
+
+```{r}
+delta_results <- models_delta_tidy %>% unnest(results) %>% 
+  select(variable, term, estimate, std.error, t_value = statistic, p.value)
+delta_results %>% filter(p.value<0.05, term == "flowrate")
+```
+
+
+
+```{r}
+# not all stats are saved in the DF
+delta_stats <- models_delta_tidy %>% unnest(stats) %>%  select(variable, r.squared, adj.r.squared,
+                                     RSE = sigma, F_stat = statistic, p.value,  DF = df.residual)
+
+delta_stats %>% filter(p.value <0.05)
+
+```
+
+
+```{r}
+mobeast %>% 
+  #filter(variable == "npoc_u_m") %>% 
+  ggplot(aes(sample = (conc_norm))) +
+  #ggplot(aes(sample = sign(conc_norm) * log1p(abs(conc_norm)))) +
+  stat_qq() +
+  stat_qq_line( color = "red") +
+  facet_wrap(.~ variable, scales = "free")
+
+```
+
+```{r}
+## work in progress : identify the values that are influential to the regression for 1 variable
+mod <- models_delta[["NO3"]]
+
+df_used <- model.frame(mod)
+
+cook <- cooks.distance(mod)
+
+influential_points <- df_used[cook > 4/length(cook), ]
+```
+
+```{r}
+## work in progress : trying to merge the results that to the orginal df to know what points are influential 
+influential_points <- df_used %>%
+  mutate(cook = cook) %>%
+  filter(cook > 4/n())
+```
+
+
+
+```{r}
+## work in progress : identify the values that are influential to the regression 
+
+influential_df <- bind_rows(
+  lapply(names(models_delta), function(var) {
+    
+    mod <- models_delta[[var]]
+    
+    df_var <- mobeast %>%
+      filter(outlier != "outlier", variable == var)
+    
+    cook <- cooks.distance(mod)
+    
+    df_var %>%
+      mutate(cook = cook) %>%
+      filter(cook > 4/n())
+  }),
+  .id = "variable"
+)
+```
+
+
+```{r}
+## work in progress : identify the values that are not influential to the regression 
+clean_df <- bind_rows(
+  lapply(names(models_delta), function(var) {
+    
+    mod <- models_delta[[var]]
+    
+    df_var <- mobeast %>%
+      filter(outlier != "outlier", variable == var)
+    
+    cook <- cooks.distance(mod)
+    
+    df_var %>%
+      mutate(cook = cook) %>%
+      filter(cook <= 4/n())
+  }),
+  .id = "variable"
+)
+```
+
+
+
+
+```{r, warning = FALSE, fig.height=12, fig.width=20}
+
+mobeast %>% 
+  filter(outlier != "outlier") %>% 
+  filter(variable_cat == "DOC"|variable_cat == "chla") %>% 
+  #filter(variable =="pro"|variable =="syn"|variable =="pico_euk"|variable =="het_bact") %>%
+  ggplot(aes(x = flowrate, y = conc_norm, color = treatment)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_point(shape = 21,color = "black", size = 2)+
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  facet_wrap(~ variable, scales = "free_y", nrow= 3, ncol = 4) +
+  theme_bw() +
+  labs(
+    x = "Flow rate",
+    y = "Delta values",
+    title = "Flow rate vs Delta values for each variable"
+  )+
+  scale_color_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
+      ) +
+  nunu_theme
+```
+
+```{r, fig.height=50, fig.width=5}
+mobeast %>% 
+  filter(outlier != "outlier") %>% 
+  ggplot( aes(x = flowrate, y = conc_norm)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  
+  facet_nested(
+    variable_cat + variable~. ,
+    scales = "free_y"
+  ) +
+  
+  theme_bw(base_size = 14) +
+  labs(
+    x = "Flow rate",
+    y = "Delta values",
+    title = "Flow rate vs Delta values grouped by category"
+  )
+```
+
+
+
+
+
+
+
+
+

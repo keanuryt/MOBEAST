@@ -72,6 +72,8 @@ unifrac <- read.csv(here("data", "DNA", "unifrac", "unifrac_weighted_97.csv"), r
 meta <- read_csv(here("data","MOBEAST_metadata_V2.csv"))
 
 DNA <- read.csv(here("data", "DNA", "MOBEAST_OTU_culled.csv"), header = 1)
+tax <- read.csv(here("data", "DNA", "MOBEAST_tax_culled.csv"), header = 1)
+
 ```
 
 # Data Clean Up
@@ -85,9 +87,14 @@ inflow_list <- meta %>%
   filter(treatment == "Inflow") %>% 
   pull(id_number)
 
+diel_list <- meta %>% mutate(date_string = as.character(date_string)) %>% 
+  filter(date_string == "2024-06-02" | date_string == "2024-06-03") %>% 
+  pull(id_number)
+
 sample_list <- meta %>% 
-  filter(!id_number %in% endmember_list) %>% 
+  #filter(!id_number %in% endmember_list) %>% 
   filter(!id_number %in% inflow_list) %>% 
+  filter(id_number %in% diel_list) %>% 
   pull(id_number)
 ```
 
@@ -96,21 +103,6 @@ unifrac_subset <- unifrac[rownames(unifrac) %in% sample_list, colnames(unifrac) 
 
 unifrac_dist <- as.dist(unifrac_subset)
 ```
-
-
-
-```{}
-cluster<- cluster %>% 
-  #mutate(cluster = factor(cluster)) %>% 
-  mutate(cluster2 = ifelse(cluster == 1, "Algae", 
-                           ifelse(cluster == 2, "CCA", 
-                                  ifelse(cluster == 3, "Coral", "Control")))) %>% 
-  select(-cluster) %>% 
-  rename(cluster = cluster2)
-
-meta<- meta %>% left_join(cluster)
-```
-
 
 
 # NMDS Calculation
@@ -147,7 +139,7 @@ nmds_merged %>%
                                                       "00:00:00", "06:00:00"))) %>% 
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
   stat_ellipse(#aes(colour = cluster, fill = cluster),
-               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
+               alpha = 0.2, geom= "polygon", level = 0.8, show.legend = FALSE)+
   
   geom_point(size = 4) +
   geom_point(shape = 1, color = "black",size = 4) +
@@ -501,19 +493,35 @@ bd_12
 div_meta <- meta %>% select(id_number, treatment, date_string)
 
 # formatting the OTU matrix with sample names in the rows and OTU on the columns
-otu <- DNA %>% select(-P1_PCRPos,-P2_PCRPos, -P3_PCRPos, -P4_PCRPos, - P5_PCRPos) %>% relocate(ASV,.before = "MOBEAST001") 
+otu <- DNA %>% 
+  # remove the PCR controls from the df
+  select(-P1_PCRPos,-P2_PCRPos, -P3_PCRPos, -P4_PCRPos, - P5_PCRPos) %>%
+  # join with the taxonomic df 
+  rename(OTUNumber = ASV) %>% 
+  left_join(tax) %>% 
+  # Here I want the relative abundance of microbes by family per samples
+  select(MOBEAST001:MOBEAST115, Family) %>% 
+  relocate(Family,.before = "MOBEAST001") %>% 
+  # different OTU may result in bacteria that share a family but belong to different genus
+  # we want to add the relative abundance of the bacteria in the same family
+  group_by(Family) %>%
+  summarise(across(where(is.numeric), \(x) sum(x, na.rm = TRUE))) %>% 
+  as.data.frame()
 
-rownames(otu)<- otu$ASV
+rownames(otu)<- otu$Family
 
-otu_t <- otu %>%  select(-ASV) %>% t()
+#transpose so that the Families are the column names and the samples in the rows
+otu_t <- otu %>%  select(-Family) %>% t()
 
+#convert the matrix in a df that I can filter
 otu_t <- otu_t %>% as.data.frame() %>% mutate(id_number = rownames(otu_t)) %>% 
-  left_join(div_meta) %>% relocate(c("id_number", "treatment", "date_string"), .before = "Otu0001")
+  left_join(div_meta) %>% relocate(c("id_number", "treatment", "date_string"))
 
 ```
 
 ### 24h 
 ```{r}
+# we only keep the 24h samples. we remove the inflow values. 
 otu_24h <- otu_t %>% mutate(date_string = as.character(date_string)) %>% 
   filter(date_string == "2024-06-02" | date_string == "2024-06-03") %>% 
   filter(treatment != "Inflow") %>% 
@@ -521,12 +529,13 @@ otu_24h <- otu_t %>% mutate(date_string = as.character(date_string)) %>%
 
 rownames(otu_24h)<- otu_24h$id_number
 
+# convert the df into a matrix
 matrix_24h <- otu_24h %>% select(-id_number) %>% as.matrix() 
 
-str(otu_24h)
 ```
 
 ```{r}
+# calculating different biodiversity metrics and indices. 
 richness <- specnumber(matrix_24h)
 shannon <- vegan::diversity(matrix_24h, index = "shannon")
 simpson <- vegan::diversity(matrix_24h, index = "simpson")
@@ -534,7 +543,7 @@ evenness <- shannon/log(richness)
 berger_parker <- apply(matrix_24h, 1, function(x) max(x)/sum(x))
 
 
-
+# merge the results in one data frame that we can use for stat models
 diversity_indices <- tibble(
   id_number = rownames(matrix_24h),
   richness = richness, 
@@ -546,14 +555,26 @@ diversity_indices <- tibble(
 ```
 
 ```{r}
+# merge the diversity metrics with the meta data
 div_df_24h <- diversity_indices %>% left_join(meta) %>% 
+  # only select the meta data that is useful for the models
   select(id_number, tank_number, treatment, inflow_table, time, date_string, time_string,
          richness,shannon,simpson, berger_parker, evenness) %>% 
-  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  mutate(time_fac = factor(time_string, 
+                           levels = c("12:00:00", "18:00:00","00:00:00", "06:00:00"))) %>% 
+  #focusing the shanon diversity index, we want to remove the outlier values
+  ## we use the mean +/- 2SD method
+  mutate(sd = sd(shannon), mean = mean(shannon)) %>% 
+  filter(shannon < mean+ 2* sd | shannon > mean-2*sd) %>%
+  select(-sd, -mean)  
+  
 ```
 
 
 ```{r}
+# statistical model to see if diversity changes by treatment and in time
+# tank number used for repeated measure random effect
 mod_div <- lmer(shannon ~ treatment*time+ (1|tank_number), data = div_df_24h)
 
 summary(mod_div)
@@ -562,9 +583,50 @@ emmeans(mod_div, specs = trt.vs.ctrl ~ treatment)
 emmeans(mod_div, pairwise ~ treatment | time)
 ```
 
-```{r}
+**Definition**: 
+*Richness*: total number of different species. (discreet count)
+*Evenness*: even population or 1 dominant group vs smaller groups. (1 is even,  0 is uneven)
+*Shannon*: accounts for evenness and richness. (High value = higher diversity)
+*Simpson*: probability that 2 indiv randomly picked are the same spp. (1 = higher diversity, 0= low/no diversity)
+*Berger_parker*: numerical dominance (high = one single spp = low diversity)
 
+
+```{r}
+div_df_24h %>% 
+  ggplot(aes(treatment, shannon, fill = treatment)) +
+  geom_violin()+
+  geom_point()+
+  facet_wrap(.~time_fac, nrow = 1)+
+  stat_summary(color = "yellow", alpha =0.5)+
+  scale_fill_manual(values = treatment_colors)+
+  nunu_theme
+```
+```{r}
+div_df_24h %>% 
+  
+  ggplot(aes(richness, evenness, color = treatment)) +
+  #geom_violin()+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)+
+
+  #facet_wrap(.~time_fac, nrow = 1)+
+  #stat_summary(color = "yellow", alpha =0.5)+
+  scale_color_manual(values = treatment_colors)+
+  nunu_theme
 ```
 
+```{r}
+div_df_24h %>% 
+  group_by(treatment) %>% 
+  reframe(mean_rich = mean(richness), mean_even = mean(evenness)) %>% 
+  ggplot(aes(mean_rich, mean_even, color = treatment)) +
+  #geom_violin()+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE)+
+  geom_label(aes(label = treatment), hjust = 0,vjust = 1.5)+
 
-
+  #facet_wrap(.~time_fac, nrow = 1)+
+  #stat_summary(color = "yellow", alpha =0.5)+
+  scale_color_manual(values = treatment_colors)+
+  nunu_theme
+```

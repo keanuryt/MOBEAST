@@ -248,6 +248,7 @@ flux_12PM_plot <- mobeast_flux %>%
   scale_color_manual(values = treatment_colors)+
   theme_bw()
 flux_12PM_plot
+
 ```
 
 ```{r}
@@ -1344,6 +1345,9 @@ return(pairwise_results)
 # Loop Function:
 
 mobeast_loop <- mobeast_24h %>% select(variable) %>% distinct() %>% pull()
+mobeast_24h %>% filter(time_string == "12:00:00"|time_string == "00:00:00") %>% 
+  group_by(variable, time_string, treatment) %>% 
+  reframe(n = n())
 
 pairwise_summary <- map_dfr(mobeast_loop, ~ {
   
@@ -1357,6 +1361,7 @@ pairwise_summary <- map_dfr(mobeast_loop, ~ {
 })
 
 ```
+
 
 ```{r}
 pairwise_summary %>% filter(p_value <0.05)
@@ -1506,6 +1511,13 @@ pairwise_summary <- map_dfr(mobeast_loop, ~ {
 
 ```
 
+```{r}
+nunu_pairwise(
+    data = mobeast_24h,
+    time_point = 12,
+    type = "fi"
+  )
+```
 
 ```{r}
 pairwise_summary %>% filter(p_value <0.05)
