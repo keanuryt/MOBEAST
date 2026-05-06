@@ -18,7 +18,9 @@ library(ggrepel)
 library(gt)
 library(patchwork)
 library(lme4)
-#library(lmerTest)
+library(lmerTest)
+library(emmeans)
+library(broom.mixed)
 ```
 
 #theme 
@@ -162,7 +164,7 @@ mobeast %>%
 
 ```{r}
 mobeast_delta <- mobeast %>%
-  filter(outlier != "outlier") %>% 
+  #filter(outlier != "outlier") %>% 
   mutate(date_string = as.character(date_string)) %>% 
   filter(date_string =="2024-06-02"|date_string =="2024-06-03") %>% 
   mutate(flowrate = log10(flowrate)) 
@@ -410,13 +412,18 @@ for (var in mobeast_loop) {
 ```{r}
 # cleaning the df so that i have ordered treatment and time
 mobeast_resid<- mobeast_resid %>% 
+  filter(outlier != "outlier") %>% 
   mutate(treatment = factor(treatment, 
                             levels = c("Control", "Coral", 
                                        "CCA", "Algae")),
          time_fac = factor(as.character(time_string), 
                            levels = c("12:00:00", "18:00:00",
-                                      "00:00:00", "06:00:00"))
-         )
+                                      "00:00:00", "06:00:00"))) 
+
+
+### I also tried to account for calculated outliers by filtering the residual data with the mean +/-2SD method. 
+### We get a lot more outliers when looking at outliers in the residuals (66[conc] vs 75[resid]). Sometimes all datapoints for a treatment are flagged as outliers... 
+### ex: CCA syn = 4 outliers, 3 of them or CCA at 12:00. 
 ```
 
 ```{r}
@@ -504,7 +511,7 @@ graph_2 <- mobeast_resid %>% filter(variable == "npoc_u_m") %>%
     facet_wrap(.~time_fac, ncol = 4)+
       labs(title = paste("24h residuals by time "),
            x = "Treatment",
-          y = "Residuals ") +
+          y = "Residuals DOC") +
       scale_fill_manual(
         breaks = c("Control", "Coral", "CCA", "Algae"),
         values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
@@ -521,72 +528,141 @@ graph_2 <- mobeast_resid %>% filter(variable == "npoc_u_m") %>%
 
 ```{r}
 # Loop Function:
-## Take the 12PM samples and isolate the types of nutrient present on the df in a vector
+## Take the 24h samples and isolate the types of nutrient  present on the df in a vector
 ## Create a list where the loop results will be save, named after the nutrients of the df
 ## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
 ## Save the outputs of the model in the list such that each nutrient has its stats
 
-resid_loop <- mobeast_resid %>% select(variable) %>% distinct() %>% pull()
+resid_loop <- mobeast_resid %>% 
+  filter(variable != "npoc_u_m") %>% 
+  select(variable) %>% distinct() %>% pull()
 
 models_resid_lmer <- vector(mode = "list", length = length(resid_loop))
 names(models_resid_lmer) <- resid_loop
 
 for (var in resid_loop) {
   df <- mobeast_resid %>% filter(variable == var)
-  models_resid_lmer[[var]] <- lmer(resid ~ treatment + (1|tank_number), data = df)
-
+  models_resid_lmer[[var]] <- lmer(resid ~ treatment*time_fac + (1|tank_number), data = df)
 }
 
+
+## separate model for DOC because 00:00 removed 
+DOC_resid <- mobeast_resid %>% 
+  filter(variable == "npoc_u_m") %>% filter(time_string != "00:00:00")
+
+DOC_resid_mod <- lmer(resid~ treatment*time_fac + (1|tank_number), data = DOC_resid)
+
 ```
 
-
-#### model results 
+#### model results (fixed and random)
 ```{r}
-# save the outputs of the model in a dataframe (fixed and random effects)
-results_resid <- imap_dfr(models_resid_lmer, ~ tidy(.x) %>%
+results <- imap_dfr(models_resid_lmer, ~ tidy(.x) %>%
                      dplyr::mutate(variable = .y)) %>% 
   relocate(variable, .before = "effect")
-results_resid
+
+DOC_resid_results <- tidy(DOC_resid_mod) %>% mutate(variable = "npoc_u_m") %>% relocate(variable, .before = "effect")
+
+results <- rbind(results, DOC_resid_results)
 ```
 
-
-#### ANOVA results 
+#### ANOVA results
 ```{r, warning= FALSE}
 # So many Warnings! 
 ## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
 
-# run anova on the models 
-anova_results <- imap_dfr(models_12PM_2, ~ {
+anova_results <- imap_dfr(models_resid_lmer, ~ {
   stats::anova(.x, type = 2) %>%
     broom::tidy() %>%
     mutate(variable = .y)}) %>%
   relocate(variable) 
 
-## which variables have significant anova results
-anova_results %>% filter(p.value <0.05)
-# tot-bact, syn, fpeak and npoc are significant. 
+DOC_anova <- anova(DOC_resid_mod, type = 2) %>%  tidy() %>% mutate(variable = "npoc_u_m") %>% relocate(variable, .before = "term")
+
+anova_results <- rbind(anova_results, DOC_anova)
+
+anova_results %>% filter(p.value <0.05) 
+
+#only sig treatment:time interaction is for M:C. 
+# sig treatment ANOVA for het bact, syn, coble C, M:C, FI, SiO2
 ```
 
-
-#### Emmeans results 
+#### emmeans results
 ```{r}
 # "estimate" are negative somehow. Why? 
 ## in manual models for DOC, estimate >0, here it's <0
 ## t.ratio in "statistics", and negative instead of positive
 ## p.values not shown, only p.adjusted. 
-emmeans_results <- imap_dfr(models_12PM_2, ~ {
+emmeans_results <- imap_dfr(models_resid_lmer, ~ {
   emmeans(.x, pairwise ~ treatment)$contrasts %>%
     broom::tidy() %>%
     mutate(variable = .y)}) %>% 
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
+DOC_emmeans <- emmeans(DOC_resid_mod, spec= pairwise ~ treatment)$contrast %>% 
+  tidy() %>% 
+  mutate(variable = "npoc_u_m") %>% 
+  relocate(variable, .before = "term") %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
+emmeans_results <- rbind(emmeans_results, DOC_emmeans)
+
+```
+
+```{r}
 emmeans_results_sig <- emmeans_results %>% 
   filter(adj.p.value <0.05)
+emmeans_results_sig
 
-emmeans_results
-emmeans_results_sig # there are no significant variables....
+emmean_sig <- emmeans_results_sig %>% pull(variable)
+emmean_sig
 ```
+
+
+#### Graphing the significant variables
+
+```{r, message = FALSE, warning=FALSE}
+mobeast_resid%>% filter(variable %in% emmean_sig) %>% 
+  #filter(variable == "SiO2") %>% 
+  ggplot(aes(x= treatment, y= resid, fill = treatment))+
+    geom_violin()+
+    geom_jitter(aes(color = outlier), alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap( ~ variable, scales = "free")+
+    labs(title = paste("24h Biogeochem Changes"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "residuals")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18))
+```
+
+```{r, message = FALSE, warning=FALSE}
+mobeast_resid%>% filter(variable %in% emmean_sig) %>% 
+  filter(variable != "tot_bact", variable != "cyano") %>% 
+  ggplot(aes(x= treatment, y= resid, fill = treatment))+
+    geom_violin()+
+    geom_jitter(aes(color = outlier), alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_grid(variable ~ time_fac, scales = "free")+
+    labs(title = paste("24h Biogeochem Changes"),
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = "residuals")+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+  scale_color_manual(breaks = c("outlier", "not outlier"), 
+                       values=c("red", "black"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18))
+```
+
+
 
 
