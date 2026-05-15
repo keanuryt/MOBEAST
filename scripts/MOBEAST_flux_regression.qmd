@@ -580,7 +580,7 @@ DOC_anova <- anova(DOC_resid_mod, type = 2) %>%  tidy() %>% mutate(variable = "n
 
 anova_results <- rbind(anova_results, DOC_anova)
 
-anova_results %>% filter(p.value <0.05) 
+anova_results %>% filter(p.value <0.05) %>% filter(term == "treatment")
 
 #only sig treatment:time interaction is for M:C. 
 # sig treatment ANOVA for het bact, syn, coble C, M:C, FI, SiO2
@@ -623,7 +623,7 @@ emmean_sig
 
 ```{r, message = FALSE, warning=FALSE}
 mobeast_resid%>% filter(variable %in% emmean_sig) %>% 
-  #filter(variable == "SiO2") %>% 
+  filter(variable != "tot_bact", variable != "cyano") %>% 
   ggplot(aes(x= treatment, y= resid, fill = treatment))+
     geom_violin()+
     geom_jitter(aes(color = outlier), alpha = 0.5)+

@@ -90,7 +90,7 @@ treatment_colors = c("Inflow"="#00838F",
 ```{r}
 table_id <- clean_names(table_id)
 
-table_id <- table_id %>% rename(tank_number=tankid) %>% select(-treatment) %>% 
+table_id <- table_id %>% rename(tank_number=tank_num) %>% select(-treatment) %>% 
   mutate(tank_number = paste0("T", tank_number)) %>% 
   mutate(inflow_table = paste("Table", inflow_table))
 DOC <- left_join(DOC, table_id, by= "tank_number")
@@ -230,7 +230,7 @@ names(models_12PM) <- DOC_loop
 
 for (var in DOC_loop) {
   df <- DOC_12PM %>% filter(nutrient == var)
-  models_12PM[[var]] <- lmer(conc_norm~ treatment + (1|tank_number), data = df)
+  models_12PM[[var]] <- lmer(conc_norm ~ treatment + (1|tank_number), data = df)
 }
 
 ```
@@ -276,14 +276,14 @@ for (var in DOC_loop) {
 #### 12PM DOC concentrations
 
 ```{r}
-summary(models_12PM[["DOC"]])
-anova(models_12PM[["DOC"]], type = 2)
-emmeans(models_12PM[["DOC"]], specs = trt.vs.ctrl ~ treatment)
+summary(models_12PM[["npoc_u_m"]])
+anova(models_12PM[["npoc_u_m"]], type = 2)
+emmeans(models_12PM[["npoc_u_m"]], specs = trt.vs.ctrl ~ treatment)
 #emmeans(models_12PM[[1]], ~ treatment)
 ```
 
 ```{r}
-resid_panel(models_12PM[["DOC"]])
+resid_panel(models_12PM[["npoc_u_m"]])
 
 ```
 
@@ -324,13 +324,13 @@ DOC_12PM %>%
 ## removing outliers from the data set
 DOC_24h <- DOC_norm %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  filter(nutrient == "npoc_mg_l") %>% 
+  filter(nutrient == "npoc_u_m") %>% 
   filter(treatment != "Inflow") %>% 
   ## remove the outliers 
   filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) #%>% 
-  #filter(time_string != "00:00:00") 
+                                                   "00:00:00","06:00:00"))) %>% 
+  filter(time_string != "00:00:00") 
   
 ```
 
@@ -364,7 +364,7 @@ DOC_24h %>%
     labs(title = paste("24h DOC Production"),
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
-       y = "Production (µmol/L)")+
+       y = "Production (uM)")+
     scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
     nunu_theme + 
@@ -374,7 +374,7 @@ DOC_24h %>%
   #scale_color_manual(values = c("red", "blue"))+
   #theme(legend.position = "right")
 
-ggsave("DOC_24h.png",width = 16, height = 8, path = here("outputs"))
+#ggsave("DOC_24h.png",width = 16, height = 8, path = here("outputs"))
 ```
 
 ### T-test 
