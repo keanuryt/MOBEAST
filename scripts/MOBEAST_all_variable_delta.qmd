@@ -75,7 +75,7 @@ treatment_colors = c("Inflow"="#00838F",
 ## Load Data
 
 ```{r}
-mobeast <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
+mobeast_raw <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
 
 ```
 
@@ -85,7 +85,7 @@ mobeast <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
 
 ```{r}
 ## flagging outliers from the data set
-mobeast<-  mobeast %>%
+mobeast<-  mobeast_raw %>%
   mutate(time_string = as.character(time_string),
               date_string = as.character(date_string),
               date_time_string = paste(date_string,time_string))%>% 
@@ -575,7 +575,7 @@ nunu_pairwise(mobeast_24h, type = "npoc_u_m", time_point = 6)
 ### DNA data 
 ```{r}
 # prepaing the data for later
-mobeast_DNA  <- mobeast %>%
+mobeast_DNA  <- mobeast_raw %>%
   mutate(time_string = as.character(time_string),
               date_string = as.character(date_string),
               date_time_string = paste(date_string,time_string))%>% 
@@ -681,10 +681,6 @@ DNA_anova_sig %>% filter(!variable %in% interaction_family,
                          anova_term == "treatment") %>% 
   select(variable) %>% distinct()
 
-DNA_anova_sig %>% filter(!variable %in% interaction_family,
-                         anova_p_val <0.05, 
-                         anova_term == "treatment") %>% 
-  select(variable) %>% distinct()
 ```
 
 
@@ -704,7 +700,7 @@ graphs_DNA_24h <- DNA_sig_var %>%
       geom_point() +
       geom_hline(yintercept = 0, linetype = "dashed") +
       stat_summary(color = "yellow", alpha = 0.5) +
-      labs(title = paste("12PM", .x, "Production"),
+      labs(title = paste("24h", .x, "Production"),
            x = "Treatment",
           y = "Areal Flux (µmol/(s.m2)") +
       scale_fill_manual(
@@ -905,15 +901,15 @@ pairwise_summary %>%
 ```{r}
 ## used the areal flux to calculate the PCA here
 ## normalization with scale(), but don't actually know what it noarmalizes to...
-pca_12PM_df <- mobeast_12PM_flux %>% select(id_number, tank_number, treatment, inflow_table,
-                             date_string, time_string, variable, areal_flux) %>%
+pca_24h_df <- mobeast_24h %>% select(id_number, tank_number, treatment, inflow_table,
+                             date_string, time_string, variable, conc_norm) %>%
   filter(variable != "cyano", variable != "tot_bact") %>% 
-  pivot_wider(names_from = variable, values_from = areal_flux) %>% 
+  pivot_wider(names_from = variable, values_from = conc_norm) %>% 
    na.omit()
 
-pca_matrix_12PM_norm <- pca_12PM_df %>% select(pico_euk:hix) %>% scale() 
+pca_matrix_24h_norm <- pca_24h_df %>% select(het_bact:npoc_u_m) %>% scale() 
 
-pca_matrix_12PM_norm %>% cor() %>% 
+pca_matrix_24h_norm %>% cor() %>% 
   ggcorrplot(
            hc.order = TRUE,
            #type = "lower",
@@ -923,17 +919,16 @@ pca_matrix_12PM_norm %>% cor() %>%
 
 ```{r}
 
-as.data.frame(pca_matrix_12PM_norm)
-pca_matrix_12PM_norm<- pca_matrix_12PM_norm %>% as.data.frame() %>% 
-  select(pico_euk, syn, pro, chla_conc,
+pca_matrix_24h_norm<- pca_matrix_24h_norm %>% as.data.frame() %>% 
+  select(het_bact, pico_euk, syn, pro, chla_conc, coble_b,SiO2,NH3,
                                 coble_t, bix, fpeak, fi, PO4, NO3, 
                                 het_bact, npoc_u_m, coble_a, 
-                                coble_c, coble_m, hix) %>% as.matrix()
+                                coble_c, coble_m, hix,npoc_u_m ) %>% as.matrix()
 ```
 
 
 ```{r}
-data.pca <- princomp(pca_matrix_12PM_norm, cor = TRUE)
+data.pca <- princomp(pca_matrix_24h_norm, cor = TRUE)
 summary(data.pca)
 
 data.pca$loadings[,1:4]
@@ -953,7 +948,7 @@ fviz_pca_var(data.pca, col.var = "cos2",
 pca_scores <- as.data.frame(data.pca$scores)
 
 ggplot(pca_scores, aes(Comp.1,Comp.2))+
-  geom_point(aes(color = pca_12PM_df$treatment, size= 3))+
+  geom_point(aes(color = pca_24h_df$treatment, size= 3))+
   geom_segment(data = loading_results, 
                aes(x=0, y=0, xend = Comp.1, yend= Comp.2),
                arrow = arrow(length = unit(0.5, "cm")),
