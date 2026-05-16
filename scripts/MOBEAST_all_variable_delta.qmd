@@ -94,7 +94,12 @@ mobeast<-  mobeast %>%
   # remove the DNA data because they should be treated differently
   filter(variable_cat != "DNA" ) %>% 
   filter(treatment != "Rain") %>% 
-  filter(treatment != "Endmember")  
+  filter(treatment != "Endmember")  %>% 
+  mutate(units = ifelse(variable_cat == "FCM", "cell/µL", 
+                        ifelse(variable_cat == "DOC", "µmol/L", 
+                        ifelse(variable_cat == "fDOM", "R.U.",
+                               ifelse(variable_cat == "nutrients", "µmol/L",
+                                      ifelse(variable_cat == "chla", "µg/L", NA))))))
   
 ```
 
@@ -325,7 +330,7 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
-emmeans_results %>% filter(variable %in% sig_eta) 
+emmeans_results %>% filter(variable %in% sig_eta) %>% filter(adj.p.value <0.05)
 ```
 
 ```{r}
@@ -370,7 +375,8 @@ for (var in sig_eta) {
   
 }
 
-effect_size_results
+effect_size_results %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") %>% filter(abs(effect.size) >=0.8)
 
 
 
@@ -380,10 +386,35 @@ effect_size_results
 
 
 #### Violin plots
+
+```{r}
+meta_var <- mobeast_24h %>% select(variable) %>% distinct() %>% 
+  mutate(variable_clean = c("Heterotrophic Bacteria", "Eukaryote", "Synechococcus",
+                            "Prochlorococcus", "Total Bacteria", "Cyanobacteria", 
+                            "Chlorophyll a", 
+                            "TN", "Coble A", "Coble B", "Coble C", "Coble M",
+                            "Coble T", "M:C", "BIX", "HIX", "Fpeak", "Fulvic Acid",
+                            "Lignin", "N+N", "NO2", "PO4", "SiO2", "NH3", "NO3", "DOC"))
+
+mobeast_24h <- mobeast_24h %>% left_join(meta_var, by = "variable") %>% 
+  relocate(variable_clean, .after = "variable")
+```
+
 ```{r, warning=FALSE}
+
+#graph_loop <- mobeast_24h %>% filter(variable %in% sig_eta) %>% select(variable_clean) %>% 
+  #distinct()
+  
+plots_24h <- vector(mode = "list", length = length(sig_eta))
+
 for (var in sig_eta) {
   
-  plot <- mobeast_24h %>% 
+  unit_plot <- mobeast_24h %>% filter(variable == var) %>% select(units) %>% distinct()
+  
+  variable_name <- mobeast_24h %>% filter(variable == var) %>% 
+    select(variable_clean) %>% distinct()
+  
+  plots_24h[[var]] <- mobeast_24h %>% 
   filter(variable == var) %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
     geom_violin()+
@@ -391,10 +422,10 @@ for (var in sig_eta) {
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
     facet_wrap( .~ time_fac, ncol = 4 )+
-    labs(title = paste("24h", var, "Changes"),
+    labs(
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
-       y = " Difference from Averaged Inflow")+
+       y = paste0("Delta ", variable_name, " (",unit_plot, ")"))+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
   scale_color_manual(breaks = c("outlier", "not outlier"), 
@@ -402,16 +433,52 @@ for (var in sig_eta) {
     nunu_theme + 
     theme(axis.text = element_text(size = 18),
           legend.position = "none")
-  print(plot) 
 }
 
 ```
 
+```{r, fig.width=14, fig.height=10}
+# fDOM plots 
+(plots_24h[["coble_c"]]+ labs(title = "A")) / (plots_24h[["hix"]]+ labs(title = "B"))
+
+ggsave(filename = "24h_fDOM.png", plot = last_plot(), path = here("outputs"))
+```
+
+```{r, fig.width=14, fig.height=10}
+# FCM plots 
+(plots_24h[["het_bact"]]+ labs(title = "A")) /(plots_24h[["syn"]]+ labs(title = "B"))
+
+ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
+```
 
 
-### Pairwise comparison 
+```{r, fig.width=14, fig.height=7}
+# Nutrients plots 
 
-#### Pairwise comparison function
+plots_24h[["NO3"]]
+
+ggsave(filename = "24h_N03.png", plot = last_plot(), path = here("outputs"))
+```
+
+
+
+```{r, fig.width=14, fig.height=30}
+# Nutrients plots 
+
+(plots_24h[["coble_c"]]+ labs(title = "Fluorescent DOM", subtitle = "A - Coble C")) /
+  (plots_24h[["hix"]]+ labs(subtitle = "B - HIX")) / 
+  
+  (plots_24h[["NO3"]]+ labs(title = "Nutrients",subtitle = "C - NO3"))/ 
+  
+  (plots_24h[["het_bact"]]+ labs(title = "Cell Count",subtitle = "D - Heterotrophic Bacteria"))/ 
+  (plots_24h[["syn"]]+ labs(subtitle = "E - Synechococcus"))
+
+ggsave(filename = "24h_sig_var.png", plot = last_plot(), path = here("outputs"))
+```
+
+## Pairwise comparison 
+
+### Pairwise comparison function
 
 ```{r}
 nunu_pairwise <- function(data, type = "coble_a", time_point = 6){
@@ -495,159 +562,11 @@ return(pairwise_results)
 ```
 
 
-```{r}
-df <- mobeast_24h %>% #filter(outlier != "outlier") %>% 
-        filter(variable == "het_bact") %>% 
-        filter(treatment == "Algae") %>% 
-  filter(time_string == "12:00:00" | time_string == "00:00:00") %>% 
-  mutate(time_US = ifelse(time_string == "12:00:00", "T12", "T00")) %>% 
-  select(tank_number, time_US, conc_norm) %>% 
-  pivot_wider(names_from = time_US, values_from = conc_norm) 
-      
-      paired <- t.test(df$T12, df$T00, paired = TRUE, na.action = na.pass)
-      
-      df2 <- tibble(
-        time_point = "12AM-12PM",
-        variable = type,
-        treatment = var,
-        mean = paired$estimate, 
-        p_value = paired$p.value)
-      
-      pairwise_results <- rbind(pairwise_results, df2)
-      pairwise_results <<- pairwise_results
-```
-
-
 
 ```{r}
-nunu_pairwise(mobeast_24h, type = "hix", time_point = 12)
+nunu_pairwise(mobeast_24h, type = "npoc_u_m", time_point = 6)
 ```
 
-
-
-```{r}
-pairwise_summary %>% filter(p_value <0.05)
-```
-
-```{r}
-nunu_pairwise(DOC_24h, type = "npoc_u_m",time_point = 6)
-
-```
-
-
-```{r}
-variable_meta <- mobeast_24h %>% 
-  select(variable, variable_cat) %>%  distinct()
-
-sig_var <- pairwise_summary %>%  filter(p_value <0.05) %>% select(variable) %>% distinct() %>% pull()
-
-pairwise_summary %>% 
-  right_join(variable_meta) %>% 
-  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
-                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
-  mutate(sig = factor(sig, 
-                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
-  arrange(variable_cat, variable) %>%
-  mutate(variable = factor(variable, levels = unique(variable))) %>%
-  filter(variable %in% sig_var) %>% filter(variable != "NO2", 
-                                           variable != "tn_u_m") %>% 
-  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
-  ggplot()+
-  geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
-  #facet_wrap(.~variable_cat)+
-  facet_grid(variable_cat ~ ., scales = "free_y", space = "free_y")+
-  labs(title = "Pairwise comparison 12AM-12PM",
-       x= "Treatment",
-       y = " Variables")+
-  guides(fill=guide_legend(title="p-value interpretation"))+
-  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
-                    values = c("#43A047", "#90CAF9", "#F44336"))+
-  theme_bw()+ 
-  theme(plot.title = element_text(size=30, face = "bold"), 
-        plot.subtitle = element_text(size=24),
-        axis.title = element_text(size = 20, face = "bold"),
-        axis.text = element_text(size = 16),
-        strip.text.x = element_text(size = 20, face = "bold"),
-        legend.title=element_text(size=16, face = "bold"),
-        legend.text=element_text(size=15),
-        strip.background = element_rect(fill = "white"),
-        legend.position = "top")
-```
-
-
-```{r}
-sig_var <- pairwise_summary %>%  filter(p_value <0.05) %>% select(variable) %>% distinct() %>% pull()
-
-pairwise_summary %>% mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
-                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
-  mutate(sig = factor(sig, levels = c("Enrichment","No Difference", "Depletion"))) %>% 
-  filter(variable %in% sig_var) %>% 
-  filter(variable != "pro", 
-         variable != "pico_euk",
-         variable != "NO2", 
-         variable != "tn_u_m") %>% 
-  mutate(variable = factor(variable, levels = c(
-    "coble_a","coble_c","coble_m", "m_to_c","bix","hix","fi",
-    "coble_b", "coble_t","fpeak","lignin")),
-    variable = fct_rev(variable)) %>%
-  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
-  ggplot()+
-  geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
-  #facet_wrap(.~variable_cat)+
-  labs(title = "Pairwise comparison 12PM vs. 12AM",
-       x= "Treatment",
-       y = " Variables")+
-  guides(fill=guide_legend(title="p-value interpretation"))+
-  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
-                    values = c("#43A047", "#90CAF9", "#F44336"))+
-  theme_bw()+ 
-  theme(plot.title = element_text(size=30, face = "bold"), 
-        plot.subtitle = element_text(size=24),
-        axis.title = element_text(size = 20, face = "bold"),
-        axis.text = element_text(size = 16),
-        strip.text.x = element_text(size = 20, face = "bold"),
-        legend.title=element_text(size=16, face = "bold"),
-        legend.text=element_text(size=15),
-        strip.background = element_rect(fill = "white"),
-        legend.position = "top")
-```
-
-```{r}
-sig_fdom <-  pairwise_summary %>%  filter(p_value <0.05) %>% 
-  filter(variable %in% sig_var) %>% 
-  filter(variable != "pro", 
-         variable != "pico_euk",
-         variable != "NO2", 
-         variable != "tn_u_m") %>% select(variable) %>% distinct() %>% pull()
- 
-```
-
-```{r}
-mobeast_24h %>% 
-  filter(variable %in% sig_fdom) %>% 
-  filter(time_string == "00:00:00"|time_string == "12:00:00") %>% 
-  mutate(variable = factor(variable, levels = c(
-    "coble_a","coble_c","coble_m", "m_to_c","bix","hix","fi",
-    "coble_b", "coble_t","fpeak","lignin"))) %>% 
-  ggplot(aes(x= treatment, y= areal_flux, fill = treatment))+
-    geom_violin()+
-    #geom_jitter(aes(color = outlier), alpha = 0.5)+
-    geom_hline(yintercept=0, linetype='dashed')+
-    stat_summary(color = "yellow", alpha =0.5)+
-    facet_grid(variable ~ time_fac, scales = "free")+
-    labs(title = paste("24h fDOM Changes"),
-       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
-       x= "Treatment",
-       y = "Areal Flux (raman unit/(s.m2)")+
-  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
-                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-  scale_color_manual(breaks = c("outlier", "not outlier"), 
-                       values=c("red", "black"))+
-    nunu_theme + 
-    theme(axis.text = element_text(size = 18), 
-          legend.position = "none")
-  
-```
 
 
 
