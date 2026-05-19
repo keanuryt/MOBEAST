@@ -192,7 +192,7 @@ mobeast_24h <- mobeast_delta %>%
   ## remove the outliers 
   #filter(outlier == "not outlier") %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) 
+                                                   "00:00:00","06:00:00"))) %>% mutate(log_flow = log10(flowrate)) 
 
 ```
 
@@ -233,7 +233,7 @@ names(models_24h) <- mobeast_loop
 
 for (var in mobeast_loop) {
   df <- mobeast_24h %>% filter(variable == var)
-  models_24h[[var]] <- lmer(conc_norm~ treatment*time_fac + flowrate + (1|tank_number), data = df)
+  models_24h[[var]] <- lmer(conc_norm~ treatment + log_flow +(1|time_fac) +(1|tank_number), data = df)
 }
 
 
@@ -333,6 +333,8 @@ emmeans_results <- imap_dfr(models_24h, ~ {
 emmeans_results %>% filter(variable %in% sig_eta) %>% filter(adj.p.value <0.05)
 ```
 
+
+
 ```{r}
 emmeans_results_sig <- emmeans_results %>% 
   filter(adj.p.value <0.05)
@@ -348,6 +350,7 @@ emmean_sig <- emmeans_results_sig %>% select(variable) %>% distinct() %>%  pull(
     emmeans(model, pairwise ~ treatment)
 
 NOT APPLICABLE BCS NO TIME INTERACTION IN THE ANOVA 
+
     
 
 #### Effect Size 
