@@ -1,7 +1,10 @@
 # Title: Merging all data
 # Date: November 18, 2025
-# Edited: 24 February 2026
+# Edited: 21 May 2026
 # Author: Keanu Rochette-Yu Tsuen 
+
+# Last edit comment: Relabeled the DNA taxonomy to just the families, not 
+## order + family + genus 
 #################
 
 
@@ -150,11 +153,11 @@ res_time_list <- colnames(res_time[,c(2:10)])
 
 DNA <- DNA %>% rename(id_number = SampleID) %>% 
   clean_names() %>% 
-  mutate(bact_tax = paste0(order,"_",family,"_",genus)) %>% 
-  group_by(id_number, bact_tax) %>% 
+  #mutate(bact_tax = paste0(order,"_",family,"_",genus)) %>% 
+  group_by(id_number, family) %>%  
   summarise(sum_abun = sum(abund)) %>% 
   ungroup() %>% 
-  pivot_wider(names_from = bact_tax, values_from = sum_abun)
+  pivot_wider(names_from = family, values_from = sum_abun)
 
 DNA_list <- colnames(DNA[,-1])
 
@@ -208,7 +211,7 @@ merged<- merged %>% mutate(date_string = as.character(date_string),
   rename(ph = pH) 
 
 ### merge DNA data 
-merged<- merged %>% left_join(DNA, by = "id_number") %>% view()
+merged<- merged %>% left_join(DNA, by = "id_number") 
          
 ## Data clean up
 merged_data <- merged %>% 
@@ -220,7 +223,7 @@ merged_data <- merged %>%
 
 ## Creating long format data 
 merged_long <- merged_data %>% 
-  pivot_longer(cols = c(het_bact:dic_mmol_kg, ph, 44:178),
+  pivot_longer(cols = c(het_bact:dic_mmol_kg, ph, 45:135),
                names_to = "variable",
               values_to = "value") %>% 
   mutate(variable_cat =
@@ -231,7 +234,7 @@ merged_long <- merged_data %>%
                                        ifelse(variable %in% nutrient_list, "nutrients", 
                                               ifelse(variable %in% res_time_list, "residence time",
                                                      ifelse(variable %in% DNA_list, "DNA",
-                                                     "chla")))))))) 
+                                                     "chla"))))))))
 
 #write_csv(merged_long, here("data", "MOBEAST_full_merged_data_long.csv"))
 

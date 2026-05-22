@@ -137,7 +137,7 @@ mobeast %>%
   nunu_theme
 ```
 
-```{r, fig.height=50, fig.width=5}
+```{, fig.height=50, fig.width=5}
 mobeast %>% 
   filter(outlier != "outlier") %>% 
   mutate(flowrate = log10(flowrate)) %>% 
@@ -204,6 +204,34 @@ delta_results
 ```{r}
 
 delta_result_gt <- delta_results %>% left_join(meta_label) %>% 
+  mutate(variable = recode_values(variable,
+      "npoc_u_m"      ~ "DOC",
+      "tn_u_m"       ~ "Total Nitrogen",
+      "het_bact" ~ "Heterotrophic Bacteria",
+      "pico_euk" ~ "Pico Eukaryote",
+      "syn" ~ "Synechococcus",
+      "pro" ~ "Prochlorococcus",
+      "tot_bact" ~ "Total Bacteria",
+      "cyano" ~ "Cyanobacteria",
+      "chla_conc" ~ "Chlorophyll a",
+      "coble_a" ~ "Coble A",
+      "coble_b" ~ "Coble B",
+      "coble_c" ~ "Coble C",
+      "coble_m" ~ "Coble M",
+      "coble_t" ~ "Coble T",
+      "m_to_c" ~ "M:C",
+      "bix" ~ "BIX",
+      "hix" ~ "HIX",
+      "fpeak" ~ "Fpeak",
+      "lignin" ~ "Lignin",
+      "fi" ~ "FI",
+      "N_N" ~ "N+N",
+      "NO2" ~ "Nitrite (NO2)",
+      "NO3" ~ "Nitrate (NO3)",
+      "PO4" ~ "Phosphate (PO4)",
+      "SiO2" ~ "Silica (SiO2)",
+      "NH3" ~ "Ammonia (NH3)"
+    )) %>% 
   relocate(variable_cat) %>% 
   arrange(variable_cat, variable) %>% 
   gt(rowname_col = "variable", groupname_col = "variable_cat") %>% 
@@ -336,7 +364,7 @@ mobeast_delta %>%
 
 
 
-```{r, fig.height=100, fig.width=7}
+```{, fig.height=100, fig.width=7}
 mobeast_delta %>% 
   ggplot( aes(x = flowrate, y = conc_norm)) +
   geom_point(size = 2, alpha = 0.8) +
