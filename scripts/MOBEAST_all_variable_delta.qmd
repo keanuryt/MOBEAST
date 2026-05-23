@@ -1095,7 +1095,7 @@ names(models_DNA_24h) <- mobeast_loop
 
 for (var in mobeast_loop) {
   df <- mobeast_DNA_24h %>% filter(variable == var)
-  models_DNA_24h[[var]] <- lmer(value~ treatment*time_fac + 
+  models_DNA_24h[[var]] <- lmer(value ~ treatment*time_fac + 
                                   log_flow + (1|tank_number), data = df)
 
 }
@@ -1130,18 +1130,22 @@ sig_treat <- anova_results %>% filter(p.value <0.05) %>%
   select(variable) %>% 
   pull()
 
-anova_results %>% filter(p.value <0.05) %>% 
-  filter(term == "treatment")
+fam_time <- anova_results %>% filter(p.value <0.05) %>% 
+  filter(term == "time_fac") %>% select(variable) %>% distinct() 
 
+fam_treatment <- anova_results %>% filter(p.value <0.05) %>% 
+  filter(term == "treatment") %>% select(variable) %>% distinct() %>% pull()
 
+fam_time %>%  filter(variable %in% fam_treatment) %>%  pull()
+
+fam_interaction <- anova_results %>% filter(p.value <0.05) %>% 
+  filter(term == "treatment:time_fac")
+
+fam_interaction %>% filter(variable %in% fam_treatment)
+interaction_family <- fam_interaction %>% filter(variable %in% fam_treatment) %>% 
+  select(variable) %>%  pull()
 ```
 
-
-```{r}
-## Families that have a significant time:treatment interactions in ANOVA
-interaction_family <- anova_results %>% filter(p.value <0.05,
-                                               term == "treatment:time_fac" & term == "treatment") 
-```
 
 
 #### Partial Eta squared 
@@ -1239,7 +1243,7 @@ emmeans_results_dna %>%
   mutate(sig = factor(sig, 
                       levels = c("Enrichment","No Difference", "Depletion"))) %>% 
   filter(variable %in% sig_treat)  %>%
-  #filter(variable %in% interaction_family) %>% 
+  filter(!variable %in% interaction_family) %>% 
   mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>%
   ggplot()+
   geom_tile(aes(x= contrast, y= variable, fill = sig), color = "black")+

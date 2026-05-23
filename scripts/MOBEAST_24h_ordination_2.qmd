@@ -110,6 +110,7 @@ unifrac_dist <- as.dist(unifrac_subset)
 # NMDS Calculation
 
 ```{r}
+
 nmds <- metaMDS(unifrac_dist, k=2, trymax = 1000)
 # put stress in the corner fo the nmds plot
 nmds$stress
@@ -172,6 +173,7 @@ nmds_merged<- nmds_merged %>% mutate(time_fac = factor(time_string, levels = c("
 
 ```{r}
 # Note : Version 2 of adonis 
+set.seed(1999)
 perma_24h <- adonis2(unifrac_dist ~ treatment+time_fac+ treatment:time_fac + log_flow, 
                      data = nmds_merged,
                      strata = nmds_merged$tank_number,by = "term")
@@ -191,6 +193,7 @@ print(perma_24h)
 - pairwise pairwise.adonis2(p.adjust.m = "BH"), make sure that it's a distance matrix (as.dist())
 
 ```{r}
+set.seed(1999)
 pairwise_adonis(x = unifrac_dist, 
                 groups = as.vector(nmds_merged$treatment),
                   p.adjust.m = "BH")
@@ -219,7 +222,7 @@ unifrac_dist_12PM <- as.dist(unifrac_12PM)
 ```
 
 
-# NMDS Calculation
+### NMDS Calculation
 
 ```{r}
 nmds_12PM <- metaMDS(unifrac_dist_12PM, k=2, trymax = 1000)
@@ -248,10 +251,10 @@ nmds_merged_12PM<- nmds_merged_12PM %>% mutate(treatment = factor(treatment, lev
 ```
 
 
-# Plotting Ordination 
+### Plotting Ordination 
 
 
-```{r, fig.width=16, fig.height= 6}
+```{r, fig.width=12, fig.height= 8}
 # Plot
 nmds_merged_12PM %>%   
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
@@ -262,7 +265,7 @@ nmds_merged_12PM %>%
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = date_string))+
   #facet_wrap(~time_string, ncol = 4)+
-  labs(title= "Ordination of 24h samples")+
+  labs(title= "Ordination 12:00 samples")+
   scale_color_manual(values=treatment_colors )+
   scale_fill_manual(values= treatment_colors) +
   nunu_theme+
@@ -271,7 +274,7 @@ nmds_merged_12PM %>%
 
 ```
 
-## PERMANOVA 
+### PERMANOVA 
 
 ```{r}
 nmds_merged_12PM<- nmds_merged_12PM %>% mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00","00:00:00","06:00:00")))
@@ -280,9 +283,10 @@ nmds_merged_12PM<- nmds_merged_12PM %>% mutate(time_fac = factor(time_string, le
 
 ```{r}
 # Note : Version 2 of adonis 
-perma_12PM <- adonis2(unifrac_dist ~ treatment + log_flow, 
-                     data = nmds_merged_12PM)
-perma_12PM
+set.seed(1999)
+perma_12PM <- adonis2(unifrac_dist_12PM ~ treatment + log_flow, 
+                     data = nmds_merged_12PM, by = "term")
+tidy(perma_12PM)
 
 ## Random effect (strata) should be applied on the tank because we sample repeatedly in the tank.
 ## We don't sample the same tank multiple times at a time point. 
@@ -290,6 +294,14 @@ perma_12PM
 ### Note: why is the output of the model not show fixed effects and random effects like lmer()? 
 
 
+```
+
+### Pairwise comparison
+```{r}
+set.seed(1999)
+pairwise_adonis(x = unifrac_dist_12PM, 
+                groups = as.vector(nmds_merged_12PM$treatment),
+                  p.adjust.m = "BH")
 ```
 
 
@@ -308,10 +320,11 @@ samples_6AM <- meta %>% mutate(time_string = as.character(time_string),
 unifrac_6AM <- unifrac[rownames(unifrac) %in% samples_6AM, colnames(unifrac) %in% samples_6AM]
 
 unifrac_dist_6AM <- as.dist(unifrac_6AM)
+
 ```
 
 
-# NMDS Calculation
+### NMDS Calculation
 
 ```{r}
 nmds_6AM <- metaMDS(unifrac_dist_6AM, k=2, trymax = 1000)
@@ -336,14 +349,14 @@ nmds_merged_6AM <- mobeast %>% select(id_number, flowrate) %>%
 ```
 
 ```{r}
-nmds_merged_6AM<- nmds_merged_6AM %>% mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+nmds_merged_6AM <- nmds_merged_6AM %>% mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
 ```
 
 
-# Plotting Ordination 
+### Plotting Ordination 
 
 
-```{r, fig.width=16, fig.height= 6}
+```{r, fig.width=12, fig.height= 8}
 # Plot
 nmds_merged_6AM %>%   
   ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
@@ -354,7 +367,7 @@ nmds_merged_6AM %>%
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = date_string))+
   #facet_wrap(~time_string, ncol = 4)+
-  labs(title= "Ordination of 24h samples")+
+  labs(title= "Ordination 06:00 samples")+
   scale_color_manual(values=treatment_colors )+
   scale_fill_manual(values= treatment_colors) +
   nunu_theme+
@@ -363,7 +376,7 @@ nmds_merged_6AM %>%
 
 ```
 
-## PERMANOVA 
+### PERMANOVA 
 
 ```{r}
 nmds_merged_6AM<- nmds_merged_6AM %>% mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00","00:00:00","06:00:00")))
@@ -372,9 +385,10 @@ nmds_merged_6AM<- nmds_merged_6AM %>% mutate(time_fac = factor(time_string, leve
 
 ```{r}
 # Note : Version 2 of adonis 
-perma_6AM <- adonis2(unifrac_dist ~ treatment + log_flow, 
-                     data = nmds_merged_6AM)
-perma_6AM
+set.seed(1999)
+perma_6AM <- adonis2(unifrac_dist_6AM ~ treatment + log_flow, 
+                     data = nmds_merged_6AM, by = "term")
+tidy(perma_6AM)
 
 ## Random effect (strata) should be applied on the tank because we sample repeatedly in the tank.
 ## We don't sample the same tank multiple times at a time point. 
@@ -384,11 +398,114 @@ perma_6AM
 
 ```
 
+### Pairwise comparison
+```{r}
 
-## Microbiome diversity 
+set.seed(1999)
+pairwise_adonis(x = unifrac_dist_6AM, 
+                groups = as.vector(nmds_merged_6AM$treatment),
+                  p.adjust.m = "BH")
+```
+
+
+
+
+# Summary Ordindations
+```{r}
+meta_24h <- meta %>% mutate(time_string = as.character(time_string),
+                date_string = as.character(date_string)) %>% 
+  filter(date_string == "2024-06-02" | date_string == "2024-06-03", 
+         treatment != "Inflow") 
+
+mobeast_24h <- mobeast %>% 
+  mutate(date_string = as.character(date_string),
+         time_string = as.character(time_string)) %>% 
+    filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  mutate(log_flow = log10(flowrate)) %>% 
+  mutate(treatment = factor(treatment, 
+                            levels = c("Control", "Coral", "CCA", "Algae"))) %>%
+  filter(!tank_number %in% c("F1", "F2"), 
+         !is.na(id_number)) %>% 
+     select(id_number, treatment,tank_number, time_string, log_flow) %>% 
+     distinct()
+
+```
 
 ```{r}
-div_meta <- meta %>% select(id_number, treatment, date_string)
+time_point <- c("12:00:00", "18:00:00","00:00:00", "06:00:00")
+perma_results <- tibble()
+pairwise_results <- tibble()
+
+for (time in time_point) {
+
+  ## Isolating the samples that go in one time point
+  samples <- mobeast_24h %>% filter(time_string == time) %>% 
+  select(id_number) %>%  pull()
+  
+  ## Create a unifrac with a specific time point
+  unifrac_time <- unifrac[rownames(unifrac) %in% samples, colnames(unifrac) %in% samples]
+
+  unifrac_dist <- as.dist(unifrac_time)
+  
+  # mobeast filtering 
+   df <- mobeast_24h %>% filter(time_string == time) 
+  
+   set.seed(1999)
+  # Calculating the PERMANOVA 
+  perma <- adonis2(unifrac_dist ~ treatment + log_flow, 
+                     data = df, by = "term")
+  
+  # saving the results of the model in a clean df with the time point name
+  results <- tidy(perma) %>% mutate(time_point = time) %>%  
+    relocate(time_point) %>% 
+    rename(Sum_Sq_PERMA = SumOfSqs, 
+           R2_PERMA = R2,
+           F_stat = statistic,
+           p_val_PERMA = p.value)
+  
+  # bind to the final result df
+  perma_results <- rbind(perma_results, results)
+  
+  set.seed(1999)
+  # save the pairwise results in a df 
+  pairwise <- pairwise_adonis(x = unifrac_dist, 
+                groups = as.vector(df$treatment),
+                  p.adjust.m = "BH")
+  
+  #bind to dinal result df 
+  results_pair <- pairwise %>%  
+    rename(Sum_Sq_pair = SumsOfSqs, 
+           R2_pair = R2,
+           F_stat_pair = F.Model,
+           p_val_pair = p.value,
+           p_adj_pair = p.adj) %>% 
+    mutate(time_point = time) %>%  
+    relocate(time_point) 
+  
+  pairwise_results <- rbind(pairwise_results, results_pair)
+  
+}
+
+perma_results
+
+pairwise_results %>% 
+  filter(pairs %in% c("Algae vs Control", 
+                      "CCA vs Control",
+                      "Control vs Coral"))
+
+```
+
+
+
+
+
+
+# Microbiome diversity 
+
+```{r}
+div_meta <- mobeast %>% select(id_number, treatment, date_string, flowrate) %>% 
+  distinct() %>% 
+  mutate(log_flow = log10(flowrate))
 
 # formatting the OTU matrix with sample names in the rows and OTU on the columns
 otu <- DNA %>% 
