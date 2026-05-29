@@ -611,6 +611,52 @@ mobeast_delta %>% filter(variable %in% sig_anova) %>%
           sd = sd(conc_norm, na.rm = TRUE))
 ```
 
+## DOM x Het Bact
+```{r}
+mobeast_wide <- mobeast_24h %>% select(tank_number, treatment, inflow_table, 
+                       time_fac,variable, conc_norm, log_flow) %>% 
+  pivot_wider(names_from = variable, values_from = conc_norm)
+```
+
+
+### HIX - No sig ANOVA
+```{r}
+mod_hix <- lm(het_bact ~ hix, 
+                  data= mobeast_wide)
+anova(mod_hix)
+```
+
+### Coble C
+
+```{r}
+mobeast_wide_algae <- filter(mobeast_wide, treatment == "Algae")
+cobC_lm <- lm(het_bact ~ coble_c,
+                data= mobeast_wide_algae)
+
+summary(cobC_lm) 
+
+resid_panel(cobC_lm, plots = "qq") 
+
+anova(cobC_lm, type=2)
+```
+
+
+```{r}
+mobeast_wide %>% filter(treatment == "Algae") %>% 
+  ggplot(aes(hix, het_bact, color = treatment, group = treatment)) +
+  geom_point()+
+  geom_smooth(method = "lm")+
+  #facet_wrap(.~treatment)+
+  scale_color_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
+      )  +
+  nunu_theme
+    
+```
+
+
+
 
 ## Pairwise comparison 
 
@@ -1047,6 +1093,9 @@ ta + ph
 ```
 
 
+
+
+
 ## DNA 
 
 ### DNA data clean up 
@@ -1243,7 +1292,7 @@ emmeans_results_dna %>%
   mutate(sig = factor(sig, 
                       levels = c("Enrichment","No Difference", "Depletion"))) %>% 
   filter(variable %in% sig_treat)  %>%
-  filter(!variable %in% interaction_family) %>% 
+  #filter(variable %in% interaction_family) %>% 
   mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>%
   ggplot()+
   geom_tile(aes(x= contrast, y= variable, fill = sig), color = "black")+
@@ -1300,8 +1349,6 @@ effect_size_results %>%
 
 
 ```
-
-
 
 
 
@@ -1522,4 +1569,57 @@ ggplot(pca_scores, aes(Comp.1,Comp.2))+
 
 
 
+
+
+## PCA 6AM only
+
+```{r}
+## used the areal flux to calculate the PCA here
+## normalization with scale(), but don't actually know what it noarmalizes to...
+pca_6AM_df <- mobeast_24h %>% select(id_number, tank_number, treatment, inflow_table,
+                             date_string, time_string, variable, conc_norm) %>%
+  filter(variable != "cyano", variable != "tot_bact",
+         variable != "tn_u_m", variable != "m_to_c",
+         variable != "N_N", variable != "lignin",
+         variable != "chla_conc") %>% 
+  pivot_wider(names_from = variable, values_from = conc_norm) %>% 
+  drop_na()
+
+pca_matrix_6AM_norm <- pca_6AM_df %>% select(het_bact:npoc_u_m) %>% scale() 
+
+pca_matrix_6AM_norm %>% cor() %>% 
+  ggcorrplot(
+           hc.order = TRUE,
+           #type = "lower",
+           lab = TRUE)
+```
+
+
+```{r}
+
+pca_matrix_6AM_norm <- pca_matrix_6AM_norm %>% as.data.frame() %>% 
+  select(het_bact, pico_euk, syn, coble_a, coble_b,
+         coble_c, coble_m, coble_t, hix, bix, fpeak, fi, 
+         SiO2, NH3,PO4, NO3, npoc_u_m) %>% as.matrix()
+dim(pca_matrix_6AM_norm)
+```
+
+
+```{r}
+data.pca <- princomp(pca_matrix_6AM_norm, cor = TRUE)
+#data.pca <- prcomp(pca_matrix_6AM_norm, scale. = FALSE)
+summary(data.pca)
+
+data.pca$loadings[,1:4]
+
+loading_results <- as.data.frame(data.pca$loadings[,1:4])
+
+fviz_eig(data.pca, addlabels = TRUE)
+
+fviz_pca_var(data.pca, col.var = "black")
+
+fviz_pca_var(data.pca, col.var = "cos2",
+            gradient.cols = c("blue", "lightgrey", "red"),
+            repel = TRUE)
+```
 

@@ -110,7 +110,6 @@ unifrac_dist <- as.dist(unifrac_subset)
 # NMDS Calculation
 
 ```{r}
-
 nmds <- metaMDS(unifrac_dist, k=2, trymax = 1000)
 # put stress in the corner fo the nmds plot
 nmds$stress
@@ -176,7 +175,7 @@ nmds_merged<- nmds_merged %>% mutate(time_fac = factor(time_string, levels = c("
 set.seed(1999)
 perma_24h <- adonis2(unifrac_dist ~ treatment+time_fac+ treatment:time_fac + log_flow, 
                      data = nmds_merged,
-                     strata = nmds_merged$tank_number,by = "term")
+                     strata = nmds_merged$tank_number, by = "term")
 print(perma_24h)
 
 ## Random effect (strata) should be applied on the tank because we sample repeatedly in the tank.
