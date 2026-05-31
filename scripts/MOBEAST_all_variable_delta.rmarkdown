@@ -12,7 +12,11 @@ knitr::opts_chunk$set(echo = TRUE,
                       message = FALSE)
 ```
 
+
+
 ## Load Libraries
+
+
 
 ```{r}
 library(tidyverse)
@@ -48,7 +52,11 @@ library(factoextra)
 ```
 
 
+
+
 ## Data visualization theme
+
+
 
 ```{r}
 nunu_theme <- theme_bw()+ 
@@ -62,8 +70,6 @@ nunu_theme <- theme_bw()+
         strip.background = element_rect(fill = "white"))
 ```
 
-
-
 ```{r}
 treatment_colors = c("Inflow"="#00838F",
                      "Control"="grey", 
@@ -74,7 +80,11 @@ treatment_colors = c("Inflow"="#00838F",
                      "Rain"= "yellow")
 ```
 
+
+
 ## Load Data
+
+
 
 ```{r}
 mobeast_raw <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
@@ -82,8 +92,12 @@ mobeast_raw <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
 ```
 
 
+
+
 ## Data Clean Up
 ### Outlier detection on bulk data
+
+
 
 ```{r}
 ## flagging outliers from the data set
@@ -117,7 +131,6 @@ mobeast_DOC_avg <- mobeast %>% filter(variable != "npoc_u_m") %>%
   rbind(DOC)
 ```
 
-
 ```{r}
 mobeast_flagged <- mobeast_DOC_avg %>% 
   # flagging outliers
@@ -138,7 +151,11 @@ mobeast_flagged <- mobeast_DOC_avg %>%
 
 
 
+
+
 ### Biogeochemistry 
+
+
 
 ```{r}
 
@@ -179,7 +196,11 @@ mobeast_delta <- mobeast_delta %>% filter(!variable_cat %in%  exclude_var,
 ```
 
 
+
+
 ## 24h data
+
+
 
 ```{r}
 # subset the data set to only the 24h samples
@@ -196,7 +217,11 @@ mobeast_24h <- mobeast_delta %>%
 
 ```
 
+
+
 ### Summary Stats 
+
+
 ```{r}
 mobeast_delta %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
@@ -216,7 +241,11 @@ mobeast_delta %>%
 
 
 
+
+
 ### LMER models
+
+
 
 ```{r}
 # Loop Function:
@@ -240,7 +269,6 @@ for (var in mobeast_loop) {
 
 ```
 
-
 ```{r}
 plot_grid(imap(models_24h, ~ {
   resid_panel(.x, plots = c("qq")) + plot_annotation(title = .y)}), 
@@ -248,7 +276,11 @@ margin = c(0.2, 0.2, 0.2, 0.2), tags = TRUE)
 
 ```
 
+
+
 #### model results (fixed and random)
+
+
 ```{r}
 results <- imap_dfr(models_24h, ~ tidy(.x) %>%
                      dplyr::mutate(variable = .y)) %>% 
@@ -258,11 +290,15 @@ results %>% filter(p.value < 0.05)
 
 ```
 
+
+
 #### ANOVA results
 
 Your gatekeeper — if nothing is significant here, you stop
 Reports F-statistic, df, and p-value for each term
 Type II is appropriate because it accounts for the other terms in the model without assuming a particular order
+
+
 
 ```{r, warning= FALSE}
 # So many Warnings! 
@@ -291,7 +327,11 @@ anova_results %>%
 ```
 
 
+
+
 ##### Nutrient ANOVA summary table 
+
+
 
 ```{r}
 nutrient_stat_summary_table <- anova_results %>%
@@ -360,6 +400,8 @@ nutrient_stat_summary_table
 
 
 
+
+
 #### Partial Eta squared 
 
 Partial η²
@@ -367,6 +409,8 @@ Partial η²
 Answers "so what?" after a significant ANOVA
 Tells you whether the significant effect is actually large enough to care about biologically
 A p < 0.05 with η² = 0.01 is statistically real but possibly biologically trivial
+
+
 
 
 ```{r}
@@ -386,11 +430,15 @@ sig_eta <- eta_results %>% filter(Eta2_partial > 0.14, variable != "tot_bact", v
 
 ```
 
+
+
 #### emmeans results
 
 Unpacks where the group differences are
 Particularly important for your treatment * time interaction — you need to know at which time points treatments diverge
 Controls for multiple comparisons
+
+
 
 
 ```{r}
@@ -409,8 +457,6 @@ emmeans_results %>% #filter(variable %in% sig_eta) %>%
   filter(adj.p.value <0.05)
 ```
 
-
-
 ```{r}
 emmeans_results_sig <- emmeans_results %>% 
   filter(adj.p.value <0.05)
@@ -419,7 +465,11 @@ emmean_sig <- emmeans_results_sig %>% select(variable) %>% distinct() %>%  pull(
 
 
 
+
+
 ##### Nutrient Time contrasts
+
+
 
 ```{r}
 ## Nutrient time contrast
@@ -438,7 +488,11 @@ for (var in c("NO3", "PO4", "NH3", "SiO2")) {
 time_contrast %>% filter(adj.p.value < 0.05)
 ```
 
+
+
 ##### FCM Time Contrasts
+
+
 
 ```{r}
 ## FCM time contrast
@@ -458,6 +512,8 @@ time_contrast %>% filter(adj.p.value < 0.05)
 ```
 
 
+
+
 #### Emmeans if time interactions ! 
 3b. If interaction is significant → decompose emmeans by time point
     emmeans(model, pairwise ~ treatment | time)
@@ -474,6 +530,8 @@ NOT APPLICABLE BCS NO TIME INTERACTION IN THE ANOVA
 Adds biological interpretability to each contrast
 Tells you not just "these groups differ" but "by how much and in which direction"
 Essential for comparing across nutrients since your residuals are on different scales
+
+
 
 
 ```{r}
@@ -504,7 +562,11 @@ effect_size_results %>%
 
 
 
+
+
 #### Violin plots
+
+
 
 ```{r}
 meta_var <- mobeast_24h %>% select(variable) %>% distinct() %>% 
@@ -570,7 +632,6 @@ ggsave(filename = "24h_fDOM.png", plot = last_plot(), path = here("outputs"))
 ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
 ```
 
-
 ```{r, fig.width=14, fig.height=7}
 # Nutrients plots 
 
@@ -578,8 +639,6 @@ plots_24h[["NO3"]]
 
 ggsave(filename = "24h_N03.png", plot = last_plot(), path = here("outputs"))
 ```
-
-
 
 ```{r, fig.width=14, fig.height=30}
 # Nutrients plots 
@@ -595,7 +654,11 @@ ggsave(filename = "24h_N03.png", plot = last_plot(), path = here("outputs"))
 #ggsave(filename = "24h_sig_var.png", plot = last_plot(), path = here("outputs"))
 ```
 
+
+
 ##### Nutrients 
+
+
 
 ```{r,message=FALSE, fig.width = 13, fig.height = 8}
 mobeast_24h %>% 
@@ -630,7 +693,11 @@ ggsave(filename = "nutrient_chla_plot.png" , plot = last_plot(), height = 8, wid
 ```
 
 
+
+
 #### Summary Stats for Thesis
+
+
 
 ```{r}
 mobeast_delta %>% filter(variable %in% sig_anova) %>% 
@@ -639,7 +706,11 @@ mobeast_delta %>% filter(variable %in% sig_anova) %>%
           sd = sd(conc_norm, na.rm = TRUE))
 ```
 
+
+
 ## DOM x Het Bact
+
+
 ```{r}
 mobeast_wide <- mobeast_24h %>% select(tank_number, treatment, inflow_table, 
                        time_fac,variable, conc_norm, log_flow) %>% 
@@ -647,14 +718,22 @@ mobeast_wide <- mobeast_24h %>% select(tank_number, treatment, inflow_table,
 ```
 
 
+
+
 ### HIX - No sig ANOVA
+
+
 ```{r}
 mod_hix <- lm(het_bact ~ hix, 
                   data= mobeast_wide)
 anova(mod_hix)
 ```
 
+
+
 ### Coble C
+
+
 
 ```{r}
 mobeast_wide_algae <- filter(mobeast_wide, treatment == "Algae")
@@ -667,7 +746,6 @@ resid_panel(cobC_lm, plots = "qq")
 
 anova(cobC_lm, type=2)
 ```
-
 
 ```{r}
 mobeast_wide %>% filter(treatment == "Algae") %>% 
@@ -686,9 +764,13 @@ mobeast_wide %>% filter(treatment == "Algae") %>%
 
 
 
+
+
 ## Pairwise comparison 
 
 ### Pairwise comparison function
+
+
 
 ```{r}
 nunu_pairwise <- function(data, type = "coble_a", time_point = 6){
@@ -771,14 +853,16 @@ return(pairwise_results)
 
 ```
 
-
-
 ```{r}
 nunu_pairwise(mobeast_24h, type = "npoc_u_m", time_point = 6)
 ```
 
 
+
+
 ## pH and TA 
+
+
 
 ```{r}
 mobeast_carb <- mobeast_flagged %>%  filter(variable_cat == "carbonate") %>% 
@@ -817,7 +901,11 @@ mobeast_carb <- mobeast_flagged %>%  filter(variable_cat == "carbonate") %>%
 ```
 
 
+
+
 ### Carbonate LMER models
+
+
 
 ```{r}
 # Loop Function:
@@ -841,7 +929,6 @@ for (var in mobeast_loop) {
 
 ```
 
-
 ```{r}
 plot_grid(imap(models_carb, ~ {
   resid_panel(.x, plots = c("qq")) + plot_annotation(title = .y)}), 
@@ -849,11 +936,15 @@ margin = c(0.2, 0.2, 0.2, 0.2), tags = TRUE)
 
 ```
 
+
+
 ### ANOVA results
 
 Your gatekeeper — if nothing is significant here, you stop
 Reports F-statistic, df, and p-value for each term
 Type II is appropriate because it accounts for the other terms in the model without assuming a particular order
+
+
 
 ```{r, warning= FALSE}
 # So many Warnings! 
@@ -880,6 +971,8 @@ anova_carb %>%
 
 
 
+
+
 ### Partial Eta squared 
 
 Partial η²
@@ -887,6 +980,8 @@ Partial η²
 Answers "so what?" after a significant ANOVA
 Tells you whether the significant effect is actually large enough to care about biologically
 A p < 0.05 with η² = 0.01 is statistically real but possibly biologically trivial
+
+
 
 
 ```{r}
@@ -909,11 +1004,15 @@ sig_eta_carb <- eta_carb %>% filter(Eta2_partial > 0.14) %>% select(variable) %>
 ```
 
 
+
+
 ### emmeans results
 
 Unpacks where the group differences are
 Particularly important for your treatment * time interaction — you need to know at which time points treatments diverge
 Controls for multiple comparisons
+
+
 
 
 ```{r}
@@ -932,11 +1031,15 @@ emmeans_carb %>% #filter(variable %in% sig_eta) %>%
   filter(adj.p.value <0.05)
 ```
 
+
+
 #### Contrast Effect Size 
 
 Adds biological interpretability to each contrast
 Tells you not just "these groups differ" but "by how much and in which direction"
 Essential for comparing across nutrients since your residuals are on different scales
+
+
 
 
 ```{r}
@@ -965,9 +1068,13 @@ effect_size_carb %>%
 ```
 
 
+
+
 ### Plots 
 
 
+
+
 ```{r}
 # Define shading dataframe matching your exact factor levels
 # Adjust period assignments to match your actual day/night schedule
@@ -1049,7 +1156,6 @@ ph <- mobeast_carb %>%
 ta + ph
 ```
 
-
 ```{r}
 
 # Define shading dataframe matching your exact factor levels
@@ -1119,6 +1225,8 @@ ph <- mobeast_carb %>%
 
 ta + ph
 ```
+
+
 
 
 
@@ -1127,6 +1235,8 @@ ta + ph
 ## DNA 
 
 ### DNA data clean up 
+
+
 ```{r}
 # prepaing the data for later
 mobeast_DNA  <- mobeast_raw %>%
@@ -1155,7 +1265,11 @@ exclude_family <- mobeast_DNA_24h %>%
   filter(avg == 0) 
 ```
 
+
+
 ### LMER Models
+
+
 ```{r}
 # Loop Function:
 ## Take the 24h samples and isolate the types of nutrient  present on the df in a vector
@@ -1179,7 +1293,6 @@ for (var in mobeast_loop) {
 
 ```
 
-
 ```{r}
 results_DNA <- imap_dfr(models_DNA_24h, ~ tidy(.x) %>%
                      dplyr::mutate(variable = .y)) %>% 
@@ -1188,7 +1301,11 @@ results_DNA <- imap_dfr(models_DNA_24h, ~ tidy(.x) %>%
 results_DNA %>%  filter(p.value <0.05)
 ```
 
+
+
 ### DNA ANOVA
+
+
 
 ```{r, warning= FALSE}
 # So many Warnings! 
@@ -1225,6 +1342,8 @@ interaction_family <- fam_interaction %>% filter(variable %in% fam_treatment) %>
 
 
 
+
+
 #### Partial Eta squared 
 
 Partial η²
@@ -1232,6 +1351,8 @@ Partial η²
 Answers "so what?" after a significant ANOVA
 Tells you whether the significant effect is actually large enough to care about biologically
 A p < 0.05 with η² = 0.01 is statistically real but possibly biologically trivial
+
+
 
 ```{r}
 eta_results <- tibble()
@@ -1246,13 +1367,19 @@ for (var in sig_treat) {
   
 }
 
+
+
 sig_eta <- eta_results %>% filter(Eta2_partial > 0.14) %>% select(variable) %>% distinct() %>% pull()
 
 sig_eta 
 ```
 
 
+
+
 ### DNA Emmeans 
+
+
 
 ```{r, message= FALSE}
 # "estimate" are negative somehow. Why? 
@@ -1276,8 +1403,6 @@ emmeans_sig_dna <- emmeans_results_dna %>% filter(adj.p.value <0.05) %>%
 emmeans_sig_dna %>% left_join(DNA_anova_sig) %>% filter(!variable %in% interaction_family) %>% select(variable) %>%  distinct() %>% pull()
 
 ```
-
-
 
 ```{r, warning=FALSE}
 DNA_sig_var <- emmeans_results_dna %>% 
@@ -1307,9 +1432,6 @@ graphs_DNA_24h <- DNA_sig_var %>%
 
 
 ```
-
-
-
 
 ```{r}
 emmeans_results_dna %>%  
@@ -1342,11 +1464,15 @@ emmeans_results_dna %>%
 ggsave(filename = "dna_enrichment_tiles.png", path = here("outputs"), height = 6, width=12)
 ```
 
+
+
 ### Effect Size 
 
 Adds biological interpretability to each contrast
 Tells you not just "these groups differ" but "by how much and in which direction"
 Essential for comparing across nutrients since your residuals are on different scales
+
+
 
 
 ```{r}
@@ -1374,59 +1500,16 @@ effect_size_results %>%
 
 ```
 
-### Summary DNA table 
-
-```{r}
-anova_results %>%
-  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
-  filter(term != "log_flow") %>%
-  group_by(variable) %>%
-  filter(any(p.value < 0.05)) %>%
-  mutate(term = recode_values(term,
-      "treatment"      ~"Treatment",
-      "time_fac"       ~ "Time",
-      "treatment:time_fac" ~ "Treatment x Time"
-    ),
-    F_stat  = round(F_stat, 2),
-    p.value = round(p.value, 3)
-  ) %>%
-  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
-  cols_label(
-    term    = "Term",
-    df      = "df",
-    F_stat  = "F",
-    p.value = "p-value"
-  ) %>%
-  fmt_number(columns = F_stat,  decimals = 2) %>%
-  fmt_number(columns = p.value, decimals = 3) %>%
-  tab_style(
-    style     = cell_fill(color = "#f0f0f0"),
-    locations = cells_row_groups()            # shaded group header rows
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold"),
-    locations = cells_row_groups()            # bold group headers
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold", color = "red"),
-    locations = cells_body(
-      columns = p.value,
-      rows    = p.value < 0.05
-    )
-  ) %>%
-  tab_options(
-    table.font.size       = 12,
-    table.width           = pct(100),
-    row_group.font.weight = "bold",
-    column_labels.font.weight = "bold"
-  )
-```
 
 
 
 
 
-## DNA Pairwise
+
+
+#### DNA Pairwise
+
+
 
 ```{r}
 
@@ -1511,7 +1594,6 @@ return(pairwise_results)
 
 ```
 
-
 ```{r}
 # Note: relative aboundance was logged to be able to compute the pairwise comparison 
 # Loop Function:
@@ -1570,7 +1652,11 @@ pairwise_summary %>%
 
 ```
 
+
+
 ## PCA 
+
+
 
 ```{r}
 ## used the areal flux to calculate the PCA here
@@ -1590,7 +1676,6 @@ pca_matrix_24h_norm %>% cor() %>%
            lab = TRUE)
 ```
 
-
 ```{r}
 
 pca_matrix_24h_norm<- pca_matrix_24h_norm %>% as.data.frame() %>% 
@@ -1599,7 +1684,6 @@ pca_matrix_24h_norm<- pca_matrix_24h_norm %>% as.data.frame() %>%
                                 het_bact, npoc_u_m, coble_a, 
                                 coble_c, coble_m, hix,npoc_u_m ) %>% as.matrix()
 ```
-
 
 ```{r}
 data.pca <- princomp(pca_matrix_24h_norm, cor = TRUE)
@@ -1642,7 +1726,11 @@ ggplot(pca_scores, aes(Comp.1,Comp.2))+
 
 
 
+
+
 ## PCA 6AM only
+
+
 
 ```{r}
 ## used the areal flux to calculate the PCA here
@@ -1665,7 +1753,6 @@ pca_matrix_6AM_norm %>% cor() %>%
            lab = TRUE)
 ```
 
-
 ```{r}
 
 pca_matrix_6AM_norm <- pca_matrix_6AM_norm %>% as.data.frame() %>% 
@@ -1674,7 +1761,6 @@ pca_matrix_6AM_norm <- pca_matrix_6AM_norm %>% as.data.frame() %>%
          SiO2, NH3,PO4, NO3, npoc_u_m) %>% as.matrix()
 dim(pca_matrix_6AM_norm)
 ```
-
 
 ```{r}
 data.pca <- princomp(pca_matrix_6AM_norm, cor = TRUE)

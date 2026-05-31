@@ -147,7 +147,8 @@ nmds_merged<- nmds_merged %>% mutate(treatment = factor(treatment, levels = c("C
 nmds_merged %>%   
   mutate(time_string = factor(time_string, levels = c("12:00:00", "18:00:00",
                                                       "00:00:00", "06:00:00"))) %>% 
-  ggplot(aes(x= NMDS1, y = NMDS2, colour = treatment, fill= treatment))+
+  rename(Treatments = treatment) %>% 
+  ggplot(aes(x= NMDS1, y = NMDS2, colour = Treatments, fill= Treatments))+
   stat_ellipse(#aes(colour = cluster, fill = cluster),
                alpha = 0.2, geom= "polygon", level = 0.8, show.legend = FALSE)+
   
@@ -155,12 +156,13 @@ nmds_merged %>%
   geom_point(shape = 1, color = "black",size = 4) +
   #geom_label_repel(aes(label = date_string))+
   facet_wrap(~time_string, ncol = 4)+
-  labs(title= "Ordination of 24h samples")+
+  #labs(title= "Ordination of 24h samples")+
+  guides(fill=guide_legend(title="Treatments"))+
   scale_color_manual(values=treatment_colors )+
   scale_fill_manual(values= treatment_colors) +
   nunu_theme+
-  theme(legend.position = "top")
-#ggsave("24h_treatment.png", width = 16, height = 6, path = here("outputs", "DNA"))
+  theme(legend.position = "bottom")
+#ggsave("bacterial_community_ordination.png", width = 16, height = 6, path = here("outputs"))
 
 ```
 ## PERMANOVA 
