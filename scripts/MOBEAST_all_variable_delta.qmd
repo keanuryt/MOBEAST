@@ -1377,9 +1377,26 @@ effect_size_results %>%
 ### Summary DNA table 
 
 ```{r}
-anova_results %>%
+
+anova_sig_family <- anova_results %>% 
   select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
   filter(term != "log_flow") %>%
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>% 
+  ungroup() %>%  
+  select(variable) %>% distinct() %>% pull()
+group1 <- anova_sig_family[1:12]
+group2 <- anova_sig_family[13:24]
+group3 <- anova_sig_family[25:36]
+group4 <- anova_sig_family[37:48]
+```
+
+```{r}
+### 1/4 table summary 
+dna_stat_summary_table1 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group1) %>% 
   group_by(variable) %>%
   filter(any(p.value < 0.05)) %>%
   mutate(term = recode_values(term,
@@ -1413,17 +1430,176 @@ anova_results %>%
       columns = p.value,
       rows    = p.value < 0.05
     )
-  ) %>%
+  ) %>% 
   tab_options(
-    table.font.size       = 12,
-    table.width           = pct(100),
-    row_group.font.weight = "bold",
-    column_labels.font.weight = "bold"
-  )
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+dna_stat_summary_table1
+
+gtsave(dna_stat_summary_table1, here("outputs", "dna_anova_table_summary1.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
+```
+
+
+```{r}
+### 2/4 table summary 
+dna_stat_summary_table2 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group2) %>% 
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>%
+  mutate(term = recode_values(term,
+      "treatment"      ~"Treatment",
+      "time_fac"       ~ "Time",
+      "treatment:time_fac" ~ "Treatment x Time"
+    ),
+    F_stat  = round(F_stat, 2),
+    p.value = round(p.value, 3)
+  ) %>%
+  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
+  cols_label(
+    term    = "Term",
+    df      = "df",
+    F_stat  = "F",
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = F_stat,  decimals = 2) %>%
+  fmt_number(columns = p.value, decimals = 3) %>%
+  tab_style(
+    style     = cell_fill(color = "#f0f0f0"),
+    locations = cells_row_groups()            # shaded group header rows
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold"),
+    locations = cells_row_groups()            # bold group headers
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold", color = "red"),
+    locations = cells_body(
+      columns = p.value,
+      rows    = p.value < 0.05
+    )
+  )  %>% 
+  tab_options(
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+gtsave(dna_stat_summary_table2, here("outputs", "dna_anova_table_summary2.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
+```
+
+
+```{r}
+### 3/4 table summary 
+dna_stat_summary_table3 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group3) %>% 
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>%
+  mutate(term = recode_values(term,
+      "treatment"      ~"Treatment",
+      "time_fac"       ~ "Time",
+      "treatment:time_fac" ~ "Treatment x Time"
+    ),
+    F_stat  = round(F_stat, 2),
+    p.value = round(p.value, 3)
+  ) %>%
+  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
+  cols_label(
+    term    = "Term",
+    df      = "df",
+    F_stat  = "F",
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = F_stat,  decimals = 2) %>%
+  fmt_number(columns = p.value, decimals = 3) %>%
+  tab_style(
+    style     = cell_fill(color = "#f0f0f0"),
+    locations = cells_row_groups()            # shaded group header rows
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold"),
+    locations = cells_row_groups()            # bold group headers
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold", color = "red"),
+    locations = cells_body(
+      columns = p.value,
+      rows    = p.value < 0.05
+    )
+  )  %>% 
+  tab_options(
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+gtsave(dna_stat_summary_table3, here("outputs", "dna_anova_table_summary3.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
 ```
 
 
 
+```{r}
+### 4/4 table summary 
+dna_stat_summary_table4 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group4) %>% 
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>%
+  mutate(term = recode_values(term,
+      "treatment"      ~"Treatment",
+      "time_fac"       ~ "Time",
+      "treatment:time_fac" ~ "Treatment x Time"
+    ),
+    F_stat  = round(F_stat, 2),
+    p.value = round(p.value, 3)
+  ) %>%
+  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
+  cols_label(
+    term    = "Term",
+    df      = "df",
+    F_stat  = "F",
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = F_stat,  decimals = 2) %>%
+  fmt_number(columns = p.value, decimals = 3) %>%
+  tab_style(
+    style     = cell_fill(color = "#f0f0f0"),
+    locations = cells_row_groups()            # shaded group header rows
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold"),
+    locations = cells_row_groups()            # bold group headers
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold", color = "red"),
+    locations = cells_body(
+      columns = p.value,
+      rows    = p.value < 0.05
+    )
+  )  %>% 
+  tab_options(
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+gtsave(dna_stat_summary_table4, here("outputs", "dna_anova_table_summary4.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
+```
 
 
 ## DNA Pairwise
