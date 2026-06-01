@@ -425,7 +425,7 @@ emmean_sig <- emmeans_results_sig %>% select(variable) %>% distinct() %>%  pull(
 ## Nutrient time contrast
 time_contrast <- tibble()
 
-for (var in c("NO3", "PO4", "NH3", "SiO2")) {
+for (var in c("NO3", "PO4", "NH3", "SiO2", "chla_conc")) {
   emm <- emmeans(models_24h[[var]], ~ time_fac | treatment)
   
   df <- contrast(emm, method = "trt.vs.ctrl") %>% 
@@ -649,23 +649,27 @@ mobeast_wide <- mobeast_24h %>% select(tank_number, treatment, inflow_table,
 
 ### HIX - No sig ANOVA
 ```{r}
-mod_hix <- lm(het_bact ~ hix, 
+mod_hix <- lm(het_bact ~ hix+ treatment+log_flow , 
                   data= mobeast_wide)
 anova(mod_hix)
+contrast(emmeans(mod_hix, ~treatment), methods= "trt.vs.ctrl")
+
 ```
 
 ### Coble C
 
 ```{r}
 mobeast_wide_algae <- filter(mobeast_wide, treatment == "Algae")
-cobC_lm <- lm(het_bact ~ coble_c,
-                data= mobeast_wide_algae)
+cobC_lm <- lm(syn ~ coble_c+ treatment+log_flow , 
+                  data= mobeast_wide)
 
 summary(cobC_lm) 
 
 resid_panel(cobC_lm, plots = "qq") 
 
-anova(cobC_lm, type=2)
+anova(cobC_lm)
+contrast(emmeans(cobC_lm, ~treatment), specs= "trt.vs.ctrl")
+
 ```
 
 

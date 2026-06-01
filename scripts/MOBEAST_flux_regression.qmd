@@ -195,15 +195,16 @@ for (var in mobeast_loop) {
 delta_results <- imap_dfr(models_delta, ~ tidy(.x) %>%
                      dplyr::mutate(variable = .y)) %>% 
   relocate(variable, .before = "term")
-delta_results
+delta_results %>% filter(p.value <0.05)
 ```
 
 
 
 
 ```{r}
-
+## Lm summary for fDOM and DOC 
 delta_result_gt <- delta_results %>% left_join(meta_label) %>% 
+  filter(!variable %in% c("tn_u_m", "tot_bact", "cyano", "NO2", "m_to_c", "N_N")) %>% 
   mutate(variable = recode_values(variable,
       "npoc_u_m"      ~ "DOC",
       "tn_u_m"       ~ "Total Nitrogen",
@@ -232,8 +233,22 @@ delta_result_gt <- delta_results %>% left_join(meta_label) %>%
       "SiO2" ~ "Silica (SiO2)",
       "NH3" ~ "Ammonia (NH3)"
     )) %>% 
+  
+  mutate(variable_cat = recode_values(variable_cat,
+    "DOC" ~ "Bulk Organic Carbon",
+    "fDOM" ~ "Fluorescent Organic Carbon",
+    "chla" ~ "Chlorophyll",
+    "FCM" ~ "Cell Count", 
+    "nutrients" ~ "Nutrients")) %>% 
+  mutate(variable_cat = factor(variable_cat, levels=
+                                 c("Nutrients","Chlorophyll",
+                                   "Bulk Organic Carbon",
+                                   "Fluorescent Organic Carbon",
+                                   "Cell Count"))) %>% 
   relocate(variable_cat) %>% 
   arrange(variable_cat, variable) %>% 
+  filter(variable_cat %in% c("Bulk Organic Carbon",
+                                   "Fluorescent Organic Carbon")) %>%
   gt(rowname_col = "variable", groupname_col = "variable_cat") %>% 
   tab_style(
     style = cell_text(weight = "bold", size = "large"),
@@ -255,10 +270,83 @@ tab_style(
   )
 ) 
 
-#gtsave(delta_result_gt, "delta_result_gt.png", path = here("outputs") )
+delta_result_gt
+
+gtsave(delta_result_gt, "lm_DOM_flow.png", path = here("outputs"))
 ```
 
+```{r}
+# lm results for fcm, chla and nutrients 
+delta_result_gt <- delta_results %>% left_join(meta_label) %>% 
+  filter(!variable %in% c("tn_u_m", "tot_bact", "cyano", "NO2", "m_to_c", "N_N")) %>% 
+  mutate(variable = recode_values(variable,
+      "npoc_u_m"      ~ "DOC",
+      "tn_u_m"       ~ "Total Nitrogen",
+      "het_bact" ~ "Heterotrophic Bacteria",
+      "pico_euk" ~ "Pico Eukaryote",
+      "syn" ~ "Synechococcus",
+      "pro" ~ "Prochlorococcus",
+      "tot_bact" ~ "Total Bacteria",
+      "cyano" ~ "Cyanobacteria",
+      "chla_conc" ~ "Chlorophyll a",
+      "coble_a" ~ "Coble A",
+      "coble_b" ~ "Coble B",
+      "coble_c" ~ "Coble C",
+      "coble_m" ~ "Coble M",
+      "coble_t" ~ "Coble T",
+      "m_to_c" ~ "M:C",
+      "bix" ~ "BIX",
+      "hix" ~ "HIX",
+      "fpeak" ~ "Fpeak",
+      "lignin" ~ "Lignin",
+      "fi" ~ "FI",
+      "N_N" ~ "N+N",
+      "NO2" ~ "Nitrite (NO2)",
+      "NO3" ~ "Nitrate (NO3)",
+      "PO4" ~ "Phosphate (PO4)",
+      "SiO2" ~ "Silica (SiO2)",
+      "NH3" ~ "Ammonia (NH3)"
+    )) %>% 
+  
+  mutate(variable_cat = recode_values(variable_cat,
+    "DOC" ~ "Bulk Organic Carbon",
+    "fDOM" ~ "Fluorescent Organic Carbon",
+    "chla" ~ "Chlorophyll",
+    "FCM" ~ "Cell Count", 
+    "nutrients" ~ "Nutrients")) %>% 
+  mutate(variable_cat = factor(variable_cat, levels=
+                                 c("Nutrients","Chlorophyll",
+                                   "Bulk Organic Carbon",
+                                   "Fluorescent Organic Carbon",
+                                   "Cell Count"))) %>% 
+  relocate(variable_cat) %>% 
+  arrange(variable_cat, variable) %>% 
+  filter(variable_cat %in% c("Nutrients","Chlorophyll","Cell Count")) %>% 
+  gt(rowname_col = "variable", groupname_col = "variable_cat") %>% 
+  tab_style(
+    style = cell_text(weight = "bold", size = "large"),
+    locations = cells_row_groups()
+  ) %>% 
+  cols_hide(variable_cat) %>% 
+  tab_style(
+  style = cell_text(color = "#2E7D32", weight = "bold"),
+  locations = cells_body(
+    columns = p.value,
+    rows = p.value < 0.05
+  )
+) %>%
+tab_style(
+  style = cell_text(color = "grey50"),
+  locations = cells_body(
+    columns = p.value,
+    rows = p.value >= 0.05
+  )
+) 
 
+delta_result_gt
+
+gtsave(delta_result_gt, "lm_chem_flow.png", path = here("outputs"))
+```
 
 ```{r}
 # not all stats are saved in the DF
