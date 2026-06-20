@@ -108,29 +108,43 @@ mobeast<-  mobeast_raw %>%
 ```{r}
 
 DOC <- mobeast %>% filter(variable == "npoc_u_m") %>%  
+  
+  #isolate the inflow values 
   mutate(inflow = ifelse(treatment == "Inflow", value, NA)) %>% 
+  
+  # remove the inflow values that are outliers
   mutate(inflow = ifelse(inflow > 208, NA, inflow)) %>% 
+  
+  # if an inflow is an outlier, then it will be equal to the mean of the overall inflow DOC value
   mutate(value = ifelse(treatment == "Inflow" & value > 208, mean(inflow, na.rm= TRUE), value)) %>% 
-  mutate(value = ifelse(value >208, NA, value)) %>% select(-inflow)
+  # remove the outlier DOC value from the DOC data set
+  mutate(value = ifelse(value > 208, NA, value)) %>% 
+  # remove the inflow column taht was used to calculate the avg of the inflow throughout the experiment
+  select(-inflow)
 
-mobeast_DOC_avg <- mobeast %>% filter(variable != "npoc_u_m") %>% 
+mobeast_DOC_avg <- mobeast %>% 
+  # from the original data set, remove the old DOC data and replace with the new DOC data with inflow data that is not outliers
+  filter(variable != "npoc_u_m") %>% 
   rbind(DOC)
 ```
 
 
 ```{r}
 mobeast_flagged <- mobeast_DOC_avg %>% 
+  
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  
   # flagging outliers
-  ## grouping by treatment, variable 
+  ## grouping by variable 
   group_by(variable) %>% 
   
   ## get the mean and the sd to calculate mean +/- 2sd
-  mutate(mean =mean(value, na.rm = T), 
+  mutate(mean = mean(value, na.rm = T), 
          stand_dev = sd(value, na.rm = T)) %>% 
   
   ## Values outside of the mean +/- 2sd range are flagged as outliers
   ## Important to filter outliers later to understand why they are outliers. 
-  mutate(outlier = ifelse(value > mean +2*stand_dev | value < mean -2*stand_dev,
+  mutate(outlier = ifelse(value > mean + 2*stand_dev | value < mean - 2*stand_dev,
                            "outlier", "not outlier")) %>% 
   ungroup() 
   
@@ -144,9 +158,12 @@ mobeast_flagged <- mobeast_DOC_avg %>%
 
 mobeast_delta <- mobeast_flagged %>%  
   
+  #removing outlier values that may be in the inflows too
+  filter(outlier != "outlier") %>% 
+  
   # Isolate inflow for each date_time and table
-  group_by(date_time, inflow_table, variable) %>%
-  #mutate(inflow = value[treatment == "Inflow"]) %>% 
+  group_by(date_time, variable) %>% 
+  #mutate(inflow_isolated = value[treatment == "Inflow"]) %>% 
   mutate(inflow_isolated = ifelse(treatment == "Inflow", value, NA)) %>% 
   ungroup() %>%
   
@@ -168,6 +185,11 @@ mobeast_delta <- mobeast_flagged %>%
 ```
 
 ```{r}
+mobeast_flagged %>% filter(outlier == "outlier", treatment == "Inflow")
+```
+
+
+```{r}
 ## Some variables will not be studied in this project
 exclude_var <- c("carbonate", "residence time")
 
@@ -179,25 +201,41 @@ mobeast_delta <- mobeast_delta %>% filter(!variable_cat %in%  exclude_var,
 ```
 
 
+
 ## 24h data
 
 ```{r}
 # subset the data set to only the 24h samples
 ## removing outliers from the data set
 mobeast_24h <- mobeast_delta %>%
-  filter(!is.na(id_number)) %>%
-  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  # remove the the DOC data because something happened  at 00:00. 
+
  filter(treatment != "Inflow") %>% 
-  ## remove the outliers 
-  #filter(outlier == "not outlier") %>% 
+
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) %>% mutate(log_flow = log10(flowrate)) 
+                                                   "00:00:00","06:00:00"))) %>% 
+  mutate(log_flow = log10(flowrate))
 
 ```
 
-### Summary Stats 
 ```{r}
+meta_var <- tibble(variable = c("het_bact", "pico_euk", "syn", "pro", "tot_bact", "cyano", 
+                      "chla_conc", "tn_u_m", "coble_a", "coble_b", "coble_c",
+                      "coble_m", "coble_t", "m_to_c", "bix", "hix", "fpeak", "FI",
+                      "lignin", "N_N", "NO2", "PO4", "SiO2", "NH3", "NO3", "DOC"),
+         variable_clean = c("Heterotrophic Bacteria", "Pico-Eukaryote", "Synechococcus",
+                            "Prochlorococcus", "Total Bacteria", "Cyanobacteria", 
+                            "Chlorophyll a", 
+                            "TN", "Coble A", "Coble B", "Coble C", "Coble M",
+                            "Coble T", "M:C", "BIX", "HIX", "Fpeak", "Fulvic Acid",
+                            "Lignin", "N+N", "NO2", "PO4", "SiO2", "NH3", "NO3", "DOC"))
+
+mobeast_24h <- mobeast_24h %>% left_join(meta_var, by = "variable") %>% 
+  relocate(variable_clean, .after = "variable")
+```
+
+
+### Summary Stats 
+```{}
 mobeast_delta %>%
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
   filter(!is.na(id_number)) %>% 
@@ -233,7 +271,7 @@ names(models_24h) <- mobeast_loop
 
 for (var in mobeast_loop) {
   df <- mobeast_24h %>% filter(variable == var)
-  models_24h[[var]] <- lmer(conc_norm~ treatment*time_fac + log_flow +  
+  models_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + log_flow  +  
                             (1|tank_number), data = df)
 }
 
@@ -241,7 +279,7 @@ for (var in mobeast_loop) {
 ```
 
 
-```{r}
+```{}
 plot_grid(imap(models_24h, ~ {
   resid_panel(.x, plots = c("qq")) + plot_annotation(title = .y)}), 
 margin = c(0.2, 0.2, 0.2, 0.2), tags = TRUE)
@@ -279,6 +317,11 @@ sig_anova <- anova_results %>%
   filter( p.value <0.05) %>%  filter(term == "treatment") %>%  
   select(variable) %>% pull()
 
+anova_results %>% 
+  filter( p.value <0.05) %>%  filter(term == "treatment") %>% 
+  filter(!variable %in% c("tot_bact", "cyano"))
+
+
 # no signficant time interactions !
 anova_results %>% 
   filter(p.value <0.05, term == "treatment:time_fac") %>%  
@@ -293,7 +336,7 @@ anova_results %>%
 
 ##### Nutrient ANOVA summary table 
 
-```{r}
+```{}
 nutrient_stat_summary_table <- anova_results %>%
   filter(variable %in% c("NO3", "PO4", "NH3", "SiO2", "chla_conc")) %>%
   filter(term != "log_flow") %>% 
@@ -406,7 +449,7 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
 emmeans_results %>% #filter(variable %in% sig_eta) %>%
-  filter(adj.p.value <0.05)
+  filter(adj.p.value <0.05) %>% filter(!variable %in% c("tot_bact", "cyano"))
 ```
 
 
@@ -420,42 +463,10 @@ emmean_sig <- emmeans_results_sig %>% select(variable) %>% distinct() %>%  pull(
 
 
 ##### Nutrient Time contrasts
-
-```{r}
-## Nutrient time contrast
-time_contrast <- tibble()
-
-for (var in c("NO3", "PO4", "NH3", "SiO2", "chla_conc")) {
-  emm <- emmeans(models_24h[[var]], ~ time_fac | treatment)
-  
-  df <- contrast(emm, method = "trt.vs.ctrl") %>% 
-    tidy() %>% mutate(variable = var) %>%  relocate(variable)
-  
-  
-  time_contrast <- rbind(time_contrast, df)
-}
-
-time_contrast %>% filter(adj.p.value < 0.05)
-```
+need tukey test
 
 ##### FCM Time Contrasts
-
-```{r}
-## FCM time contrast
-time_contrast <- tibble()
-
-for (var in c("het_bact", "syn")) {
-  emm <- emmeans(models_24h[[var]], ~ time_fac | treatment)
-  
-  df <- contrast(emm, method = "trt.vs.ctrl") %>% 
-    tidy() %>% mutate(variable = var) %>%  relocate(variable)
-  
-  
-  time_contrast <- rbind(time_contrast, df)
-}
-
-time_contrast %>% filter(adj.p.value < 0.05)
-```
+Need tukey test
 
 
 #### Emmeans if time interactions ! 
@@ -506,27 +517,15 @@ effect_size_results %>%
 
 #### Violin plots
 
-```{r}
-meta_var <- mobeast_24h %>% select(variable) %>% distinct() %>% 
-  mutate(variable_clean = c("Heterotrophic Bacteria", "Eukaryote", "Synechococcus",
-                            "Prochlorococcus", "Total Bacteria", "Cyanobacteria", 
-                            "Chlorophyll a", 
-                            "TN", "Coble A", "Coble B", "Coble C", "Coble M",
-                            "Coble T", "M:C", "BIX", "HIX", "Fpeak", "Fulvic Acid",
-                            "Lignin", "N+N", "NO2", "PO4", "SiO2", "NH3", "NO3", "DOC"))
-
-mobeast_24h <- mobeast_24h %>% left_join(meta_var, by = "variable") %>% 
-  relocate(variable_clean, .after = "variable")
-```
-
 ```{r, warning=FALSE}
 
-#graph_loop <- mobeast_24h %>% filter(variable %in% sig_eta) %>% select(variable_clean) %>% 
-  #distinct()
+graph_loop <- mobeast_24h %>% #filter(variable %in% sig_eta) %>% 
+  select(variable) %>% 
+  distinct() %>% pull()
   
-plots_24h <- vector(mode = "list", length = length(sig_eta))
+plots_24h <- vector(mode = "list", length = length(graph_loop))
 
-for (var in sig_eta) {
+for (var in graph_loop) {
   
   unit_plot <- mobeast_24h %>% filter(variable == var) %>% select(units) %>% distinct()
   
@@ -560,12 +559,12 @@ for (var in sig_eta) {
 # fDOM plots 
 (plots_24h[["coble_c"]]+ labs(title = "A")) / (plots_24h[["hix"]]+ labs(title = "B"))
 
-ggsave(filename = "24h_fDOM.png", plot = last_plot(), path = here("outputs"))
+#ggsave(filename = "24h_fDOM.png", plot = last_plot(), path = here("outputs"))
 ```
 
-```{r, fig.width=14, fig.height=10}
+```{r, fig.width=14, fig.height=12}
 # FCM plots 
-(plots_24h[["het_bact"]]+ labs(title = "A")) /(plots_24h[["syn"]]+ labs(title = "B"))
+(plots_24h[["het_bact"]]+ labs(title = "A")) /(plots_24h[["syn"]]+ labs(title = "B")) / (plots_24h[["chla_conc"]] + labs(title = "C"))
 
 ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
 ```
@@ -1147,17 +1146,40 @@ mobeast_DNA  <- mobeast_raw %>%
 ```
 
 ```{r}
-mobeast_DNA_24h <- mobeast_DNA %>% filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  filter(treatment != "Inflow") %>% 
+mobeast_DNA_24h_raw <- mobeast_DNA %>% filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  #filter(treatment != "Inflow") %>% 
   filter(!is.na(id_number)) %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) %>% mutate(log_flow = log10(flowrate))
+                                                   "00:00:00","06:00:00"))) %>% 
+  mutate(log_flow = log10(flowrate))
 
-exclude_family <- mobeast_DNA_24h %>% 
-  group_by(time, variable) %>% 
-  reframe(avg = mean(value)) %>% 
-  filter(avg == 0) 
 ```
+
+```{r}
+## outlier detection on the relative abundance??
+mobeast_DNA_24h_flagged <- mobeast_DNA_24h_raw %>%  
+  group_by(variable) %>% 
+  mutate(mean = mean(value, na.rm= T), 
+         sd = sd(value, na.rm= T)) %>% 
+  mutate(outlier = ifelse(value > mean + 2*sd |value < mean - 2*sd, "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  filter(outlier != "outlier")
+```
+
+
+```{r}
+## outlier detection on the relative abundance??
+mobeast_DNA_24h <- mobeast_DNA_24h_flagged %>%  
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", value, NA)) %>% 
+  group_by(time, variable) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>% 
+  mutate(conc_norm  = value - inflow ) %>% 
+  filter(treatment != "Inflow" )
+```
+
+
+
 
 ### LMER Models
 ```{r}
@@ -1166,6 +1188,11 @@ exclude_family <- mobeast_DNA_24h %>%
 ## Create a list where the loop results will be save, named after the nutrients of the df
 ## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
 ## Save the outputs of the model in the list such that each nutrient has its stats
+
+exclude_family <- mobeast_DNA_24h %>% 
+  group_by(time, variable) %>% 
+  reframe(avg = mean(value)) %>% 
+  filter(avg == 0) 
 
 mobeast_loop <- mobeast_DNA_24h %>% filter(!variable %in% exclude_family$variable & !variable %in% exclude_family$time) %>%
   select(variable) %>% distinct() %>% pull()
@@ -1176,7 +1203,7 @@ names(models_DNA_24h) <- mobeast_loop
 
 for (var in mobeast_loop) {
   df <- mobeast_DNA_24h %>% filter(variable == var)
-  models_DNA_24h[[var]] <- lmer(value ~ treatment*time_fac + 
+  models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
                                   log_flow + (1|tank_number), data = df)
 
 }
@@ -1873,4 +1900,115 @@ fviz_pca_var(data.pca, col.var = "cos2",
             gradient.cols = c("blue", "lightgrey", "red"),
             repel = TRUE)
 ```
+
+
+
+
+
+
+
+
+
+# Craig plots 
+
+```{r}
+df <- read_csv(here("data", "mobeast_cen.csv"))
+
+df<- df %>% mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+```
+
+
+
+
+#### Violin plots
+
+```{r, warning=FALSE}
+
+graph_loop <- df %>% #filter(variable %in% sig_eta) %>% 
+  select(variable) %>% 
+  distinct() %>% pull()
+  
+plots_24h <- vector(mode = "list", length = length(graph_loop))
+
+for (var in graph_loop) {
+  
+  unit_plot <- df %>% filter(variable == var) %>% select(units) %>% distinct() %>% pull()
+  
+  variable_name <- df %>% filter(variable == var) %>% 
+    select(variable) %>% distinct() %>% pull()
+  
+  plots_24h[[var]] <- df %>% filter(treatment != "Inflow") %>% 
+  filter(variable == var) %>% 
+  ggplot(aes(x= treatment, y= delta, fill = treatment))+
+    geom_violin()+
+    geom_jitter(color = "black", alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    #facet_wrap( .~ time_fac, ncol = 4 )+
+    labs(
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = paste0("Delta ", variable_name, " (",unit_plot, ")"))+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18),
+          legend.position = "none")
+}
+
+```
+
+
+
+```{r, message= FALSE}
+ 
+plots_24h[["Rhodobacteraceae"]]
+
+
+```
+
+
+```{r}
+mobeast_24h %>% filter(treatment != "Inflow") %>% 
+  filter(variable == "NH3") %>% 
+  ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_jitter(color = "black", alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap( .~ time_fac, ncol = 4 )+
+    labs(
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = paste0("Delta NH3 uM"))+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18),
+          legend.position = "none")
+```
+
+```{r}
+mobeast_DNA_24h %>% filter(treatment != "Inflow") %>% 
+  filter(variable == "Nitrincolaceae") %>% 
+  ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
+    geom_violin()+
+    geom_jitter(color = "black", alpha = 0.5)+
+    geom_hline(yintercept=0, linetype='dashed')+
+    stat_summary(color = "yellow", alpha =0.5)+
+    facet_wrap( .~ time_fac, ncol = 4 )+
+    labs(
+       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
+       x= "Treatment",
+       y = paste0("Delta Nitrincolaceae"))+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
+    nunu_theme + 
+    theme(axis.text = element_text(size = 18),
+          legend.position = "none")
+```
+
+
+
+
 
