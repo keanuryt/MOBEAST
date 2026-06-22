@@ -94,13 +94,12 @@ mobeast_DNA  <- mobeast_raw %>%
   filter(treatment != "Rain") %>% 
   filter(treatment != "Endmember") %>% 
   mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
-  
-  
 
 ```
 
 ```{r}
-mobeast_DNA_24h_raw <- mobeast_DNA %>% filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+mobeast_DNA_24h_raw <- mobeast_DNA %>% 
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
   #filter(treatment != "Inflow") %>% 
   filter(!is.na(id_number)) %>% 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
@@ -110,9 +109,9 @@ mobeast_DNA_24h_raw <- mobeast_DNA %>% filter(date_string == "2024-06-02"|date_s
 ```
 
 ```{r}
-## outlier detection on the relative abundance??
+## outlier detection on the relative abundance
 mobeast_DNA_24h_flagged <- mobeast_DNA_24h_raw %>%  
-  group_by(variable) %>% 
+  group_by(variable, treatment) %>% 
   mutate(mean = mean(value, na.rm= T), 
          sd = sd(value, na.rm= T)) %>% 
   mutate(outlier = ifelse(value > mean + 2*sd |value < mean - 2*sd, "outlier", "not outlier")) %>% 
@@ -130,6 +129,14 @@ mobeast_DNA_24h <- mobeast_DNA_24h_flagged %>%
   ungroup() %>% 
   mutate(conc_norm  = value - inflow ) %>% 
   filter(treatment != "Inflow" )
+```
+
+```{r}
+mobeast_DNA_24h %>% 
+  group_by(id_number, variable) %>% 
+  reframe(sum = sum(value, na.rm = T)) %>% 
+  filter(sum > 0.005) %>% 
+  select(variable) %>% distinct()
 ```
 
 
