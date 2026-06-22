@@ -1,0 +1,625 @@
+---
+title: "MOBEAST DNA delta"
+created: 21 June 2026
+edited: 21 June 2026
+format: html
+editor: source
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(here)
+
+library(ggrepel)
+library(patchwork)
+library(RColorBrewer)
+library(measurements)
+library(gt)
+library(webshot2)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(emmeans)
+library(performance)
+library(multcompView)
+library(broom.mixed)
+library(effectsize)
+
+
+# PCA packages
+library(corrr)
+library(ggcorrplot)
+library(FactoMineR)
+library(factoextra) 
+```
+
+
+## Data visualization theme
+
+```{r}
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        strip.background = element_rect(fill = "white"))
+```
+
+
+
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
+## Load Data
+
+```{r}
+mobeast_raw <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
+
+```
+
+
+## DNA 
+
+### DNA data clean up 
+```{r}
+# prepaing the data for later
+mobeast_DNA  <- mobeast_raw %>%
+  mutate(time_string = as.character(time_string),
+              date_string = as.character(date_string),
+              date_time_string = paste(date_string,time_string))%>% 
+  filter(variable_cat == "DNA" ) %>% 
+  filter(treatment != "Rain") %>% 
+  filter(treatment != "Endmember") %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
+  
+  
+
+```
+
+```{r}
+mobeast_DNA_24h_raw <- mobeast_DNA %>% filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  #filter(treatment != "Inflow") %>% 
+  filter(!is.na(id_number)) %>% 
+  mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
+                                                   "00:00:00","06:00:00"))) %>% 
+  mutate(log_flow = log10(flowrate))
+
+```
+
+```{r}
+## outlier detection on the relative abundance??
+mobeast_DNA_24h_flagged <- mobeast_DNA_24h_raw %>%  
+  group_by(variable) %>% 
+  mutate(mean = mean(value, na.rm= T), 
+         sd = sd(value, na.rm= T)) %>% 
+  mutate(outlier = ifelse(value > mean + 2*sd |value < mean - 2*sd, "outlier", "not outlier")) %>% 
+  ungroup() %>% 
+  filter(outlier != "outlier")
+```
+
+
+```{r}
+## outlier detection on the relative abundance??
+mobeast_DNA_24h <- mobeast_DNA_24h_flagged %>%  
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", value, NA)) %>% 
+  group_by(time, variable) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>% 
+  mutate(conc_norm  = value - inflow ) %>% 
+  filter(treatment != "Inflow" )
+```
+
+
+
+
+### LMER Models
+```{r}
+# Loop Function:
+## Take the 24h samples and isolate the types of nutrient  present on the df in a vector
+## Create a list where the loop results will be save, named after the nutrients of the df
+## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
+## Save the outputs of the model in the list such that each nutrient has its stats
+
+exclude_family <- mobeast_DNA_24h %>% 
+  group_by(time, variable) %>% 
+  reframe(avg = mean(value)) %>% 
+  filter(avg == 0) 
+
+mobeast_loop <- mobeast_DNA_24h %>% filter(!variable %in% exclude_family$variable & !variable %in% exclude_family$time) %>%
+  select(variable) %>% distinct() %>% pull()
+
+models_DNA_24h <- vector(mode = "list", length = length(mobeast_loop))
+names(models_DNA_24h) <- mobeast_loop
+
+
+for (var in mobeast_loop) {
+  df <- mobeast_DNA_24h %>% filter(variable == var)
+  models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
+                                  log_flow + (1|tank_number), data = df)
+
+}
+
+```
+
+
+```{r}
+results_DNA <- imap_dfr(models_DNA_24h, ~ tidy(.x) %>%
+                     dplyr::mutate(variable = .y)) %>% 
+  relocate(variable, .before = "effect")
+
+results_DNA %>%  filter(p.value <0.05)
+```
+
+### DNA ANOVA
+
+```{r, warning= FALSE}
+# So many Warnings! 
+## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
+
+anova_results <- imap_dfr(models_DNA_24h, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+DNA_anova_sig <- anova_results %>% filter(p.value <0.05) %>% select(variable, anova_term = term, anova_p_val = p.value)
+
+sig_treat <- anova_results %>% filter(p.value <0.05) %>% 
+  filter(term == "treatment") %>%
+  select(variable) %>% 
+  pull()
+
+fam_time <- anova_results %>% filter(p.value <0.05) %>% 
+  filter(term == "time_fac") %>% select(variable) %>% distinct() 
+
+fam_treatment <- anova_results %>% filter(p.value <0.05) %>% 
+  filter(term == "treatment") %>% select(variable) %>% distinct() %>% pull()
+
+fam_time %>%  filter(variable %in% fam_treatment) %>%  pull()
+
+fam_interaction <- anova_results %>% filter(p.value <0.05) %>% 
+  filter(term == "treatment:time_fac")
+
+fam_interaction %>% filter(variable %in% fam_treatment)
+interaction_family <- fam_interaction %>% filter(variable %in% fam_treatment) %>% 
+  select(variable) %>%  pull()
+```
+
+
+
+#### Partial Eta squared 
+
+Partial η²
+
+Answers "so what?" after a significant ANOVA
+Tells you whether the significant effect is actually large enough to care about biologically
+A p < 0.05 with η² = 0.01 is statistically real but possibly biologically trivial
+
+```{r}
+eta_results <- tibble()
+
+for (var in sig_treat) {
+  df <- tibble(eta_squared(anova(models_DNA_24h[[var]]), partial = TRUE))
+  df <- df %>% mutate(variable = var ) %>% relocate(variable)
+  
+  eta_results <- rbind(eta_results, df)
+  
+  eta_results <- eta_results 
+  
+}
+
+sig_eta <- eta_results %>% filter(Eta2_partial > 0.14) %>% select(variable) %>% distinct() %>% pull()
+
+sig_eta 
+```
+
+
+### DNA Emmeans 
+
+```{r, message= FALSE}
+# "estimate" are negative somehow. Why? 
+## in manual models for DOC, estimate >0, here it's <0
+## t.ratio in "statistics", and negative instead of positive
+## p.values not shown, only p.adjusted. 
+emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
+
+
+```
+
+```{r}
+emmeans_sig_dna <- emmeans_results_dna %>% filter(adj.p.value <0.05) %>% 
+  select(variable, emmean_term = term, contrast, emmeans_p_val = adj.p.value) 
+
+emmeans_sig_dna %>% left_join(DNA_anova_sig) %>% filter(!variable %in% interaction_family) %>% select(variable) %>%  distinct() %>% pull()
+
+```
+
+
+
+```{r, warning=FALSE}
+DNA_sig_var <- emmeans_results_dna %>% 
+  filter(adj.p.value <0.05) %>% 
+  select(variable) %>% distinct() %>% pull()
+
+graphs_DNA_24h <- DNA_sig_var %>%
+  set_names() %>%
+  map(~ {
+    df <- mobeast_DNA_24h %>% filter(variable == .x)
+    
+    ggplot(df, aes(x = treatment, y = value, fill = treatment)) +
+      geom_violin() +
+      geom_point() +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      stat_summary(color = "yellow", alpha = 0.5) +
+      labs(title = paste("24h", .x, "Production"),
+           x = "Treatment",
+          y = "Relative Abundance") +
+      scale_fill_manual(
+        breaks = c("Control", "Coral", "CCA", "Algae", "Inflow"),
+        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50", "orange")
+      ) +
+      nunu_theme +
+      theme(legend.position = "none")
+  })
+
+
+```
+
+
+
+
+```{r}
+emmeans_results_dna %>%  
+  mutate(sig = ifelse(adj.p.value<0.05 & estimate < 0, "Enrichment", 
+                                         ifelse(adj.p.value<0.05 & estimate > 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  filter(variable %in% sig_treat)  %>%
+  #filter(variable %in% interaction_family) %>% 
+  mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>%
+  
+  # these families have sig ANOVA but not sig control vs treatment contrast
+  ## probs have sig treatment vs treatment contrasts 
+  filter(variable != "Oligoflexaceae", variable != "NS9_marine_group") %>% 
+  
+  ggplot()+
+  geom_tile(aes(x= contrast, y= variable, fill = sig), color = "black")+
+  #facet_wrap(.~variable_cat)+
+  labs(
+       x= "Treatment",
+       y = " Variables")+
+  guides(fill=guide_legend(title="p-value Interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw() +
+  nunu_theme+
+  theme(legend.position = "right",
+        plot.title = element_text(face = "bold"))
+  
+ggsave(filename = "dna_enrichment_tiles.png", path = here("outputs"), height = 6, width=12)
+```
+
+### Effect Size 
+
+Adds biological interpretability to each contrast
+Tells you not just "these groups differ" but "by how much and in which direction"
+Essential for comparing across nutrients since your residuals are on different scales
+
+
+```{r}
+effect_size_results <- tibble()
+
+for (var in sig_eta) {
+  emm <- emmeans(models_DNA_24h[[var]], ~ treatment)
+  contrasts <- contrast(emm, method = "trt.vs.ctrl")
+
+## Effect size for each contrast
+  df <- tidy(eff_size(emm, sigma = sigma(models_DNA_24h[[var]]), 
+                edf = df.residual(models_DNA_24h[[var]])))
+  
+  df <- df %>% mutate(variable = var) %>% rename(effect.size = estimate) %>% 
+    relocate(variable)
+  
+  effect_size_results <- rbind(effect_size_results, df)
+  
+}
+
+effect_size_results %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") %>% filter(abs(effect.size) >=0.8) %>%  filter (variable %in%sig_treat)
+
+
+
+```
+
+### Summary DNA table 
+
+```{r}
+
+anova_sig_family <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>% 
+  ungroup() %>%  
+  select(variable) %>% distinct() %>% pull()
+group1 <- anova_sig_family[1:12]
+group2 <- anova_sig_family[13:24]
+group3 <- anova_sig_family[25:36]
+group4 <- anova_sig_family[37:48]
+```
+
+```{r}
+### 1/4 table summary 
+dna_stat_summary_table1 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group1) %>% 
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>%
+  mutate(term = recode_values(term,
+      "treatment"      ~"Treatment",
+      "time_fac"       ~ "Time",
+      "treatment:time_fac" ~ "Treatment x Time"
+    ),
+    F_stat  = round(F_stat, 2),
+    p.value = round(p.value, 3)
+  ) %>%
+  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
+  cols_label(
+    term    = "Term",
+    df      = "df",
+    F_stat  = "F",
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = F_stat,  decimals = 2) %>%
+  fmt_number(columns = p.value, decimals = 3) %>%
+  tab_style(
+    style     = cell_fill(color = "#f0f0f0"),
+    locations = cells_row_groups()            # shaded group header rows
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold"),
+    locations = cells_row_groups()            # bold group headers
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold", color = "red"),
+    locations = cells_body(
+      columns = p.value,
+      rows    = p.value < 0.05
+    )
+  ) %>% 
+  tab_options(
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+dna_stat_summary_table1
+
+gtsave(dna_stat_summary_table1, here("outputs", "dna_anova_table_summary1.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
+```
+
+
+```{r}
+### 2/4 table summary 
+dna_stat_summary_table2 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group2) %>% 
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>%
+  mutate(term = recode_values(term,
+      "treatment"      ~"Treatment",
+      "time_fac"       ~ "Time",
+      "treatment:time_fac" ~ "Treatment x Time"
+    ),
+    F_stat  = round(F_stat, 2),
+    p.value = round(p.value, 3)
+  ) %>%
+  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
+  cols_label(
+    term    = "Term",
+    df      = "df",
+    F_stat  = "F",
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = F_stat,  decimals = 2) %>%
+  fmt_number(columns = p.value, decimals = 3) %>%
+  tab_style(
+    style     = cell_fill(color = "#f0f0f0"),
+    locations = cells_row_groups()            # shaded group header rows
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold"),
+    locations = cells_row_groups()            # bold group headers
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold", color = "red"),
+    locations = cells_body(
+      columns = p.value,
+      rows    = p.value < 0.05
+    )
+  )  %>% 
+  tab_options(
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+gtsave(dna_stat_summary_table2, here("outputs", "dna_anova_table_summary2.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
+```
+
+
+```{r}
+### 3/4 table summary 
+dna_stat_summary_table3 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group3) %>% 
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>%
+  mutate(term = recode_values(term,
+      "treatment"      ~"Treatment",
+      "time_fac"       ~ "Time",
+      "treatment:time_fac" ~ "Treatment x Time"
+    ),
+    F_stat  = round(F_stat, 2),
+    p.value = round(p.value, 3)
+  ) %>%
+  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
+  cols_label(
+    term    = "Term",
+    df      = "df",
+    F_stat  = "F",
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = F_stat,  decimals = 2) %>%
+  fmt_number(columns = p.value, decimals = 3) %>%
+  tab_style(
+    style     = cell_fill(color = "#f0f0f0"),
+    locations = cells_row_groups()            # shaded group header rows
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold"),
+    locations = cells_row_groups()            # bold group headers
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold", color = "red"),
+    locations = cells_body(
+      columns = p.value,
+      rows    = p.value < 0.05
+    )
+  )  %>% 
+  tab_options(
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+gtsave(dna_stat_summary_table3, here("outputs", "dna_anova_table_summary3.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
+```
+
+
+
+```{r}
+### 4/4 table summary 
+dna_stat_summary_table4 <- anova_results %>% 
+  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  filter(term != "log_flow") %>%
+  filter(variable %in% group4) %>% 
+  group_by(variable) %>%
+  filter(any(p.value < 0.05)) %>%
+  mutate(term = recode_values(term,
+      "treatment"      ~"Treatment",
+      "time_fac"       ~ "Time",
+      "treatment:time_fac" ~ "Treatment x Time"
+    ),
+    F_stat  = round(F_stat, 2),
+    p.value = round(p.value, 3)
+  ) %>%
+  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
+  cols_label(
+    term    = "Term",
+    df      = "df",
+    F_stat  = "F",
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = F_stat,  decimals = 2) %>%
+  fmt_number(columns = p.value, decimals = 3) %>%
+  tab_style(
+    style     = cell_fill(color = "#f0f0f0"),
+    locations = cells_row_groups()            # shaded group header rows
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold"),
+    locations = cells_row_groups()            # bold group headers
+  ) %>%
+  tab_style(
+    style     = cell_text(weight = "bold", color = "red"),
+    locations = cells_body(
+      columns = p.value,
+      rows    = p.value < 0.05
+    )
+  )  %>% 
+  tab_options(
+  table.font.size      = 12,
+  row_group.font.weight = "bold",
+  table.width           = pct(75)  # or a fixed value like px(800)
+)
+
+gtsave(dna_stat_summary_table4, here("outputs", "dna_anova_table_summary4.png")) 
+       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
+       #vheight = 1600) # height in pixels ← increase if table gets cut off
+```
+
+
+
+```{r}
+sig_var <- pairwise_summary %>% filter(p_value <0.05) %>% 
+  select(variable) %>% distinct() %>% pull()
+```
+
+```{r}
+pairwise_summary %>% 
+  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
+                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
+  mutate(sig = factor(sig, 
+                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
+  #mutate(variable = factor(variable, levels = unique(variable))) %>%
+  filter(variable %in% sig_var) %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  ggplot()+
+  geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
+  #facet_grid(variable_cat ~ ., scales = "free_y", space = "free_y")+
+  labs(title = "Pairwise comparison 12AM-12PM",
+       x= "Treatment",
+       y = " Variables")+
+  guides(fill=guide_legend(title="p-value interpretation"))+
+  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
+                    values = c("#43A047", "#90CAF9", "#F44336"))+
+  theme_bw()#+ 
+  theme(plot.title = element_text(size=30, face = "bold"), 
+        plot.subtitle = element_text(size=24),
+        axis.title = element_text(size = 20, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 20, face = "bold"),
+        legend.title=element_text(size=16, face = "bold"),
+        legend.text=element_text(size=15),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "top")
+
+```

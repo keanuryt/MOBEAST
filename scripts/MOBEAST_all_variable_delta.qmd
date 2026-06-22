@@ -106,37 +106,32 @@ mobeast<-  mobeast_raw %>%
 ```
 
 ```{r}
-
+# first pass for outlier detection on DOC because extreme values detected
 DOC <- mobeast %>% filter(variable == "npoc_u_m") %>%  
-  
-  #isolate the inflow values 
-  mutate(inflow = ifelse(treatment == "Inflow", value, NA)) %>% 
-  
-  # remove the inflow values that are outliers
-  mutate(inflow = ifelse(inflow > 208, NA, inflow)) %>% 
-  
-  # if an inflow is an outlier, then it will be equal to the mean of the overall inflow DOC value
-  mutate(value = ifelse(treatment == "Inflow" & value > 208, mean(inflow, na.rm= TRUE), value)) %>% 
-  # remove the outlier DOC value from the DOC data set
-  mutate(value = ifelse(value > 208, NA, value)) %>% 
-  # remove the inflow column taht was used to calculate the avg of the inflow throughout the experiment
-  select(-inflow)
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>%
+  mutate(mean = mean(value, na.rm = T),
+         sd = sd(value, na.rm= T)) %>% 
+  mutate(outlier = ifelse(value < mean - 2*sd | value > mean + 2*sd, 
+                          "outlier", "not outlier")) %>% 
+  filter(outlier != "outlier") %>% 
+  select(-mean, -sd, - outlier)
 
-mobeast_DOC_avg <- mobeast %>% 
+mobeast_DOC <- mobeast %>% 
   # from the original data set, remove the old DOC data and replace with the new DOC data with inflow data that is not outliers
   filter(variable != "npoc_u_m") %>% 
   rbind(DOC)
 ```
 
 
+
 ```{r}
-mobeast_flagged <- mobeast_DOC_avg %>% 
+mobeast_flagged <- mobeast_DOC %>% 
   
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
   
   # flagging outliers
   ## grouping by variable 
-  group_by(variable) %>% 
+  group_by(variable, treatment) %>% 
   
   ## get the mean and the sd to calculate mean +/- 2sd
   mutate(mean = mean(value, na.rm = T), 
@@ -146,7 +141,7 @@ mobeast_flagged <- mobeast_DOC_avg %>%
   ## Important to filter outliers later to understand why they are outliers. 
   mutate(outlier = ifelse(value > mean + 2*stand_dev | value < mean - 2*stand_dev,
                            "outlier", "not outlier")) %>% 
-  ungroup() 
+  ungroup()
   
 ```
 
@@ -184,19 +179,16 @@ mobeast_delta <- mobeast_flagged %>%
 
 ```
 
-```{r}
-mobeast_flagged %>% filter(outlier == "outlier", treatment == "Inflow")
-```
-
 
 ```{r}
 ## Some variables will not be studied in this project
-exclude_var <- c("carbonate", "residence time")
+exclude_var <- c("tot_bact", "cyano", "NO2", "ph_diff", "delta_ta", "do_mg_l", "dic_mmol_kg",
+                 "tn_u_m", "N_N")
 
 # we also won't focus on the other time points, they are mainly for the FCM data and not other data was collected at those times anyway
 exclude_time <- c("03:00:00","09:00:00","15:00:00","21:00:00")
 
-mobeast_delta <- mobeast_delta %>% filter(!variable_cat %in%  exclude_var,
+mobeast_delta <- mobeast_delta %>% filter(!variable %in%  exclude_var,
                         !time_string %in% exclude_time) 
 ```
 
@@ -213,24 +205,32 @@ mobeast_24h <- mobeast_delta %>%
 
   mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
                                                    "00:00:00","06:00:00"))) %>% 
-  mutate(log_flow = log10(flowrate))
+  mutate(log_flow = log10(flowrate)) %>% 
+  filter(!is.na(conc_norm))
 
 ```
+
+
+
+
 
 ```{r}
 meta_var <- tibble(variable = c("het_bact", "pico_euk", "syn", "pro", "tot_bact", "cyano", 
                       "chla_conc", "tn_u_m", "coble_a", "coble_b", "coble_c",
-                      "coble_m", "coble_t", "m_to_c", "bix", "hix", "fpeak", "FI",
-                      "lignin", "N_N", "NO2", "PO4", "SiO2", "NH3", "NO3", "DOC"),
+                      "coble_m", "coble_t", "m_to_c", "bix", "hix", "fpeak", "fi",
+                      "lignin", "N_N", "NO2", "PO4", "SiO2", "NH3", "NO3", "do_mg_l",
+                      "ta", "dic_mmol_kg", "ph", "npoc_u_m"),
          variable_clean = c("Heterotrophic Bacteria", "Pico-Eukaryote", "Synechococcus",
                             "Prochlorococcus", "Total Bacteria", "Cyanobacteria", 
                             "Chlorophyll a", 
                             "TN", "Coble A", "Coble B", "Coble C", "Coble M",
                             "Coble T", "M:C", "BIX", "HIX", "Fpeak", "Fulvic Acid",
-                            "Lignin", "N+N", "NO2", "PO4", "SiO2", "NH3", "NO3", "DOC"))
+                            "Lignin", "N+N", "NO2", "PO4", "SiO2", "NH3", "NO3", 
+                            "Dissolved Oxygen", "Total Alkalinity", "DIC", "pH", "DOC"))
 
 mobeast_24h <- mobeast_24h %>% left_join(meta_var, by = "variable") %>% 
   relocate(variable_clean, .after = "variable")
+
 ```
 
 
@@ -251,6 +251,8 @@ mobeast_delta %>%
   filter(variable == "npoc_u_m") %>%  
   arrange(mean)
 ```
+
+
 
 
 
@@ -318,8 +320,7 @@ sig_anova <- anova_results %>%
   select(variable) %>% pull()
 
 anova_results %>% 
-  filter( p.value <0.05) %>%  filter(term == "treatment") %>% 
-  filter(!variable %in% c("tot_bact", "cyano"))
+  filter( p.value <0.05) %>%  filter(term == "treatment") 
 
 
 # no signficant time interactions !
@@ -403,32 +404,6 @@ nutrient_stat_summary_table
 
 
 
-#### Partial Eta squared 
-
-Partial η²
-
-Answers "so what?" after a significant ANOVA
-Tells you whether the significant effect is actually large enough to care about biologically
-A p < 0.05 with η² = 0.01 is statistically real but possibly biologically trivial
-
-
-```{r}
-eta_results <- tibble()
-
-for (var in sig_anova) {
-  df <- tibble(eta_squared(anova(models_24h[[var]]), partial = TRUE))
-  df <- df %>% mutate(variable = var ) %>% relocate(variable)
-  
-  eta_results <- rbind(eta_results, df)
-  
-  eta_results <- eta_results 
-  
-}
-
-sig_eta <- eta_results %>% filter(Eta2_partial > 0.14, variable != "tot_bact", variable != "cyano", variable != "N_N") %>% select(variable) %>% distinct() %>% pull()
-
-```
-
 #### emmeans results
 
 Unpacks where the group differences are
@@ -449,7 +424,7 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
 emmeans_results %>% #filter(variable %in% sig_eta) %>%
-  filter(adj.p.value <0.05) %>% filter(!variable %in% c("tot_bact", "cyano"))
+  filter(adj.p.value <0.05) 
 ```
 
 
@@ -468,18 +443,7 @@ need tukey test
 ##### FCM Time Contrasts
 Need tukey test
 
-
-#### Emmeans if time interactions ! 
-3b. If interaction is significant → decompose emmeans by time point
-    emmeans(model, pairwise ~ treatment | time)
     
-    If interaction is NOT significant → look at main effects only
-    emmeans(model, pairwise ~ treatment)
-
-NOT APPLICABLE BCS NO TIME INTERACTION IN THE ANOVA 
-
-    
-
 #### Contrast Effect Size 
 
 Adds biological interpretability to each contrast
@@ -511,8 +475,6 @@ effect_size_results %>%
 
 
 ```
-
-
 
 
 #### Violin plots
@@ -646,326 +608,51 @@ mobeast_wide <- mobeast_24h %>% select(tank_number, treatment, inflow_table,
 ```
 
 
-### HIX - No sig ANOVA
+### HIX 
 ```{r}
-mod_hix <- lm(het_bact ~ hix+ treatment+log_flow , 
+mod_hix <- lm(het_bact ~ hix + treatment + log_flow , 
                   data= mobeast_wide)
 anova(mod_hix)
 contrast(emmeans(mod_hix, ~treatment), methods= "trt.vs.ctrl")
 
+ggplot(mobeast_wide, aes(hix, het_bact, color = treatment,group= treatment))+
+  geom_point()+
+  geom_smooth(method = "lm",se = F)+
+  facet_wrap(.~treatment)+
+  scale_color_manual(values = treatment_colors)+
+  nunu_theme
+
+ggplot(mobeast_wide, aes(hix, het_bact, fill = treatment,group= treatment))+
+  geom_violin()+
+  facet_wrap(.~treatment, nrow=1)+
+  stat_summary(alpha = 0.5)+
+  scale_fill_manual(values = treatment_colors)+
+  nunu_theme
 ```
 
 ### Coble C
 
 ```{r}
-mobeast_wide_algae <- filter(mobeast_wide, treatment == "Algae")
-cobC_lm <- lm(syn ~ coble_c+ treatment+log_flow , 
+mod_cobC <- lm(het_bact ~ coble_c + treatment + log_flow , 
                   data= mobeast_wide)
+anova(mod_cobC)
+contrast(emmeans(mod_cobC, ~treatment), methods= "trt.vs.ctrl")
 
-summary(cobC_lm) 
-
-resid_panel(cobC_lm, plots = "qq") 
-
-anova(cobC_lm)
-contrast(emmeans(cobC_lm, ~treatment), specs= "trt.vs.ctrl")
-
-```
-
-
-```{r}
-mobeast_wide %>% filter(treatment == "Algae") %>% 
-  ggplot(aes(hix, het_bact, color = treatment, group = treatment)) +
+ggplot(mobeast_wide, aes(coble_c, het_bact, color = treatment,group= treatment))+
   geom_point()+
-  geom_smooth(method = "lm")+
-  #facet_wrap(.~treatment)+
-  scale_color_manual(
-        breaks = c("Control", "Coral", "CCA", "Algae"),
-        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
-      )  +
+  geom_smooth(method = "lm",se = F)+
+  facet_wrap(.~treatment, nrow=1)+
+  scale_color_manual(values = treatment_colors)+
   nunu_theme
-    
+
+ggplot(mobeast_wide, aes(coble_c, het_bact, fill = treatment,group= treatment))+
+  geom_violin()+
+  facet_wrap(.~treatment, nrow=1)+
+  stat_summary(alpha = 0.5)+
+  scale_fill_manual(values = treatment_colors)+
+  nunu_theme
 ```
 
-
-
-
-## Pairwise comparison 
-
-### Pairwise comparison function
-
-```{r}
-nunu_pairwise <- function(data, type = "coble_a", time_point = 6){
-
-  ## Get a list of the treatments for the for loop   
-  treatment <- data %>% mutate(treatment = as.character(treatment)) %>%
-  select(treatment) %>%  distinct() %>% pull()
-  
-  ## Create un empty data frame
-pairwise_results <- tibble(
-  time_point = vector(),
-  treatment= vector(),
-  mean = vector(),
-  p_value = vector())
-
-# this is the pairwise comparison for the 6 pairs (6AM-6PM)
-  if(time_point == 6){
-    for(var in treatment){
-      
-      ## only keep the 6AM and 6PM
-      df <- data %>% 
-        filter(variable == type) %>% 
-        filter(treatment == var) %>% 
-  filter(time_string == "18:00:00" | time_string == "06:00:00") %>% 
-        ## Rename the times so they can become column names
-  mutate(time_US = ifelse(time_string == "18:00:00", "T18", "T06")) %>% 
-        ## Only keep the column of interest for the stats
-  select(tank_number, time_US, conc_norm) %>% 
-  pivot_wider(names_from = time_US, values_from = conc_norm) 
-      
-      ## Pairwise function 
-      paired <- t.test(df$T18, df$T06, paired = TRUE, na.action = na.pass)
-      
-      ## Save the result in at data frame
-      df2 <- tibble(
-        time_point = "06AM-06PM",
-        variable = type,
-        treatment = var,
-        mean = paired$estimate, 
-        p_value = paired$p.value)
-      
-      # Code will loop oveer all treatments and save the results in a data frame
-      pairwise_results <-rbind(pairwise_results,df2)
-      
-      # Save the results in RStudio
-      pairwise_results <<- pairwise_results
-    }  
-  
-
-# This is for the 12 samples (12AM-12PM)
-  }else if(time_point == 12){
-    for(var in treatment){
-      
-      ## Same as before but for the 12AM-12PM
-      df <- data %>% 
-        filter(variable == type) %>% 
-        filter(treatment == var) %>% 
-  filter(time_string == "12:00:00" | time_string == "00:00:00") %>% 
-  mutate(time_US = ifelse(time_string == "12:00:00", "T12", "T00")) %>% 
-  select(tank_number, time_US, conc_norm) %>% 
-  pivot_wider(names_from = time_US, values_from = conc_norm) 
-      
-      paired <- t.test(df$T12, df$T00, paired = TRUE, na.action = na.pass)
-      
-      df2 <- tibble(
-        time_point = "12AM-12PM",
-        variable = type,
-        treatment = var,
-        mean = paired$estimate, 
-        p_value = paired$p.value)
-      
-      pairwise_results <- rbind(pairwise_results, df2)
-      pairwise_results <<- pairwise_results
-    }
-}
-
-# Display the results of the code 
-return(pairwise_results)
-}
-
-```
-
-
-
-```{r}
-nunu_pairwise(mobeast_24h, type = "npoc_u_m", time_point = 6)
-```
-
-
-## pH and TA 
-
-```{r}
-mobeast_carb <- mobeast_flagged %>%  filter(variable_cat == "carbonate") %>% 
-  
-  # Isolate inflow for each date_time and table
-  group_by(date_time, inflow_table, variable) %>%
-  #mutate(inflow = value[treatment == "Inflow"]) %>% 
-  mutate(inflow_isolated = ifelse(treatment == "Inflow", value, NA)) %>% 
-  ungroup() %>%
-  
-  # averaging the inflow values 
-  group_by(date_time, variable) %>% 
-  mutate(inflow = mean(inflow_isolated, na.rm = TRUE)) %>%
-  ungroup() %>% 
-  
-  
-  # Normalize for treatments
-  mutate(conc_norm = value - inflow)  %>%  
-  relocate(inflow, .after = "conc_norm") %>% 
-  relocate(date_time, .before = "date") %>%
-  
-  #organize the treatment levels
-  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))) %>% 
-  select(-mean, -stand_dev, -inflow, -residence_time, - inflow_isolated) %>% 
-  filter(variable %in% c("ta", "ph")) %>% 
-  filter(!time_string %in% exclude_time) %>% 
-  filter(!is.na(id_number)) %>%
-  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  # remove the the DOC data because something happened  at 00:00. 
- filter(treatment != "Inflow") %>% 
-  ## remove the outliers 
-  #filter(outlier == "not outlier") %>% 
-  mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) %>% mutate(log_flow = log10(flowrate)) 
-
-```
-
-
-### Carbonate LMER models
-
-```{r}
-# Loop Function:
-## Take the 24h samples and isolate the types of nutrient  present on the df in a vector
-## Create a list where the loop results will be save, named after the nutrients of the df
-## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
-## Save the outputs of the model in the list such that each nutrient has its stats
-
-mobeast_loop <- mobeast_carb %>% select(variable) %>% distinct() %>% pull()
-
-models_carb <- vector(mode = "list", length = length(mobeast_loop))
-names(models_carb) <- mobeast_loop
-
-
-for (var in mobeast_loop) {
-  df <- mobeast_carb %>% filter(variable == var)
-  models_carb[[var]] <- lmer(conc_norm~ treatment*time_fac + log_flow +  
-                            (1|tank_number), data = df)
-}
-
-
-```
-
-
-```{r}
-plot_grid(imap(models_carb, ~ {
-  resid_panel(.x, plots = c("qq")) + plot_annotation(title = .y)}), 
-margin = c(0.2, 0.2, 0.2, 0.2), tags = TRUE)
-
-```
-
-### ANOVA results
-
-Your gatekeeper — if nothing is significant here, you stop
-Reports F-statistic, df, and p-value for each term
-Type II is appropriate because it accounts for the other terms in the model without assuming a particular order
-
-```{r, warning= FALSE}
-# So many Warnings! 
-## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
-
-anova_carb <- imap_dfr(models_carb, ~ {
-  stats::anova(.x, type = 2) %>%
-    broom::tidy() %>%
-    mutate(variable = .y)}) %>%
-  relocate(variable) 
-
-# all the variables that have significant treatment effects
-anova_carb %>% 
-  filter( p.value <0.05) %>%  filter(term == "treatment")
-
-# no signficant time interactions !
-anova_carb %>% 
-  filter(p.value <0.05, term == "treatment:time_fac")
-
-
-
-```
-
-
-
-
-### Partial Eta squared 
-
-Partial η²
-
-Answers "so what?" after a significant ANOVA
-Tells you whether the significant effect is actually large enough to care about biologically
-A p < 0.05 with η² = 0.01 is statistically real but possibly biologically trivial
-
-
-```{r}
-eta_carb <- tibble()
-
-for (var in c("ph", "ta")) {
-  df <- tibble(eta_squared(anova(models_carb[[var]]), partial = TRUE))
-  df <- df %>% mutate(variable = var ) %>% relocate(variable)
-  
-  eta_carb <- rbind(eta_carb, df)
-  
-  eta_carb <- eta_carb 
-  
-}
-
-eta_carb %>% filter(Eta2_partial > 0.14)
-
-sig_eta_carb <- eta_carb %>% filter(Eta2_partial > 0.14) %>% select(variable) %>% distinct() %>% pull()
-
-```
-
-
-### emmeans results
-
-Unpacks where the group differences are
-Particularly important for your treatment * time interaction — you need to know at which time points treatments diverge
-Controls for multiple comparisons
-
-
-```{r}
-# "estimate" are negative somehow. Why? 
-## in manual models for DOC, estimate >0, here it's <0
-## t.ratio in "statistics", and negative instead of positive
-## p.values not shown, only p.adjusted. 
-emmeans_carb <- imap_dfr(models_carb, ~ {
-  emmeans(.x, pairwise ~ treatment)$contrasts %>%
-    broom::tidy() %>%
-    mutate(variable = .y)}) %>% 
-  relocate(variable) %>% 
-  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
-
-emmeans_carb %>% #filter(variable %in% sig_eta) %>%
-  filter(adj.p.value <0.05)
-```
-
-#### Contrast Effect Size 
-
-Adds biological interpretability to each contrast
-Tells you not just "these groups differ" but "by how much and in which direction"
-Essential for comparing across nutrients since your residuals are on different scales
-
-
-```{r}
-effect_size_carb <- tibble()
-
-for (var in c("ph", "ta")) {
-  emm <- emmeans(models_carb[[var]], ~ treatment)
-  contrasts <- contrast(emm, method = "trt.vs.ctrl")
-
-## Effect size for each contrast
-  df <- tidy(eff_size(emm, sigma = sigma(models_carb[[var]]), 
-                edf = df.residual(models_carb[[var]])))
-  
-  df <- df %>% mutate(variable = var) %>% rename(effect.size = estimate) %>% 
-    relocate(variable)
-  
-  effect_size_carb <- rbind(effect_size_carb, df)
-  
-}
-
-effect_size_carb %>% 
-  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") %>% filter(abs(effect.size) >=0.8)
-
-
-
-```
 
 
 ### Plots 
@@ -975,11 +662,11 @@ effect_size_carb %>%
 # Define shading dataframe matching your exact factor levels
 # Adjust period assignments to match your actual day/night schedule
 shading <- data.frame(
-  time_fac = levels(mobeast_carb$time_fac),
+  time_fac = levels(mobeast_24h$time_fac),
   period   = c("day", "night", "night", "day")  # adjust to your time points
 )
 
-ta <- mobeast_carb %>% 
+ta <- mobeast_24h %>% 
   filter(variable == "ta") %>% 
   group_by(variable, time_fac, treatment) %>% 
   reframe(mean = mean(conc_norm, na.rm = T),
@@ -999,7 +686,7 @@ ta <- mobeast_carb %>%
   geom_point() +
   geom_line(aes(color = treatment)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_grid(treatment ~ ., scales = "free_y") +
+  facet_grid(treatment ~ .) +
   labs(title = "Total Alkalinity ",
     x = "Time Point",
     y = paste0("Delta TA (µmol/kg)")
@@ -1014,7 +701,7 @@ ta <- mobeast_carb %>%
     legend.position = "none"
   )
 
-ph <- mobeast_carb %>% 
+ph <- mobeast_24h %>% 
   filter(variable == "ph") %>% 
   group_by(variable, time_fac, treatment) %>% 
   reframe(mean = mean(conc_norm, na.rm = T),
@@ -1034,7 +721,7 @@ ph <- mobeast_carb %>%
   geom_point() +
   geom_line(aes(color = treatment)) +
   geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_grid(treatment ~ ., scales = "free_y") +
+  facet_grid(treatment ~ .) +
   labs(title = "pH",
     x = "Time Point",
     y = paste0("Delta pH")
@@ -1058,11 +745,11 @@ ta + ph
 # Define shading dataframe matching your exact factor levels
 # Adjust period assignments to match your actual day/night schedule
 shading <- data.frame(
-  time_fac = levels(mobeast_carb$time_fac),
+  time_fac = levels(mobeast_24h$time_fac),
   period   = c("day", "night", "night", "day")  # adjust to your time points
 )
 
-ta <- mobeast_carb %>% 
+ta <- mobeast_24h %>% 
   filter(variable == "ta") %>% 
   ggplot(aes(x = time_fac, y = conc_norm, fill = treatment)) +
   # Day/night shading - added before geom_point and geom_line
@@ -1076,7 +763,7 @@ ta <- mobeast_carb %>%
   geom_violin() +
   stat_summary(color = "yellow", alpha =0.5)+
   geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_grid(treatment ~ ., scales = "free_y") +
+  facet_grid(treatment ~ .) +
   labs(title = "Total Alkalinity ",
     x = "Time Point",
     y = paste0("Delta TA (µmol/kg)")
@@ -1091,7 +778,7 @@ ta <- mobeast_carb %>%
     legend.position = "none"
   )
 
-ph <- mobeast_carb %>% 
+ph <- mobeast_24h %>% 
   filter(variable == "ph") %>% 
   ggplot(aes(x = time_fac, y = conc_norm, fill = treatment)) +
   # Day/night shading - added before geom_point and geom_line
@@ -1105,7 +792,7 @@ ph <- mobeast_carb %>%
   geom_violin() +
   stat_summary(color = "yellow", alpha =0.5)+
   geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_grid(treatment ~ ., scales = "free_y") +
+  facet_grid(treatment ~ .) +
   labs(title = "pH",
     x = "Time Point",
     y = paste0("Delta pH")
@@ -1125,658 +812,6 @@ ta + ph
 
 
 
-
-
-## DNA 
-
-### DNA data clean up 
-```{r}
-# prepaing the data for later
-mobeast_DNA  <- mobeast_raw %>%
-  mutate(time_string = as.character(time_string),
-              date_string = as.character(date_string),
-              date_time_string = paste(date_string,time_string))%>% 
-  filter(variable_cat == "DNA" ) %>% 
-  filter(treatment != "Rain") %>% 
-  filter(treatment != "Endmember") %>% 
-  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
-  
-  
-
-```
-
-```{r}
-mobeast_DNA_24h_raw <- mobeast_DNA %>% filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
-  #filter(treatment != "Inflow") %>% 
-  filter(!is.na(id_number)) %>% 
-  mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00",
-                                                   "00:00:00","06:00:00"))) %>% 
-  mutate(log_flow = log10(flowrate))
-
-```
-
-```{r}
-## outlier detection on the relative abundance??
-mobeast_DNA_24h_flagged <- mobeast_DNA_24h_raw %>%  
-  group_by(variable) %>% 
-  mutate(mean = mean(value, na.rm= T), 
-         sd = sd(value, na.rm= T)) %>% 
-  mutate(outlier = ifelse(value > mean + 2*sd |value < mean - 2*sd, "outlier", "not outlier")) %>% 
-  ungroup() %>% 
-  filter(outlier != "outlier")
-```
-
-
-```{r}
-## outlier detection on the relative abundance??
-mobeast_DNA_24h <- mobeast_DNA_24h_flagged %>%  
-  mutate(inflow_isolated = ifelse(treatment == "Inflow", value, NA)) %>% 
-  group_by(time, variable) %>% 
-  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
-  ungroup() %>% 
-  mutate(conc_norm  = value - inflow ) %>% 
-  filter(treatment != "Inflow" )
-```
-
-
-
-
-### LMER Models
-```{r}
-# Loop Function:
-## Take the 24h samples and isolate the types of nutrient  present on the df in a vector
-## Create a list where the loop results will be save, named after the nutrients of the df
-## In the for-loop, filter the df by nutrient and apply a statistical model with lmer
-## Save the outputs of the model in the list such that each nutrient has its stats
-
-exclude_family <- mobeast_DNA_24h %>% 
-  group_by(time, variable) %>% 
-  reframe(avg = mean(value)) %>% 
-  filter(avg == 0) 
-
-mobeast_loop <- mobeast_DNA_24h %>% filter(!variable %in% exclude_family$variable & !variable %in% exclude_family$time) %>%
-  select(variable) %>% distinct() %>% pull()
-
-models_DNA_24h <- vector(mode = "list", length = length(mobeast_loop))
-names(models_DNA_24h) <- mobeast_loop
-
-
-for (var in mobeast_loop) {
-  df <- mobeast_DNA_24h %>% filter(variable == var)
-  models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
-                                  log_flow + (1|tank_number), data = df)
-
-}
-
-```
-
-
-```{r}
-results_DNA <- imap_dfr(models_DNA_24h, ~ tidy(.x) %>%
-                     dplyr::mutate(variable = .y)) %>% 
-  relocate(variable, .before = "effect")
-
-results_DNA %>%  filter(p.value <0.05)
-```
-
-### DNA ANOVA
-
-```{r, warning= FALSE}
-# So many Warnings! 
-## Warning: The column names NumDF and DenDF in ANOVA output were not recognized or transformed.
-
-anova_results <- imap_dfr(models_DNA_24h, ~ {
-  stats::anova(.x, type = 2) %>%
-    broom::tidy() %>%
-    mutate(variable = .y)}) %>%
-  relocate(variable) 
-
-DNA_anova_sig <- anova_results %>% filter(p.value <0.05) %>% select(variable, anova_term = term, anova_p_val = p.value)
-
-sig_treat <- anova_results %>% filter(p.value <0.05) %>% 
-  filter(term == "treatment") %>%
-  select(variable) %>% 
-  pull()
-
-fam_time <- anova_results %>% filter(p.value <0.05) %>% 
-  filter(term == "time_fac") %>% select(variable) %>% distinct() 
-
-fam_treatment <- anova_results %>% filter(p.value <0.05) %>% 
-  filter(term == "treatment") %>% select(variable) %>% distinct() %>% pull()
-
-fam_time %>%  filter(variable %in% fam_treatment) %>%  pull()
-
-fam_interaction <- anova_results %>% filter(p.value <0.05) %>% 
-  filter(term == "treatment:time_fac")
-
-fam_interaction %>% filter(variable %in% fam_treatment)
-interaction_family <- fam_interaction %>% filter(variable %in% fam_treatment) %>% 
-  select(variable) %>%  pull()
-```
-
-
-
-#### Partial Eta squared 
-
-Partial η²
-
-Answers "so what?" after a significant ANOVA
-Tells you whether the significant effect is actually large enough to care about biologically
-A p < 0.05 with η² = 0.01 is statistically real but possibly biologically trivial
-
-```{r}
-eta_results <- tibble()
-
-for (var in sig_treat) {
-  df <- tibble(eta_squared(anova(models_DNA_24h[[var]]), partial = TRUE))
-  df <- df %>% mutate(variable = var ) %>% relocate(variable)
-  
-  eta_results <- rbind(eta_results, df)
-  
-  eta_results <- eta_results 
-  
-}
-
-sig_eta <- eta_results %>% filter(Eta2_partial > 0.14) %>% select(variable) %>% distinct() %>% pull()
-
-sig_eta 
-```
-
-
-### DNA Emmeans 
-
-```{r, message= FALSE}
-# "estimate" are negative somehow. Why? 
-## in manual models for DOC, estimate >0, here it's <0
-## t.ratio in "statistics", and negative instead of positive
-## p.values not shown, only p.adjusted. 
-emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
-  emmeans(.x, pairwise ~ treatment)$contrasts %>%
-    broom::tidy() %>%
-    mutate(variable = .y)}) %>% 
-  relocate(variable) %>% 
-  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
-
-
-```
-
-```{r}
-emmeans_sig_dna <- emmeans_results_dna %>% filter(adj.p.value <0.05) %>% 
-  select(variable, emmean_term = term, contrast, emmeans_p_val = adj.p.value) 
-
-emmeans_sig_dna %>% left_join(DNA_anova_sig) %>% filter(!variable %in% interaction_family) %>% select(variable) %>%  distinct() %>% pull()
-
-```
-
-
-
-```{r, warning=FALSE}
-DNA_sig_var <- emmeans_results_dna %>% 
-  filter(adj.p.value <0.05) %>% 
-  select(variable) %>% distinct() %>% pull()
-
-graphs_DNA_24h <- DNA_sig_var %>%
-  set_names() %>%
-  map(~ {
-    df <- mobeast_DNA_24h %>% filter(variable == .x)
-    
-    ggplot(df, aes(x = treatment, y = value, fill = treatment)) +
-      geom_violin() +
-      geom_point() +
-      geom_hline(yintercept = 0, linetype = "dashed") +
-      stat_summary(color = "yellow", alpha = 0.5) +
-      labs(title = paste("24h", .x, "Production"),
-           x = "Treatment",
-          y = "Relative Abundance") +
-      scale_fill_manual(
-        breaks = c("Control", "Coral", "CCA", "Algae", "Inflow"),
-        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50", "orange")
-      ) +
-      nunu_theme +
-      theme(legend.position = "none")
-  })
-
-
-```
-
-
-
-
-```{r}
-emmeans_results_dna %>%  
-  mutate(sig = ifelse(adj.p.value<0.05 & estimate < 0, "Enrichment", 
-                                         ifelse(adj.p.value<0.05 & estimate > 0, "Depletion", "No Difference")))%>% 
-  mutate(sig = factor(sig, 
-                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
-  filter(variable %in% sig_treat)  %>%
-  #filter(variable %in% interaction_family) %>% 
-  mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>%
-  
-  # these families have sig ANOVA but not sig control vs treatment contrast
-  ## probs have sig treatment vs treatment contrasts 
-  filter(variable != "Oligoflexaceae", variable != "NS9_marine_group") %>% 
-  
-  ggplot()+
-  geom_tile(aes(x= contrast, y= variable, fill = sig), color = "black")+
-  #facet_wrap(.~variable_cat)+
-  labs(
-       x= "Treatment",
-       y = " Variables")+
-  guides(fill=guide_legend(title="p-value Interpretation"))+
-  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
-                    values = c("#43A047", "#90CAF9", "#F44336"))+
-  theme_bw() +
-  nunu_theme+
-  theme(legend.position = "right",
-        plot.title = element_text(face = "bold"))
-  
-ggsave(filename = "dna_enrichment_tiles.png", path = here("outputs"), height = 6, width=12)
-```
-
-### Effect Size 
-
-Adds biological interpretability to each contrast
-Tells you not just "these groups differ" but "by how much and in which direction"
-Essential for comparing across nutrients since your residuals are on different scales
-
-
-```{r}
-effect_size_results <- tibble()
-
-for (var in sig_eta) {
-  emm <- emmeans(models_DNA_24h[[var]], ~ treatment)
-  contrasts <- contrast(emm, method = "trt.vs.ctrl")
-
-## Effect size for each contrast
-  df <- tidy(eff_size(emm, sigma = sigma(models_DNA_24h[[var]]), 
-                edf = df.residual(models_DNA_24h[[var]])))
-  
-  df <- df %>% mutate(variable = var) %>% rename(effect.size = estimate) %>% 
-    relocate(variable)
-  
-  effect_size_results <- rbind(effect_size_results, df)
-  
-}
-
-effect_size_results %>% 
-  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") %>% filter(abs(effect.size) >=0.8) %>%  filter (variable %in%sig_treat)
-
-
-
-```
-
-### Summary DNA table 
-
-```{r}
-
-anova_sig_family <- anova_results %>% 
-  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
-  filter(term != "log_flow") %>%
-  group_by(variable) %>%
-  filter(any(p.value < 0.05)) %>% 
-  ungroup() %>%  
-  select(variable) %>% distinct() %>% pull()
-group1 <- anova_sig_family[1:12]
-group2 <- anova_sig_family[13:24]
-group3 <- anova_sig_family[25:36]
-group4 <- anova_sig_family[37:48]
-```
-
-```{r}
-### 1/4 table summary 
-dna_stat_summary_table1 <- anova_results %>% 
-  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
-  filter(term != "log_flow") %>%
-  filter(variable %in% group1) %>% 
-  group_by(variable) %>%
-  filter(any(p.value < 0.05)) %>%
-  mutate(term = recode_values(term,
-      "treatment"      ~"Treatment",
-      "time_fac"       ~ "Time",
-      "treatment:time_fac" ~ "Treatment x Time"
-    ),
-    F_stat  = round(F_stat, 2),
-    p.value = round(p.value, 3)
-  ) %>%
-  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
-  cols_label(
-    term    = "Term",
-    df      = "df",
-    F_stat  = "F",
-    p.value = "p-value"
-  ) %>%
-  fmt_number(columns = F_stat,  decimals = 2) %>%
-  fmt_number(columns = p.value, decimals = 3) %>%
-  tab_style(
-    style     = cell_fill(color = "#f0f0f0"),
-    locations = cells_row_groups()            # shaded group header rows
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold"),
-    locations = cells_row_groups()            # bold group headers
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold", color = "red"),
-    locations = cells_body(
-      columns = p.value,
-      rows    = p.value < 0.05
-    )
-  ) %>% 
-  tab_options(
-  table.font.size      = 12,
-  row_group.font.weight = "bold",
-  table.width           = pct(75)  # or a fixed value like px(800)
-)
-
-dna_stat_summary_table1
-
-gtsave(dna_stat_summary_table1, here("outputs", "dna_anova_table_summary1.png")) 
-       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
-       #vheight = 1600) # height in pixels ← increase if table gets cut off
-```
-
-
-```{r}
-### 2/4 table summary 
-dna_stat_summary_table2 <- anova_results %>% 
-  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
-  filter(term != "log_flow") %>%
-  filter(variable %in% group2) %>% 
-  group_by(variable) %>%
-  filter(any(p.value < 0.05)) %>%
-  mutate(term = recode_values(term,
-      "treatment"      ~"Treatment",
-      "time_fac"       ~ "Time",
-      "treatment:time_fac" ~ "Treatment x Time"
-    ),
-    F_stat  = round(F_stat, 2),
-    p.value = round(p.value, 3)
-  ) %>%
-  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
-  cols_label(
-    term    = "Term",
-    df      = "df",
-    F_stat  = "F",
-    p.value = "p-value"
-  ) %>%
-  fmt_number(columns = F_stat,  decimals = 2) %>%
-  fmt_number(columns = p.value, decimals = 3) %>%
-  tab_style(
-    style     = cell_fill(color = "#f0f0f0"),
-    locations = cells_row_groups()            # shaded group header rows
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold"),
-    locations = cells_row_groups()            # bold group headers
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold", color = "red"),
-    locations = cells_body(
-      columns = p.value,
-      rows    = p.value < 0.05
-    )
-  )  %>% 
-  tab_options(
-  table.font.size      = 12,
-  row_group.font.weight = "bold",
-  table.width           = pct(75)  # or a fixed value like px(800)
-)
-
-gtsave(dna_stat_summary_table2, here("outputs", "dna_anova_table_summary2.png")) 
-       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
-       #vheight = 1600) # height in pixels ← increase if table gets cut off
-```
-
-
-```{r}
-### 3/4 table summary 
-dna_stat_summary_table3 <- anova_results %>% 
-  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
-  filter(term != "log_flow") %>%
-  filter(variable %in% group3) %>% 
-  group_by(variable) %>%
-  filter(any(p.value < 0.05)) %>%
-  mutate(term = recode_values(term,
-      "treatment"      ~"Treatment",
-      "time_fac"       ~ "Time",
-      "treatment:time_fac" ~ "Treatment x Time"
-    ),
-    F_stat  = round(F_stat, 2),
-    p.value = round(p.value, 3)
-  ) %>%
-  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
-  cols_label(
-    term    = "Term",
-    df      = "df",
-    F_stat  = "F",
-    p.value = "p-value"
-  ) %>%
-  fmt_number(columns = F_stat,  decimals = 2) %>%
-  fmt_number(columns = p.value, decimals = 3) %>%
-  tab_style(
-    style     = cell_fill(color = "#f0f0f0"),
-    locations = cells_row_groups()            # shaded group header rows
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold"),
-    locations = cells_row_groups()            # bold group headers
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold", color = "red"),
-    locations = cells_body(
-      columns = p.value,
-      rows    = p.value < 0.05
-    )
-  )  %>% 
-  tab_options(
-  table.font.size      = 12,
-  row_group.font.weight = "bold",
-  table.width           = pct(75)  # or a fixed value like px(800)
-)
-
-gtsave(dna_stat_summary_table3, here("outputs", "dna_anova_table_summary3.png")) 
-       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
-       #vheight = 1600) # height in pixels ← increase if table gets cut off
-```
-
-
-
-```{r}
-### 4/4 table summary 
-dna_stat_summary_table4 <- anova_results %>% 
-  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
-  filter(term != "log_flow") %>%
-  filter(variable %in% group4) %>% 
-  group_by(variable) %>%
-  filter(any(p.value < 0.05)) %>%
-  mutate(term = recode_values(term,
-      "treatment"      ~"Treatment",
-      "time_fac"       ~ "Time",
-      "treatment:time_fac" ~ "Treatment x Time"
-    ),
-    F_stat  = round(F_stat, 2),
-    p.value = round(p.value, 3)
-  ) %>%
-  gt(groupname_col = "variable") %>%        # ← this merges the repeated variable cells
-  cols_label(
-    term    = "Term",
-    df      = "df",
-    F_stat  = "F",
-    p.value = "p-value"
-  ) %>%
-  fmt_number(columns = F_stat,  decimals = 2) %>%
-  fmt_number(columns = p.value, decimals = 3) %>%
-  tab_style(
-    style     = cell_fill(color = "#f0f0f0"),
-    locations = cells_row_groups()            # shaded group header rows
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold"),
-    locations = cells_row_groups()            # bold group headers
-  ) %>%
-  tab_style(
-    style     = cell_text(weight = "bold", color = "red"),
-    locations = cells_body(
-      columns = p.value,
-      rows    = p.value < 0.05
-    )
-  )  %>% 
-  tab_options(
-  table.font.size      = 12,
-  row_group.font.weight = "bold",
-  table.width           = pct(75)  # or a fixed value like px(800)
-)
-
-gtsave(dna_stat_summary_table4, here("outputs", "dna_anova_table_summary4.png")) 
-       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
-       #vheight = 1600) # height in pixels ← increase if table gets cut off
-```
-
-
-## DNA Pairwise
-
-```{r}
-
-## modified function for DNA 
-nunu_pairwise <- function(data, type = "coble_a", time_point = 6, value= areal_flux){
-
-  ## Get a list of the treatments for the for loop   
-  treatment <- data %>% mutate(treatment = as.character(treatment)) %>%
-  select(treatment) %>%  distinct() %>% pull()
-  
-  ## Create un empty data frame
-pairwise_results <- tibble(
-  time_point = vector(),
-  treatment= vector(),
-  mean = vector(),
-  p_value = vector())
-
-# this is the pairwise comparison for the 6 pairs (6AM-6PM)
-  if(time_point == 6){
-    for(var in treatment){
-      
-      ## only keep the 6AM and 6PM
-      df <- data %>% 
-        filter(variable == type) %>% 
-        filter(treatment == var) %>% 
-  filter(time_string == "18:00:00" | time_string == "06:00:00") %>% 
-        ## Rename the times so they can become column names
-  mutate(time_US = ifelse(time_string == "18:00:00", "T18", "T06")) %>% 
-        ## Only keep the column of interest for the stats
-  select(tank_number, time_US, value) %>% 
-  pivot_wider(names_from = time_US, values_from = value) 
-      
-      ## Pairwise function 
-      paired <- t.test(df$T18, df$T06, paired = TRUE, na.action = na.pass)
-      
-      ## Save the result in at data frame
-      df2 <- tibble(
-        time_point = "06AM-06PM",
-        variable = type,
-        treatment = var,
-        mean = paired$estimate, 
-        p_value = paired$p.value)
-      
-      # Code will loop oveer all treatments and save the results in a data frame
-      pairwise_results <-rbind(pairwise_results,df2)
-      
-      # Save the results in RStudio
-      pairwise_results <<- pairwise_results
-    }  
-  
-
-# This is for the 12 samples (12AM-12PM)
-  }else if(time_point == 12){
-    for(var in treatment){
-      
-      ## Same as before but for the 12AM-12PM
-      df <- data %>% 
-        filter(variable == type) %>% 
-        filter(treatment == var) %>% 
-  filter(time_string == "12:00:00" | time_string == "00:00:00") %>% 
-  mutate(time_US = ifelse(time_string == "12:00:00", "T12", "T00")) %>% 
-  select(tank_number, time_US, value) %>% 
-  pivot_wider(names_from = time_US, values_from = value) 
-      
-      paired <- t.test(df$T12, df$T00, paired = TRUE, na.action = na.pass)
-      
-      df2 <- tibble(
-        time_point = "12AM-12PM",
-        variable = type,
-        treatment = var,
-        mean = paired$estimate, 
-        p_value = paired$p.value)
-      
-      pairwise_results <- rbind(pairwise_results, df2)
-      pairwise_results <<- pairwise_results
-    }
-}
-
-# Display the results of the code 
-return(pairwise_results)
-}
-
-```
-
-
-```{r}
-# Note: relative aboundance was logged to be able to compute the pairwise comparison 
-# Loop Function:
-
-mobeast_loop <- mobeast_DNA_24h %>% select(variable) %>% distinct() %>% pull()
-
-mobeast_DNA_24h <- mobeast_DNA_24h %>% mutate(abun_log = log10(value +1))
-
-pairwise_summary <- map_dfr(mobeast_loop, ~ {
-  
-  nunu_pairwise(
-    data = mobeast_DNA_24h,
-    time_point = 12,
-    value = abun_log,
-    type = .x
-  ) %>%
-    dplyr::mutate(variable = .x)
-  
-})
-
-```
-
-```{r}
-sig_var <- pairwise_summary %>% filter(p_value <0.05) %>% 
-  select(variable) %>% distinct() %>% pull()
-```
-
-```{r}
-pairwise_summary %>% 
-  mutate(sig = ifelse(p_value<0.05 & mean > 0, "Enrichment", 
-                                         ifelse(p_value<0.05 & mean < 0, "Depletion", "No Difference")))%>% 
-  mutate(sig = factor(sig, 
-                      levels = c("Enrichment","No Difference", "Depletion"))) %>% 
-  #mutate(variable = factor(variable, levels = unique(variable))) %>%
-  filter(variable %in% sig_var) %>% 
-  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
-  ggplot()+
-  geom_tile(aes(x= treatment, y= variable, fill = sig), color = "black")+
-  #facet_grid(variable_cat ~ ., scales = "free_y", space = "free_y")+
-  labs(title = "Pairwise comparison 12AM-12PM",
-       x= "Treatment",
-       y = " Variables")+
-  guides(fill=guide_legend(title="p-value interpretation"))+
-  scale_fill_manual(breaks = c("Enrichment", "No Difference", "Depletion"),
-                    values = c("#43A047", "#90CAF9", "#F44336"))+
-  theme_bw()#+ 
-  theme(plot.title = element_text(size=30, face = "bold"), 
-        plot.subtitle = element_text(size=24),
-        axis.title = element_text(size = 20, face = "bold"),
-        axis.text = element_text(size = 16),
-        strip.text.x = element_text(size = 20, face = "bold"),
-        legend.title=element_text(size=16, face = "bold"),
-        legend.text=element_text(size=15),
-        strip.background = element_rect(fill = "white"),
-        legend.position = "top")
-
-```
-
 ## PCA 
 
 ```{r}
@@ -1784,7 +819,6 @@ pairwise_summary %>%
 ## normalization with scale(), but don't actually know what it noarmalizes to...
 pca_24h_df <- mobeast_24h %>% select(id_number, tank_number, treatment, inflow_table,
                              date_string, time_string, variable, conc_norm) %>%
-  filter(variable != "cyano", variable != "tot_bact") %>% 
   pivot_wider(names_from = variable, values_from = conc_norm) %>% 
    na.omit()
 
@@ -1844,171 +878,4 @@ ggplot(pca_scores, aes(Comp.1,Comp.2))+
         values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
       )  
 ```
-
-
-
-
-
-## PCA 6AM only
-
-```{r}
-## used the areal flux to calculate the PCA here
-## normalization with scale(), but don't actually know what it noarmalizes to...
-pca_6AM_df <- mobeast_24h %>% select(id_number, tank_number, treatment, inflow_table,
-                             date_string, time_string, variable, conc_norm) %>%
-  filter(variable != "cyano", variable != "tot_bact",
-         variable != "tn_u_m", variable != "m_to_c",
-         variable != "N_N", variable != "lignin",
-         variable != "chla_conc") %>% 
-  pivot_wider(names_from = variable, values_from = conc_norm) %>% 
-  drop_na()
-
-pca_matrix_6AM_norm <- pca_6AM_df %>% select(het_bact:npoc_u_m) %>% scale() 
-
-pca_matrix_6AM_norm %>% cor() %>% 
-  ggcorrplot(
-           hc.order = TRUE,
-           #type = "lower",
-           lab = TRUE)
-```
-
-
-```{r}
-
-pca_matrix_6AM_norm <- pca_matrix_6AM_norm %>% as.data.frame() %>% 
-  select(het_bact, pico_euk, syn, coble_a, coble_b,
-         coble_c, coble_m, coble_t, hix, bix, fpeak, fi, 
-         SiO2, NH3,PO4, NO3, npoc_u_m) %>% as.matrix()
-dim(pca_matrix_6AM_norm)
-```
-
-
-```{r}
-data.pca <- princomp(pca_matrix_6AM_norm, cor = TRUE)
-#data.pca <- prcomp(pca_matrix_6AM_norm, scale. = FALSE)
-summary(data.pca)
-
-data.pca$loadings[,1:4]
-
-loading_results <- as.data.frame(data.pca$loadings[,1:4])
-
-fviz_eig(data.pca, addlabels = TRUE)
-
-fviz_pca_var(data.pca, col.var = "black")
-
-fviz_pca_var(data.pca, col.var = "cos2",
-            gradient.cols = c("blue", "lightgrey", "red"),
-            repel = TRUE)
-```
-
-
-
-
-
-
-
-
-
-# Craig plots 
-
-```{r}
-df <- read_csv(here("data", "mobeast_cen.csv"))
-
-df<- df %>% mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow")))
-```
-
-
-
-
-#### Violin plots
-
-```{r, warning=FALSE}
-
-graph_loop <- df %>% #filter(variable %in% sig_eta) %>% 
-  select(variable) %>% 
-  distinct() %>% pull()
-  
-plots_24h <- vector(mode = "list", length = length(graph_loop))
-
-for (var in graph_loop) {
-  
-  unit_plot <- df %>% filter(variable == var) %>% select(units) %>% distinct() %>% pull()
-  
-  variable_name <- df %>% filter(variable == var) %>% 
-    select(variable) %>% distinct() %>% pull()
-  
-  plots_24h[[var]] <- df %>% filter(treatment != "Inflow") %>% 
-  filter(variable == var) %>% 
-  ggplot(aes(x= treatment, y= delta, fill = treatment))+
-    geom_violin()+
-    geom_jitter(color = "black", alpha = 0.5)+
-    geom_hline(yintercept=0, linetype='dashed')+
-    stat_summary(color = "yellow", alpha =0.5)+
-    #facet_wrap( .~ time_fac, ncol = 4 )+
-    labs(
-       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
-       x= "Treatment",
-       y = paste0("Delta ", variable_name, " (",unit_plot, ")"))+
-  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
-                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-    nunu_theme + 
-    theme(axis.text = element_text(size = 18),
-          legend.position = "none")
-}
-
-```
-
-
-
-```{r, message= FALSE}
- 
-plots_24h[["Rhodobacteraceae"]]
-
-
-```
-
-
-```{r}
-mobeast_24h %>% filter(treatment != "Inflow") %>% 
-  filter(variable == "NH3") %>% 
-  ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
-    geom_violin()+
-    geom_jitter(color = "black", alpha = 0.5)+
-    geom_hline(yintercept=0, linetype='dashed')+
-    stat_summary(color = "yellow", alpha =0.5)+
-    facet_wrap( .~ time_fac, ncol = 4 )+
-    labs(
-       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
-       x= "Treatment",
-       y = paste0("Delta NH3 uM"))+
-  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
-                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-    nunu_theme + 
-    theme(axis.text = element_text(size = 18),
-          legend.position = "none")
-```
-
-```{r}
-mobeast_DNA_24h %>% filter(treatment != "Inflow") %>% 
-  filter(variable == "Nitrincolaceae") %>% 
-  ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
-    geom_violin()+
-    geom_jitter(color = "black", alpha = 0.5)+
-    geom_hline(yintercept=0, linetype='dashed')+
-    stat_summary(color = "yellow", alpha =0.5)+
-    facet_wrap( .~ time_fac, ncol = 4 )+
-    labs(
-       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
-       x= "Treatment",
-       y = paste0("Delta Nitrincolaceae"))+
-  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
-                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-    nunu_theme + 
-    theme(axis.text = element_text(size = 18),
-          legend.position = "none")
-```
-
-
-
-
 
