@@ -132,11 +132,12 @@ mobeast_DNA_24h <- mobeast_DNA_24h_flagged %>%
 ```
 
 ```{r}
+# only keep the families that are the most abundant by samples
 mobeast_DNA_24h %>% 
   group_by(id_number, variable) %>% 
-  reframe(sum = sum(value, na.rm = T)) %>% 
+  mutate(sum = sum(value, na.rm = T)) %>% 
   filter(sum > 0.005) %>% 
-  select(variable) %>% distinct()
+  ungroup()
 ```
 
 

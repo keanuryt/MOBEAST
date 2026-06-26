@@ -201,6 +201,13 @@ pairwise_adonis(x = unifrac_dist,
 ```
 
 
+```{r}
+set.seed(1999)
+pairwise_adonis(x = unifrac_dist, 
+                groups = as.vector(nmds_merged$time_fac),
+                  p.adjust.m = "BH")
+```
+
 
 
 # Ordination of individual time points

@@ -1,0 +1,163 @@
+---
+title: "For Keanu"
+author: "Nic Storie"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+#Creating the heatmap 
+```{r}
+#zscore the data.subset1 dataset (147)
+genus.padjust.subset = genus.padjust.merge[,c(2:265)]
+genus.padjust.subset.transformed = asin(sqrt(genus.padjust.subset))
+zscore.data.subset <- t(scale(genus.padjust.subset.transformed))
+
+# Sidequest = a few z-scores are really high so I'm seeing where is a good place to "clip" them (i.e., change to a lower number)
+all_z = as.vector(as.matrix(zscore.data.subset))
+
+ggplot(data.frame(z = all_z), aes(x = z)) +
+  geom_histogram() +
+  theme_minimal() +
+  labs(
+    title = "Histogram of All Z-scored Abundances",
+    x = "Z-score",
+    y = "Count"
+  )
+
+######### Clustering ###########
+#1) Choose distance metric
+our_dist_method = "euclidean"
+#2)Choose clustering method
+our_clust_method = "ward.D2"
+
+#Cluster rows but not columns
+set.seed(2025)
+row_clust = hclust(dist(zscore.data.subset, method = our_dist_method),
+                                method = our_clust_method)
+row_dend = as.dendrogram(row_clust)
+#Splitting clusters 
+row_k = 9 
+
+#Split into clusters
+#Note: sample clusts and analyt clusts will tell you which cluster each sample/analyte is in.
+microbe_cluster = cutree(row_clust, 
+                         k = row_k)
+
+
+#How to get name of taxa in each cluster
+taxa_by_cluster = split(names(microbe_cluster), microbe_cluster)
+taxa_by_cluster
+
+                    
+cluster_colors.1 = c( "salmon4", #Cluster 1 = Treated effluent
+                    "black", #Cluster 2 
+                    "red", #CLuster 3 
+                    "steelblue", # Cluster 4
+                    "orange", # Cluster 5 
+                    "black", # Cluster 6
+                    "black" , #Cluster 7
+                    "black", #Cluster 8
+                    "black") #Cluster 9
+
+######## Getting RA sum per cluster per sample
+#1) Transpose abundance matrix to match z=score
+raw_RA = culled.abund.genus[, rownames(zscore.data.subset)]
+raw_RA$Sample_ID = rownames(raw_RA)
+
+raw_RA = merge(raw_RA, metadata, by.x = "Sample_ID", by.y = "Sample_ID")
+rownames(raw_RA) = raw_RA$Unique.ID
+raw_RA.2 = raw_RA[,c(1:146)] 
+
+abund_matrix = t(raw_RA) 
+abund_matrix.2 = abund_matrix[names(microbe_cluster), ]
+abund_matrix.3 <- apply(abund_matrix.2, 2, as.numeric)
+rownames(abund_matrix.3) <- rownames(abund_matrix.2)
+
+# Compute cluster-wise sums for each sample
+cluster_sums = sapply(1:row_k, function(k) {
+  taxa_in_cluster = names(microbe_cluster[microbe_cluster == k])
+  colSums(abund_matrix.3[taxa_in_cluster, , drop = FALSE])
+})
+
+cluster_sums = as.data.frame(cluster_sums)
+colnames(cluster_sums) = paste0("Cluster_", 1:row_k)
+rownames(cluster_sums) = colnames(abund_matrix.2)  # samples
+
+#Getting row order of cluster_sums to match column order of heatmpa
+cluster_sums.1 = cluster_sums[match(colnames(zscore.data.subset),
+                                   rownames(cluster_sums)), , drop = FALSE]
+
+
+#Cluster annotation
+cluster_sum_RA =  HeatmapAnnotation(
+  'Cluster Abundance' = anno_barplot(
+    cluster_sums.1,
+    gp = gpar(fill = cluster_colors.1, col = "black", lwd = 0.1),
+    border = T,
+    height = unit(3, "cm"),
+    bar_width = 0.9,
+    axis_param = list(side = "left")
+  )
+)
+
+
+
+# Dendrogram colors by cluster
+#Setting cluster colors
+
+cluster_colors.2 = c( "orange", #Cluster 1 
+                    "red",   # Cluster 2 
+                    "salmon4",       # Cluster 3 
+                    "steelblue", #CLuster 4 
+                    "black", # Cluster 5 
+                    "black", # Cluster 6
+                    "black", # Cluster 7
+                    "black",# Cluster 8
+                    "black") # Cluster 9
+
+row_dend_colored = color_branches(row_dend, k = row_k, col = cluster_colors.2)
+
+row_dend_colored = dendextend::set(
+  row_dend_colored,
+  "branches_lwd",
+  5
+)
+
+
+#Clipping z-score
+
+z_clipped <- pmin(pmax(zscore.data.subset, -1), 5)
+
+
+
+#Setting color scheme for heatmap
+col_fun <- colorRamp2(c(-1, 0, 5), c( "blue", "white", "red"))
+
+#pdf(file="~/Desktop/cluster_sum_genus_heatmap_all_samples1.pdf", width = 35, height = 32)
+
+all.samples = Heatmap(z_clipped,
+        col = col_fun,
+        cluster_rows = row_dend_colored,
+        row_split = 9,
+        cluster_columns = F,
+        column_split = factor(genus.padjust.merge$New_sample,
+                                           levels = c("OSDS", "US", "TS", "HGW", "LGW_LT", "LGW_HT", "RW", "Honoli'i Stream", "Outfall")),
+        name = "Mean Genus z-score", 
+        #row_gap = unit(c(1), "mm"), 
+        #rect_gp = gpar(col = "white", lwd = .5), 
+        row_names_side = "left", 
+        row_dend_side = "left",   
+        row_names_max_width = max_text_width(rownames(z_clipped)), 
+        top_annotation = c(cluster_sum_RA),
+        border = T, 
+        row_names_gp = gpar(fontsize = 10), 
+        column_names_gp = gpar(fontsize = 7), 
+        width = ncol(z_clipped)*unit(2,"mm"), 
+        height = nrow(z_clipped)*unit(3,"mm"),
+        show_column_dend = F, 
+        row_dend_width = unit( 3, "cm"))
+
+#draw(all.samples)
+
+#dev.off()
+```
