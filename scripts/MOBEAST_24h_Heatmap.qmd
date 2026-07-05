@@ -130,6 +130,7 @@ OTU_htm <- DNA %>%
 
 ```{r}
 OTU_htm_24h <- OTU_htm %>% filter(treatment != "Inflow")
+  
 ```
 
 ```{r}
@@ -144,7 +145,7 @@ OTU_htm %>% filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>%
 rare_taxa_threshold = 0.005
 ```
 
-```{r}
+```{}
 # family
 ## per sample, min abundance "threshold" and more than 3x occurence. 
 taxa_filtered <- OTU_htm_24h %>%
@@ -162,11 +163,12 @@ taxa_filtered %>% select(taxa) %>% distinct()
 
 ```
 
-```{}
+```{r}
 # genus
 ## per sample, min abundance 0.5% and more than 3x occurence. 
 
 taxa_filtered <- OTU_htm_24h %>%
+  filter(!str_detect(genus_tax, "unclassified")) %>%
   group_by(id_number, genus_tax) %>%
   mutate(sum_abund = sum(abund)) %>% 
   ungroup() %>% 
@@ -567,7 +569,8 @@ OTU_24h <- DNA %>%
   ungroup() %>% 
   filter(treatment != "Inflow") %>% 
   filter(!is.na(conc_norm)) %>% 
-  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>%
+  filter(!str_detect(OTU_tax, "unclassified")) 
   
 ```
 
@@ -927,7 +930,8 @@ genus_24h <- DNA %>%
   mutate(conc_norm  = zscore.calculation(sqrt_abund)) %>% 
   filter(treatment != "Inflow") %>% 
   filter(!is.na(conc_norm)) %>% 
-  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>%
+  filter(!str_detect(genus_tax, "unclassified")) 
   
 ```
 
@@ -973,8 +977,9 @@ anova_results <- imap_dfr(models_DNA_24h, ~ {
     mutate(variable = .y)}) %>%
   relocate(variable) 
 
+
 anova_results %>% filter(term == "treatment", p.value <0.05) %>% 
-  select(variable, term, p.value)
+  select(variable, term, p.value) 
 
 ```
 
@@ -991,7 +996,9 @@ emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
 
 
 emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
-  select(variable, contrast, adj.p.value)
+  select(variable, contrast, adj.p.value) 
+
+
 ```
 
 
@@ -1015,11 +1022,15 @@ emmeans_results_dna %>% filter(variable %in% sig_taxa) %>%
 
 
 
-## Delta Heatmap 
+## Z-score Delta Heatmap 
 
 ```{r}
+# OTU 
+
 # Delta no transformation, no z-scoring but **summed otu** used to make the heatmap
 OTU_24h <- DNA %>%  
+  
+  filter(!str_detect(family_tax, "unclassified")) %>%
   
   # filtering out rare taxa
   ## removing taxa that have a max abundance >0.5%
@@ -1048,20 +1059,134 @@ OTU_24h <- DNA %>%
   select(-mean, -sd) %>% 
   
   # calculating delta values
-  mutate(inflow_isolated = ifelse(treatment == "Inflow", sum_abund, NA)) %>% 
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
   group_by(time, OTU_tax) %>% 
   mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
   ungroup() %>%
-  mutate(conc_norm  = sum_abund - inflow ) %>% 
+  mutate(conc_norm  = abund - inflow ) %>% 
   filter(treatment != "Inflow") %>% 
   filter(!is.na(conc_norm)) %>% 
+  mutate( z_score_conc = zscore.calculation(conc_norm)) %>% 
   mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
 ```
 
+
 ```{r}
-OTU_24h %>% group_by(id_number, OTU_tax) %>% 
-  summarize(conc_norm) %>% 
-  select(OTU_tax)
+# Family 
+
+# Delta no transformation, no z-scoring but **summed otu** used to make the heatmap
+OTU_24h_filtered <- DNA %>%  
+  
+  # filtering out rare taxa
+  ## removing taxa that have a max abundance >0.5%
+  group_by(family_tax) %>% 
+  mutate(max = max(abund)) %>%
+  ungroup() %>% 
+  filter(max >0.005) %>% 
+  
+  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  group_by(id_number, family_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  group_by(family_tax) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  filter(n_above_threshold >= 3) %>% 
+  ungroup() %>% 
+  
+  
+  # outlier detection
+  group_by(family_tax,treatment) %>%
+  mutate(mean = mean(abund),
+         sd = sd(abund),
+         outlier = ifelse(abund > mean + 2*sd | abund < mean - 2*sd, "outlier", "not outlier")) %>%
+  ungroup() %>% 
+  filter(outlier != "outlier") %>%
+  select(-mean, -sd) 
+
+
+  # calculating delta values
+OTU_24h <- OTU_24h_filtered %>% 
+  
+  filter(!str_detect(family_tax, "unclassified")) %>% 
+  
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
+  group_by(time, family_tax) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>%
+  
+   group_by(id_number, treatment, time, family_tax) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T),
+    conc_norm  = sum_abund - inflow ) %>% 
+    ungroup() %>% 
+  
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate(z_score_conc = zscore.calculation(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  select(id_number, tank_number, treatment, date,time,time_fac,date_time, inflow_table,
+         z_score_conc,family_tax) %>% distinct()
+```
+
+```{}
+# Genus 
+
+# Delta no transformation, no z-scoring but **summed otu** used to make the heatmap
+OTU_24h_filtered <- DNA %>%  
+  
+  # filtering out rare taxa
+  ## removing taxa that have a max abundance >0.5%
+  group_by(genus_tax) %>% 
+  mutate(max = max(abund)) %>%
+  ungroup() %>% 
+  filter(max >0.005) %>% 
+  
+  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  group_by(id_number, genus_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  group_by(genus_tax) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  filter(n_above_threshold >= 3) %>% 
+  ungroup() %>% 
+  
+  
+  # outlier detection
+  group_by(genus_tax,treatment) %>%
+  mutate(mean = mean(abund),
+         sd = sd(abund),
+         outlier = ifelse(abund > mean + 2*sd | abund < mean - 2*sd, "outlier", "not outlier")) %>%
+  ungroup() %>% 
+  filter(outlier != "outlier") %>%
+  select(-mean, -sd) 
+  
+
+
+
+  # calculating delta values
+OTU_24h <- OTU_24h_filtered %>% 
+  
+  filter(!str_detect(genus_tax, "unclassified")) %>% 
+  
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
+  group_by(time, genus_tax) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>%
+  
+   group_by(id_number, treatment, time, genus_tax) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T),
+    conc_norm  = sum_abund - inflow ) %>% 
+    ungroup() %>% 
+  
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate(z_score_conc = zscore.calculation(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  select(id_number, tank_number, treatment, date,time,time_fac,date_time, inflow_table,
+         z_score_conc,genus_tax) %>% distinct()
+```
+
+```{}
+OTU_24h %>% filter(genus_tax == "Vibrio X Vibrionaceae X Vibrionales X Gammaproteobacteria X Proteobacteria")
 ```
 
 ```{r, echo=TRUE, collapse=TRUE}
@@ -1070,18 +1195,19 @@ OTU_24h %>% group_by(id_number, OTU_tax) %>%
 
 # some the abundance of bacteria by family
 family.culled.long.table <- OTU_24h %>%
-  group_by(id_number, OTU_tax) %>%
-  summarize(conc_norm) %>% 
+  group_by(id_number, family_tax) %>%
+  summarize(z_score_conc) %>% 
   ungroup()
 
 # Make wide format table to make a matrix later
-family.culled.abund <- pivot_wider(family.culled.long.table, names_from = OTU_tax, values_from = conc_norm)
+family.culled.abund <- pivot_wider(family.culled.long.table, names_from = family_tax, values_from = z_score_conc)
 
 # Remove ID number from the data frame
 ## Z-score function only works on df that has a matrix format
 culled.abund.OTU <- family.culled.abund %>% as.data.frame() 
 
 ```
+
 
 ```{}
 sqrt.matrix <- apply(culled.abund.OTU, 2, FUN=sqrt)
@@ -1183,12 +1309,12 @@ col_ha <- HeatmapAnnotation(
 ```{r, fig.height = 16, fig.width = 24}
 # Version 2
 #png(width=1600, height=1000, file= here("outputs", "zscore_24hdata.png"))
-mat_ordered_no_na <- mat_ordered %>% na.omit()
-ht = Heatmap(mat_ordered_no_na, 
+
+ht = Heatmap(mat_ordered, 
              name = "sqrt z-scored", 
              heatmap_legend_param = list(legend_direction = "horizontal"),
              show_row_names = TRUE,
-             na_col = "grey", 
+             na_col = "black", 
         row_names_max_width = unit(18, "cm"),
         clustering_method_rows = "complete",
         clustering_distance_rows = "euclidean",
@@ -1205,7 +1331,7 @@ ht = Heatmap(mat_ordered_no_na,
         row_dend_width = unit(1.5, "cm"),
         #column_names_gp = gpar(fontsize = 10),
         show_column_names = FALSE,
-        row_km = 3, # 5? number of forced segregation in rows 
+        #row_km = 3, # 5? number of forced segregation in rows 
         #column_km = 4,#number of forced segregation in columns 
         top_annotation = col_ha,
         #bottom_annotation = col_ha,
