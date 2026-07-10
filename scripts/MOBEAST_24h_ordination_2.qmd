@@ -162,7 +162,7 @@ nmds_merged %>%
   scale_fill_manual(values= treatment_colors) +
   nunu_theme+
   theme(legend.position = "bottom")
-#ggsave("bacterial_community_ordination.png", width = 16, height = 6, path = here("outputs"))
+ggsave("bacterial_community_ordination.png", width = 16, height = 6, path = here("outputs"))
 
 ```
 ## PERMANOVA 
@@ -177,7 +177,7 @@ nmds_merged<- nmds_merged %>% mutate(time_fac = factor(time_string, levels = c("
 set.seed(1999)
 perma_24h <- adonis2(unifrac_dist ~ treatment+time_fac+ treatment:time_fac + log_flow, 
                      data = nmds_merged,
-                     #strata = nmds_merged$tank_number, 
+                     strata = nmds_merged$tank_number, 
                      by = "term")
 print(perma_24h)
 

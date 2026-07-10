@@ -105,7 +105,7 @@ mobeast<-  mobeast_raw %>%
   
 ```
 
-```{r}
+```{}
 # first pass for outlier detection on DOC because extreme values detected
 DOC <- mobeast %>% filter(variable == "npoc_u_m") %>%  
   filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>%
@@ -122,6 +122,17 @@ mobeast_DOC <- mobeast %>%
   rbind(DOC)
 ```
 
+```{r}
+# first pass for outlier detection on DOC because extreme values detected
+DOC <- mobeast %>% filter(variable == "npoc_u_m") %>%  
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>%
+  filter(time_string != "00:00:00")
+
+mobeast_DOC <- mobeast %>% 
+  # from the original data set, remove the old DOC data and replace with the new DOC data with inflow data that is not outliers
+  filter(variable != "npoc_u_m") %>% 
+  rbind(DOC)
+```
 
 
 ```{r}
@@ -133,16 +144,20 @@ mobeast_flagged <- mobeast_DOC %>%
   ## grouping by variable 
   group_by(variable, treatment) %>% 
   
+  
   ## get the mean and the sd to calculate mean +/- 2sd
-  mutate(mean = mean(value, na.rm = T), 
-         stand_dev = sd(value, na.rm = T)) %>% 
+  mutate(log_value = log10(value),
+         mean = mean(log_value, na.rm = T), 
+         stand_dev = sd(log_value, na.rm = T)) %>% 
   
   ## Values outside of the mean +/- 2sd range are flagged as outliers
   ## Important to filter outliers later to understand why they are outliers. 
-  mutate(outlier = ifelse(value > mean + 2*stand_dev | value < mean - 2*stand_dev,
+  mutate(outlier = ifelse(log_value > mean + 2*stand_dev | log_value < mean - 2*stand_dev,
                            "outlier", "not outlier")) %>% 
   ungroup()
   
+
+mobeast_flagged %>%  filter(variable == "NO3")
 ```
 
 
@@ -182,8 +197,8 @@ mobeast_delta <- mobeast_flagged %>%
 
 ```{r}
 ## Some variables will not be studied in this project
-exclude_var <- c("tot_bact", "cyano", "NO2", "ph_diff", "delta_ta", "do_mg_l", "dic_mmol_kg",
-                 "tn_u_m", "N_N")
+exclude_var <- c("tot_bact", "cyano", "NO2", "ph_diff", "delta_ta", "dic_mmol_kg",
+                 "tn_u_m", "lignin")
 
 # we also won't focus on the other time points, they are mainly for the FCM data and not other data was collected at those times anyway
 exclude_time <- c("03:00:00","09:00:00","15:00:00","21:00:00")
@@ -277,8 +292,14 @@ for (var in mobeast_loop) {
                             (1|tank_number), data = df)
 }
 
-
 ```
+
+```{}
+test_df <- mobeast_24h %>%  filter(variable == "lignin")
+lmer(conc_norm ~ treatment*time_fac + log_flow  +  
+                            (1|tank_number), data = test_df)
+```
+
 
 
 ```{}
@@ -320,18 +341,45 @@ sig_anova <- anova_results %>%
   select(variable) %>% pull()
 
 anova_results %>% 
-  filter( p.value <0.05) %>%  filter(term == "treatment") 
+  filter( p.value <0.05,
+    #term == "treatment:time_fac"
+    ) %>%  
+  #filter(term == "time_fac") %>% 
+  #filter(variable %in% c("PO4", "N_N", "NO3","NH3", "SiO2"))
 
 
 # no signficant time interactions !
 anova_results %>% 
-  filter(p.value <0.05, term == "treatment:time_fac") %>%  
+  filter(p.value <0.05, 
+         term == "treatment:time_fac") %>%  
+  
   select(variable)
 
 anova_results %>% 
   #filter( p.value <0.05) %>% 
   filter(variable %in% c("het_bact", "syn"))
 
+# report results from the fdom
+fdom<- mobeast_delta %>%  filter(variable_cat == "fDOM" | variable== "npoc_u_m") %>% 
+  select("variable") %>%  distinct() %>% pull()
+
+anova_results %>% 
+  filter( p.value <0.05,
+    term == "time"
+    ) %>%  
+  #filter(term == "time_fac") %>% 
+  filter(variable %in% fdom)
+
+# report results from the FCM and chla 
+fcm<- mobeast_delta %>%  filter(variable_cat == "FCM" | variable_cat== "chla") %>% 
+  select("variable") %>%  distinct() %>% pull()
+
+anova_results %>% 
+  filter( p.value <0.05,
+    term == "treatment:time_fac"
+    ) %>%  
+  #filter(term == "time_fac") %>% 
+  filter(variable %in% fcm)
 ```
 
 
@@ -423,10 +471,16 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
-emmeans_results %>% #filter(variable %in% sig_eta) %>%
+emmeans_results %>% filter(variable %in% sig_anova) %>%
   filter(adj.p.value <0.05) 
 ```
 
+
+```{r}
+emmeans_results %>% 
+  filter(variable %in% fcm) %>% 
+  filter(adj.p.value <0.05)
+```
 
 
 ```{r}
@@ -438,7 +492,17 @@ emmean_sig <- emmeans_results_sig %>% select(variable) %>% distinct() %>%  pull(
 
 
 ##### Nutrient Time contrasts
-need tukey test
+
+```{r}
+emmeans_time_results <- imap_dfr(models_24h, ~ {
+  emmeans(.x, pairwise ~ time_fac | treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)
+}) %>% 
+  relocate(variable)
+
+emmeans_time_results %>%  filter(adj.p.value<0.05)
+```
 
 ##### FCM Time Contrasts
 Need tukey test
@@ -451,7 +515,7 @@ Tells you not just "these groups differ" but "by how much and in which direction
 Essential for comparing across nutrients since your residuals are on different scales
 
 
-```{r}
+```{}
 effect_size_results <- tibble()
 
 for (var in sig_eta) {
@@ -517,30 +581,42 @@ for (var in graph_loop) {
 
 ```
 
-```{r, fig.width=14, fig.height=10}
+```{r, fig.width=14, fig.height=14}
 # fDOM plots 
-(plots_24h[["coble_c"]]+ labs(title = "A")) / (plots_24h[["hix"]]+ labs(title = "B"))
+(plots_24h[["coble_c"]]+ labs(title = "A")) / (plots_24h[["m_to_c"]]+ labs(title = "B"))/
+  (plots_24h[["hix"]]+ labs(title = "C")) / (plots_24h[["fi"]]+ labs(title = "D"))
 
 #ggsave(filename = "24h_fDOM.png", plot = last_plot(), path = here("outputs"))
 ```
 
-```{r, fig.width=14, fig.height=12}
+```{r, fig.width=14, fig.height=17}
 # FCM plots 
-(plots_24h[["het_bact"]]+ labs(title = "A")) /(plots_24h[["syn"]]+ labs(title = "B")) / (plots_24h[["chla_conc"]] + labs(title = "C"))
+(plots_24h[["het_bact"]]+ labs(title = "A")) /(plots_24h[["syn"]]+ labs(title = "B")) / (plots_24h[["pico_euk"]] + labs(title = "C")) / (plots_24h[["chla_conc"]] + labs(title = "D"))
 
 ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
 ```
 
 
-```{r, fig.width=14, fig.height=7}
+```{r, fig.width=14, fig.height=10}
 # Nutrients plots 
 
-plots_24h[["NO3"]]
+(plots_24h[["NO3"]]+ labs(title = "A")) / (plots_24h[["SiO2"]]+ labs(title = "B"))
 
-ggsave(filename = "24h_N03.png", plot = last_plot(), path = here("outputs"))
+
+ggsave(filename = "24h_nutrients.png", plot = last_plot(), path = here("outputs"))
 ```
 
+```{r, fig.width=14, fig.height=10}
+# Carbonate plots 
 
+(plots_24h[["ph"]]+ labs(title = "A", 
+                         y = "Delta pH")) / 
+  (plots_24h[["ta"]]+ labs(title = "B",
+                           y = "Delta TA (μmol/kg)"))
+
+
+ggsave(filename = "24h_carbonate.png", plot = last_plot(), path = here("outputs"))
+```
 
 ```{r, fig.width=14, fig.height=30}
 # Nutrients plots 
