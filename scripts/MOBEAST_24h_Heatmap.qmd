@@ -147,11 +147,6 @@ OTU_htm_24h <- OTU_htm %>% filter(treatment != "Inflow")
   
 ```
 
-```{r}
-OTU_htm %>% filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
-  select(id_number) %>% distinct()
-```
-
 
 
 ## Data with only the most abundant taxa 
@@ -179,12 +174,13 @@ taxa_filtered <- OTU_htm_24h %>%
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
   group_by(genus_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
   filter(n_above_threshold >= 3) %>% 
   ungroup() %>% 
-  
-  
-  mutate(taxa = genus_tax)
+  mutate(taxa = genus_tax) %>% 
+  select(-long_name, -kingdom, -family_tax,-max, -n_above_threshold)
+
+taxa_filtered
   
 taxa_filtered %>% select(taxa) %>% distinct()
 ```
@@ -324,7 +320,7 @@ col_ha <- HeatmapAnnotation(
 ```{r, fig.height = 16, fig.width = 24}
 # Version 2
 #png(width=3000, height=1200, file= here("outputs", "zscore_24hdata.png"))
-#png(width=2000, height=1600, file= here("outputs", "zscore_24hdata.png"))
+png(width=2000, height=1200, file= here("outputs", "zscore_24hdata.png"))
 
 ht = Heatmap(mat_ordered, 
              name = "Z-scored Abundance", 
@@ -358,12 +354,12 @@ ht = Heatmap(mat_ordered,
         #bottom_annotation = col_ha,
         column_split = treatment_ordered
         )
-set.seed(1998)
+set.seed(1999)
 ht_drawn <- draw(ht, heatmap_legend_side = "right",
                  annotation_legend_side = "right", 
   merge_legends = TRUE)
 
-#dev.off()
+dev.off()
 
 ```
 
@@ -450,7 +446,8 @@ anova_results <- imap_dfr(models_modules, ~ {
     mutate(variable = .y)}) %>%
   relocate(variable) 
 
-anova_results %>% filter(p.value <0.05) %>% select(variable, term, statistic, p.value)
+anova_results %>% filter(p.value <0.05) %>% 
+  select(variable, term, statistic, p.value)
 
 ```
 
@@ -475,14 +472,11 @@ emmeans_results_dna %>% filter(adj.p.value < 0.05) %>%
 
 ### Plot of the clusters/module
 ```{r Family clustering, fig.width= 12, fig.height= 7}
-modules_24h %>% drop_na(cluster) %>%
-  group_by(id_number, cluster) %>% 
-  reframe(sum_abund = sqrt(sum(abund)), time_fac, treatment) %>% 
-  ungroup() %>% 
+modules_df %>% drop_na(cluster) %>%
   group_by(treatment, time_fac, cluster) %>%
-  reframe(mean_abund = mean(sum_abund),
-          sd_abund   = sd(sum_abund),
-          sum_abund) %>%
+  reframe(mean_abund = mean(conc_norm),
+          sd_abund   = sd(conc_norm),
+          conc_norm) %>%
   ungroup() %>% 
   ggplot(aes(x = time_fac, y = mean_abund, group = treatment, color = treatment)) +
   geom_line(linewidth = 1) +
@@ -491,7 +485,7 @@ modules_24h %>% drop_na(cluster) %>%
                   ymax = mean_abund + sd_abund,
                   fill = treatment),
               alpha = 0.15, color = NA) +
-  geom_point(aes(x = time_fac, y = sum_abund), shape = 1, alpha = 0.1,
+  geom_point(aes(x = time_fac, y = conc_norm), shape = 1, alpha = 0.1,
              size = 2.5) +
   labs(#title = "Modules from Genus Clustering", 
        x= "Time", 
@@ -505,6 +499,7 @@ modules_24h %>% drop_na(cluster) %>%
 
 ggsave(filename = "modules.png", plot = last_plot(), path = here("outputs"))
 ```
+
 
 
 
@@ -550,7 +545,7 @@ OTU_24h <- DNA %>%
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
   group_by(OTU_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
   filter(n_above_threshold >= 3) %>% 
   ungroup() %>% 
   
@@ -640,7 +635,9 @@ emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
 
-emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% select(variable, contrast, estimate, adj.p.value)
+emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
+  filter(variable %in% anova_sig, adj.p.value < 0.05) %>%
+  select(variable, contrast, estimate, adj.p.value)
 ```
 
 ```{r}
@@ -731,7 +728,7 @@ OTU_24h <- DNA %>%
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
   group_by(OTU_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
   filter(n_above_threshold >= 3) %>% 
   ungroup() %>% 
   
@@ -799,7 +796,8 @@ anova_results <- imap_dfr(models_DNA_24h, ~ {
     mutate(variable = .y)}) %>%
   relocate(variable) 
 
-anova_results %>% filter(term == "treatment", p.value <0.05)
+anova_results %>% filter(term == "treatment", p.value <0.05) %>%  select(variable, term, statistic, p.value)
+
 
 anova_sig <- anova_results %>% 
   filter(term == "treatment", p.value <0.05) %>%  
@@ -820,7 +818,9 @@ emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
 
-emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% select(variable, contrast, estimate, adj.p.value)
+emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
+  filter(variable %in% anova_sig, adj.p.value < 0.05) %>%
+  select(variable, contrast, estimate, adj.p.value)
 ```
 
 ```{r}
@@ -878,7 +878,7 @@ genus_24h <- DNA %>%
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
   group_by(genus_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
   filter(n_above_threshold >= 3) %>% 
   ungroup() %>% 
   
@@ -926,7 +926,7 @@ resid_panel(models_DNA_24h[["Vibrio X Vibrionaceae X Vibrionales X Gammaproteoba
 
 ### Genus ANOVA
 
-```{r, warning= FALSE}
+```{r, warning= FALSE}  
 
 anova_results <- imap_dfr(models_DNA_24h, ~ {
   stats::anova(.x, type = 2) %>%
@@ -965,10 +965,7 @@ emmeans_results_dna %>%
   filter(adj.p.value < 0.05,
          variable %in% anova_sig) %>% 
   select(variable, contrast, estimate, adj.p.value) %>% 
-  mutate(sig = ifelse(estimate <0 & adj.p.value < 0.05, "Enrichment", 
-                      ifelse(estimate > 0 & adj.p.value < 0.05, 
-                             "Depletion", "No change"))) %>% 
-  filter(sig == "Depletion")
+  filter(estimate >0)
 
 
 ```
@@ -1015,6 +1012,8 @@ ggsave(filename = "genus_enrichment.png", plot = last_plot(), path = here("outpu
 # Delta no transformation, no z-scoring 
 OTU_24h <- DNA %>%  
   
+  mutate(genus_tax = paste0(genus, ", ", family,", ", class)) %>% 
+  
   # filtering out rare taxa
   ## removing taxa that have a max abundance >0.5%
   group_by(genus_tax) %>% 
@@ -1028,7 +1027,7 @@ OTU_24h <- DNA %>%
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
   group_by(genus_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
   filter(n_above_threshold >= 3) %>% 
   ungroup() %>% 
   
@@ -1096,7 +1095,8 @@ anova_results <- imap_dfr(models_DNA_24h, ~ {
     mutate(variable = .y)}) %>%
   relocate(variable) 
 
-anova_results %>% filter(term == "treatment", p.value <0.05)
+anova_results %>% filter(term == "treatment", p.value <0.05) %>% 
+  select(variable, term, statistic, p.value)
 
 anova_sig <- anova_results %>% 
   filter(term == "treatment", p.value <0.05) %>%  
@@ -1117,7 +1117,9 @@ emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
 
-emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% select(variable, contrast, estimate, adj.p.value)
+emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
+  filter(variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value)
 ```
 
 ```{r}
