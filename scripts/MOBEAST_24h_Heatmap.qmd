@@ -178,7 +178,8 @@ taxa_filtered <- OTU_htm_24h %>%
   filter(n_above_threshold >= 3) %>% 
   ungroup() %>% 
   mutate(taxa = genus_tax) %>% 
-  select(-long_name, -kingdom, -family_tax,-max, -n_above_threshold)
+  select(-long_name, -kingdom, -family_tax,-max, 
+         -n_above_threshold)
 
 taxa_filtered
   
@@ -319,7 +320,7 @@ col_ha <- HeatmapAnnotation(
 
 ```{r, fig.height = 16, fig.width = 24}
 # Version 2
-#png(width=3000, height=1200, file= here("outputs", "zscore_24hdata.png"))
+#png(width=3000, height=2200, file= here("outputs", "zscore_24hdata.png"))
 png(width=2000, height=1200, file= here("outputs", "zscore_24hdata.png"))
 
 ht = Heatmap(mat_ordered, 
@@ -471,7 +472,7 @@ emmeans_results_dna %>% filter(adj.p.value < 0.05) %>%
 
 
 ### Plot of the clusters/module
-```{r Family clustering, fig.width= 12, fig.height= 7}
+```{r Family clustering, fig.width= 16, fig.height= 6}
 modules_df %>% drop_na(cluster) %>%
   group_by(treatment, time_fac, cluster) %>%
   reframe(mean_abund = mean(conc_norm),
@@ -492,12 +493,12 @@ modules_df %>% drop_na(cluster) %>%
        y= "Relative Abundance")+
   scale_color_manual(values = treatment_colors) +
   scale_fill_manual(values  = treatment_colors) +
-  facet_wrap(. ~ cluster)+
+  facet_grid(. ~ cluster)+
   nunu_theme
 
 
 
-ggsave(filename = "modules.png", plot = last_plot(), path = here("outputs"))
+ggsave(filename = "modules_ICRS.png", plot = last_plot(), path = here("outputs"))
 ```
 
 

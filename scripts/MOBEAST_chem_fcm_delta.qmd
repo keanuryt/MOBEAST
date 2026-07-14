@@ -146,7 +146,8 @@ mobeast_flagged <- mobeast_DOC %>%
   
   
   ## get the mean and the sd to calculate mean +/- 2sd
-  mutate(log_value = log10(value),
+  mutate(#log_value = log10(value),
+    log_value = value, 
          mean = mean(log_value, na.rm = T), 
          stand_dev = sd(log_value, na.rm = T)) %>% 
   
@@ -345,7 +346,7 @@ anova_results %>%
     #term == "treatment:time_fac"
     ) %>%  
   #filter(term == "time_fac") %>% 
-  #filter(variable %in% c("PO4", "N_N", "NO3","NH3", "SiO2"))
+  filter(variable %in% c("PO4", "N_N", "NO3","NH3", "SiO2"))
 
 
 # no signficant time interactions !
@@ -365,7 +366,7 @@ fdom<- mobeast_delta %>%  filter(variable_cat == "fDOM" | variable== "npoc_u_m")
 
 anova_results %>% 
   filter( p.value <0.05,
-    term == "time"
+    #term == "treatment"
     ) %>%  
   #filter(term == "time_fac") %>% 
   filter(variable %in% fdom)
@@ -376,7 +377,7 @@ fcm<- mobeast_delta %>%  filter(variable_cat == "FCM" | variable_cat== "chla") %
 
 anova_results %>% 
   filter( p.value <0.05,
-    term == "treatment:time_fac"
+    term == "treatment"
     ) %>%  
   #filter(term == "time_fac") %>% 
   filter(variable %in% fcm)
@@ -471,14 +472,14 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
-emmeans_results %>% filter(variable %in% sig_anova) %>%
+emmeans_results %>% filter(variable %in% sig_anova) #%>%
   filter(adj.p.value <0.05) 
 ```
 
 
 ```{r}
 emmeans_results %>% 
-  filter(variable %in% fcm) %>% 
+  #filter(variable %in% fcm) %>% 
   filter(adj.p.value <0.05)
 ```
 
@@ -600,11 +601,31 @@ ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
 ```{r, fig.width=14, fig.height=10}
 # Nutrients plots 
 
-(plots_24h[["NO3"]]+ labs(title = "A")) / (plots_24h[["SiO2"]]+ labs(title = "B"))
+(plots_24h[["N_N"]]+ labs(title = "A")) / (plots_24h[["SiO2"]]+ labs(title = "B"))
 
 
 ggsave(filename = "24h_nutrients.png", plot = last_plot(), path = here("outputs"))
 ```
+
+```{r, fig.width=14, fig.height=5}
+plots_24h[["N_N"]]
+
+ggsave(filename = "24h_N+N.png", plot = last_plot(), path = here("outputs"))
+```
+
+```{r, fig.width=14, fig.height=12}
+ plots_24h[["fi"]] / plots_24h[["coble_c"]] / plots_24h[["m_to_c"]] + plot_layout(axes = "collect")
+
+ggsave(filename = "24h_ICRS_FDOM.png", plot = last_plot(), path = here("outputs"))
+```
+
+
+```{r, fig.width=14, fig.height=10}
+ plots_24h[["syn"]] / plots_24h[["het_bact"]]+ plot_layout(axes = "collect")
+
+ggsave(filename = "24h_ICRS_FCM.png", plot = last_plot(), path = here("outputs"))
+```
+
 
 ```{r, fig.width=14, fig.height=10}
 # Carbonate plots 
