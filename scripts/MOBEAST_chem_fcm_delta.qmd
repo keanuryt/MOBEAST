@@ -472,7 +472,7 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
-emmeans_results %>% filter(variable %in% sig_anova) #%>%
+emmeans_results %>% filter(variable %in% sig_anova) %>%
   filter(adj.p.value <0.05) 
 ```
 
@@ -607,8 +607,9 @@ ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
 ggsave(filename = "24h_nutrients.png", plot = last_plot(), path = here("outputs"))
 ```
 
-```{r, fig.width=14, fig.height=5}
-plots_24h[["N_N"]]
+```{r, fig.width=14, fig.height=6}
+plots_24h[["N_N"]]+
+  labs(y = "Nitrate+Nitrite Difference from Inflow (µM)")
 
 ggsave(filename = "24h_N+N.png", plot = last_plot(), path = here("outputs"))
 ```
