@@ -150,9 +150,6 @@ OTU_htm_24h <- OTU_htm %>% filter(treatment != "Inflow")
 
 
 ## Data with only the most abundant taxa 
-```{r}
-rare_taxa_threshold = 0.005
-```
 
 
 ```{r}
@@ -160,16 +157,17 @@ rare_taxa_threshold = 0.005
 ## per sample, min abundance 0.5% and more than 3x occurence. 
 
 taxa_filtered <- OTU_htm_24h %>%
+  
   mutate(genus_tax = paste0(genus, ", ", family, ", ", class)) %>% 
   filter(!family %in% unclassified_families) %>%
   
-  group_by(genus_tax) %>% 
-  mutate(sum_abund= sum(abund)) %>% 
-  mutate(max = max(sum_abund)) %>%
-  filter(max >0.005) %>%
-  ungroup() %>%
+  #group_by(genus_tax) %>% 
+  #mutate(sum_abund= sum(abund)) %>% 
+  #mutate(max = max(sum_abund)) %>%
+  #filter(max >0.005) %>%
+  #ungroup() %>%
 
-  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  ## remove taxa that don't have an abundance >0.5% in at least 3 samples
   group_by(id_number, genus_tax) %>% 
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
@@ -178,8 +176,8 @@ taxa_filtered <- OTU_htm_24h %>%
   filter(n_above_threshold >= 3) %>% 
   ungroup() %>% 
   mutate(taxa = genus_tax) %>% 
-  select(-long_name, -kingdom, -family_tax,-max, 
-         -n_above_threshold)
+  select(-long_name, -kingdom, -family_tax, #-max, 
+         -n_above_threshold) %>% distinct()
 
 taxa_filtered
   
@@ -321,7 +319,7 @@ col_ha <- HeatmapAnnotation(
 ```{r, fig.height = 16, fig.width = 24}
 # Version 2
 #png(width=3000, height=2200, file= here("outputs", "zscore_24hdata.png"))
-png(width=2000, height=1200, file= here("outputs", "zscore_24hdata.png"))
+#png(width=2000, height=1200, file= here("outputs", "zscore_24hdata.png"))
 
 ht = Heatmap(mat_ordered, 
              name = "Z-scored Abundance", 
@@ -360,7 +358,7 @@ ht_drawn <- draw(ht, heatmap_legend_side = "right",
                  annotation_legend_side = "right", 
   merge_legends = TRUE)
 
-dev.off()
+#dev.off()
 
 ```
 
@@ -386,10 +384,11 @@ cluster_membership
 
 
 ```{r}
-modules <- taxa_filtered %>%  
+modules <- taxa_filtered %>%  select(id_number, tank_number,treatment,date, time, date_time,
+                                     inflow_table,taxa, abund) %>% 
   left_join(cluster_membership) 
 
-modules <-modules %>% left_join(flow_meta)
+modules <- modules %>% left_join(flow_meta)
 
 
 ```
@@ -417,7 +416,9 @@ modules_df <- modules_24h %>%
   mutate(sum_ra_module = sum(abund),
          conc_norm = sqrt(sum_ra_module)) %>% 
   ungroup() %>% 
-  mutate(log_flow = log10(flowrate))
+  mutate(log_flow = log10(flowrate)) %>%
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         conc_norm, cluster, log_flow) %>% distinct()
 
 mobeast_loop <- modules_df %>% 
   select(cluster) %>% distinct() %>% pull()
@@ -432,7 +433,6 @@ for (var in mobeast_loop) {
                                   log_flow + (1|tank_number), data = df)
   
 }
-
 
 ```
 
@@ -466,9 +466,6 @@ emmeans_results_dna <- imap_dfr(models_modules, ~ {
 emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
   select(variable, term, estimate, contrast, adj.p.value)
 ```
-
-
-
 
 
 ### Plot of the clusters/module
@@ -532,31 +529,33 @@ DNA_meta <- DNA %>% select(id_number, tank_number, treatment, time_fac, log_flow
 ```{r}
 # Sqrt transform 
 OTU_24h <- DNA %>%  
+  filter(!family %in% unclassified_families) %>% 
   
   # filtering out rare taxa
   ## removing taxa that have a max abundance >0.5%
-  group_by(OTU_tax) %>% 
-  mutate(sum_abund = sum(abund)) %>% 
-  mutate(max = max(sum_abund)) %>%
-  ungroup() %>% 
-  filter(max >0.005) %>% 
+  #group_by(OTU_tax) %>% 
+  #mutate(sum_abund = sum(abund)) %>% 
+  #mutate(max = max(sum_abund)) %>%
+  #ungroup() %>% 
+  #filter(max >0.005) %>% 
   
   ## remove taxa that don't have an abundance >0.1% in at least 3 samples
   group_by(id_number, OTU_tax) %>% 
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
-  group_by(OTU_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
-  filter(n_above_threshold >= 3) %>% 
-  ungroup() %>% 
-  
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, OTU_tax, log_flow) %>% 
+  #group_by(OTU_tax) %>%
+  #mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
+  #filter(n_above_threshold >= 3) %>% 
+  #ungroup() %>% 
   
   # sqrt() transform
-  mutate(conc_norm = sqrt(abund)) %>% 
+  mutate(conc_norm = sqrt(sum_abund)) %>% 
   filter(treatment != "Inflow") %>% 
   filter(!is.na(conc_norm)) %>% 
-  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>%
-  filter(!family %in% unclassified_families) 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+  
   
 ```
 
@@ -715,34 +714,24 @@ emmeans_results_dna %>% filter(variable %in% sig_taxa) %>%
 ```{r}
 # Delta no transformation, no z-scoring 
 OTU_24h <- DNA %>%  
+  filter(!family %in% unclassified_families) %>% 
   
-  # filtering out rare taxa
-  ## removing taxa that have a max abundance >0.5%
-  group_by(OTU_tax) %>% 
-  mutate(sum_abund = sum(abund)) %>% 
-  mutate(max = max(sum_abund)) %>%
-  ungroup() %>% 
-  filter(max >0.005) %>% 
-  
-  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
   group_by(id_number, OTU_tax) %>% 
-  mutate(sum_abund= sum(abund)) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T)) %>% 
   ungroup() %>% 
-  group_by(OTU_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
-  filter(n_above_threshold >= 3) %>% 
-  ungroup() %>% 
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, OTU_tax, log_flow) %>%
   
   # calculating delta values
-  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", sum_abund, NA)) %>% 
   group_by(time, OTU_tax) %>% 
   mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
   ungroup() %>%
-  mutate(conc_norm  = abund - inflow ) %>% 
+  mutate(conc_norm  = sum_abund - inflow ) %>% 
   filter(treatment != "Inflow") %>% 
   filter(!is.na(conc_norm)) %>% 
-  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
-  filter(!family %in% unclassified_families) 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+   
 ```
 
 
@@ -803,10 +792,15 @@ anova_results %>% filter(term == "treatment", p.value <0.05) %>%  select(variabl
 anova_sig <- anova_results %>% 
   filter(term == "treatment", p.value <0.05) %>%  
   select(variable) %>%  distinct() %>% pull()
+```
 
+
+```{r}
 otu_anova_tab <- anova_results %>% filter(term == "treatment", p.value <0.05) %>% gt()
 gtsave(otu_anova_tab, "delta_otu_anova_tab.png", path = here("outputs"))
 ```
+
+
 
 ### OTU Emmeans 
 
@@ -859,36 +853,28 @@ emmeans_results_dna %>% filter(variable %in% sig_taxa) %>%
 ## Sqrt Genus Models
 
 ```{r}
-genus_24h <- DNA %>%  
+genus_24h <- DNA %>%
+  
+  filter(!family %in% unclassified_families)  %>% 
   
   mutate(genus_tax = paste0(genus, ", ", family,", ", class),
          time_fac = factor(time, 
                            levels = c("12:00:00", "18:00:00", "00:00:00", "06:00:00")),
          log_flow = log10(flowrate)) %>% 
-  
-  # filtering out rare taxa
-  ## removing taxa that have a max abundance >0.5%
-  group_by(genus_tax) %>% 
-  mutate(sum_abund = sum(abund),
-    max = max(sum_abund)) %>%
-  ungroup() %>% 
-  filter(max >0.005) %>% 
-  
+
   ## remove taxa that don't have an abundance >0.1% in at least 3 samples
   group_by(id_number, genus_tax) %>% 
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
-  group_by(genus_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
-  filter(n_above_threshold >= 3) %>% 
-  ungroup() %>% 
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, genus_tax, log_flow) %>% 
   
   # outlier detection
-  mutate(conc_norm = sqrt(abund)) %>% 
+  mutate(conc_norm = sqrt(sum_abund)) %>% 
   filter(treatment != "Inflow") %>% 
   filter(!is.na(conc_norm)) %>% 
-  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>%
-  filter(!family %in% unclassified_families)  
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) 
+
   
 ```
 
@@ -965,8 +951,7 @@ emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
 emmeans_results_dna %>% 
   filter(adj.p.value < 0.05,
          variable %in% anova_sig) %>% 
-  select(variable, contrast, estimate, adj.p.value) %>% 
-  filter(estimate >0)
+  select(variable, contrast, estimate, adj.p.value)
 
 
 ```
@@ -1011,42 +996,34 @@ ggsave(filename = "genus_enrichment.png", plot = last_plot(), path = here("outpu
 
 ```{r}
 # Delta no transformation, no z-scoring 
-OTU_24h <- DNA %>%  
+genus_24h <- DNA %>%  
+  
+  filter(!family %in% unclassified_families) %>%
   
   mutate(genus_tax = paste0(genus, ", ", family,", ", class)) %>% 
   
-  # filtering out rare taxa
-  ## removing taxa that have a max abundance >0.5%
-  group_by(genus_tax) %>% 
-  mutate(sum_abund = sum(abund)) %>% 
-  mutate(max = max(sum_abund)) %>%
-  ungroup() %>% 
-  filter(max >0.005) %>% 
-  
-  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
   group_by(id_number, genus_tax) %>% 
-  mutate(sum_abund= sum(abund)) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T)) %>% 
   ungroup() %>% 
-  group_by(genus_tax) %>%
-  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
-  filter(n_above_threshold >= 3) %>% 
-  ungroup() %>% 
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, genus_tax, log_flow) %>%
   
   # calculating delta values
-  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", sum_abund, NA)) %>% 
   group_by(time, genus_tax) %>% 
   mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
   ungroup() %>%
-  mutate(conc_norm  = abund - inflow ) %>% 
+  
+  mutate(conc_norm  = sum_abund - inflow ) %>% 
   filter(treatment != "Inflow") %>% 
   filter(!is.na(conc_norm)) %>% 
-  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
-  filter(!family %in% unclassified_families) 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) 
+   
 ```
 
 
 ```{r}
-exclude_tax <- OTU_24h %>% 
+exclude_tax <- genus_24h %>% 
   group_by(time, genus_tax) %>% 
   reframe(avg = mean(conc_norm)) %>% 
   filter(avg == 0) 
@@ -1055,7 +1032,7 @@ exclude_tax
 
 ### Genus Models
 ```{r}
-mobeast_loop <- OTU_24h %>% 
+mobeast_loop <- genus_24h %>% 
   filter(!genus_tax %in% exclude_tax$genus_tax & !genus_tax %in% exclude_tax$time) %>%
   select(genus_tax) %>% distinct() %>% pull()
 
@@ -1064,7 +1041,7 @@ names(models_DNA_24h) <- mobeast_loop
 
 
 for (var in mobeast_loop) {
-  df <- OTU_24h %>% filter(genus_tax == var)
+  df <- genus_24h %>% filter(genus_tax == var)
   models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
                                   log_flow + (1|tank_number), data = df)
 
