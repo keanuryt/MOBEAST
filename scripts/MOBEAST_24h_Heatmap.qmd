@@ -617,10 +617,9 @@ anova_sig <- anova_results %>%
   filter(term == "treatment", p.value <0.05) %>%  
   select(variable) %>%  distinct() %>% pull()
 
-otu_anova_tab <- anova_results %>% filter(term == "treatment", p.value <0.05) %>% gt()
-gtsave(otu_anova_tab, "sqrt_otu_anova_tab.png", path = here("outputs"))
+anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
 
-
+write_csv(anova_table, path = here("outputs","otu_sqrt_anova.csv"))
 
 ```
 
@@ -796,8 +795,9 @@ anova_sig <- anova_results %>%
 
 
 ```{r}
-otu_anova_tab <- anova_results %>% filter(term == "treatment", p.value <0.05) %>% gt()
-gtsave(otu_anova_tab, "delta_otu_anova_tab.png", path = here("outputs"))
+anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
+
+write_csv(anova_table, path = here("outputs","otu_delta_anova.csv"))
 ```
 
 
@@ -932,8 +932,9 @@ anova_sig <- anova_results %>%
   distinct() %>% 
   pull()
 
-otu_anova_tab <- anova_results %>% filter(term == "treatment", p.value <0.05) %>% gt()
-gtsave(otu_anova_tab, "sqrt_genus_anova_tab.png", path = here("outputs"))
+anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
+
+write_csv(anova_table, path = here("outputs","genus_sqrt_anova.csv"))
 ```
 
 ### Genus Emmeans 
@@ -1080,8 +1081,9 @@ anova_sig <- anova_results %>%
   filter(term == "treatment", p.value <0.05) %>%  
   select(variable) %>%  distinct() %>% pull()
 
-otu_anova_tab <- anova_results %>% filter(term == "treatment", p.value <0.05) %>% gt()
-gtsave(otu_anova_tab, "delta_genus_anova_tab.png", path = here("outputs"))
+anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
+
+write_csv(anova_table, path = here("outputs","genus_delta_anova.csv"))
 ```
 
 ### Genus Emmeans 
