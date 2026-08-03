@@ -377,7 +377,7 @@ fcm<- mobeast_delta %>%  filter(variable_cat == "FCM" | variable_cat== "chla") %
 
 anova_results %>% 
   filter( p.value <0.05,
-    term == "treatment"
+    term == "time_fac"
     ) %>%  
   #filter(term == "time_fac") %>% 
   filter(variable %in% fcm)
@@ -386,10 +386,10 @@ anova_results %>%
 
 ##### Nutrient ANOVA summary table 
 
-```{}
+```{r}
 nutrient_stat_summary_table <- anova_results %>%
   filter(variable %in% c("NO3", "PO4", "NH3", "SiO2", "chla_conc")) %>%
-  filter(term != "log_flow") %>% 
+  #filter(term != "log_flow") %>% 
   mutate(variable = recode_values(variable,
       "NO3"      ~"Nitrate",
       "PO4"       ~ "Phosphate",
@@ -397,58 +397,20 @@ nutrient_stat_summary_table <- anova_results %>%
       "SiO2" ~ "Silicate",
       "chla_conc" ~ "Chlorophyll a"
     )) %>% 
-  select(variable, term, df = NumDF, F_stat = statistic, p.value) %>%
+  select(Variable = variable, Term = term, DF = NumDF, F_statistic = statistic, p.value) %>%
   mutate(
-    p.value = round(p.value, 3),
-    F_stat  = round(F_stat, 2)
+    p.value = round(p.value, digits = 3),
+    F_statistic  = round(F_statistic, digits = 2)
   ) %>%
-  mutate(term = recode_values(term,
+  mutate(Term = recode_values(Term,
       "treatment"      ~"Treatment",
       "time_fac"       ~ "Time",
-      "treatment:time_fac" ~ "Treatment x Time"
-    )) %>% 
-  gt(groupname_col = "variable") %>%
-  #tab_header(
-    #title    = "ANOVA Results",
-   # subtitle = "Linear mixed model — Type II tests"
-  #) %>%
-  cols_label(
-    term    = "Term",
-    df      = "df",
-    F_stat  = "F",
-    p.value = "p-value"
-  ) %>%
-  #tab_style(
-   # style = cell_text(bold = TRUE),
-   # locations = cells_row_groups()) %>%
-  tab_style(
-    style = cell_fill(color = "#f0f0f0"),
-    locations = cells_row_groups()
-  ) %>%
-  fmt_number(columns = F_stat, decimals = 2) %>%
-  fmt_number(columns = p.value, decimals = 3) %>%
-  tab_options(
-    table.font.size  = 12,
-    row_group.font.weight = "bold"
-  ) %>% 
-    tab_style(
-  style = cell_text(weight = "bold", color = "red"),
-  locations = cells_body(
-    columns = p.value,
-    rows    = p.value < 0.05
-  )
-) %>% 
-  tab_options(
-  table.font.size      = 12,
-  row_group.font.weight = "bold",
-  table.width           = pct(50)  # or a fixed value like px(800)
-)
+      "treatment:time_fac" ~ "Treatment x Time", 
+      "log_flow" ~ "Log10 Flow Rate"
+    )) 
 
-nutrient_stat_summary_table
 
-#gtsave(nutrient_stat_summary_table, here("outputs", "nutrient_anova_table_summary.png"), 
-       #vwidth = 1200,   # width in pixels  ← increase this to make it wider
-       #vheight = 1600) # height in pixels ← increase if table gets cut off
+write_csv(nutrient_stat_summary_table, path = here("outputs","nutrients_anova.csv"))
 ```
 
 
@@ -492,7 +454,7 @@ emmean_sig <- emmeans_results_sig %>% select(variable) %>% distinct() %>%  pull(
 
 
 
-##### Nutrient Time contrasts
+##### Nutrient Tukey Time contrasts
 
 ```{r}
 emmeans_time_results <- imap_dfr(models_24h, ~ {
@@ -506,7 +468,26 @@ emmeans_time_results %>%  filter(adj.p.value<0.05)
 ```
 
 ##### FCM Time Contrasts
-Need tukey test
+
+```{r}
+tukey_FCM_results <- imap_dfr(models_24h, ~ {
+  emmeans(.x, pairwise ~ time_fac)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)
+}) %>% 
+  relocate(variable)
+
+tukey_FCM_results %>% filter(variable %in% fcm, 
+                             adj.p.value <0.05) %>%
+  mutate(abs_stat = abs(statistic)) %>% 
+  group_by(variable) %>% 
+  reframe(contrast, 
+          statistic,
+          max = max(abs_stat),
+          adj.p.value) %>% 
+  filter(abs(statistic) == max)
+```
+
 
     
 #### Contrast Effect Size 

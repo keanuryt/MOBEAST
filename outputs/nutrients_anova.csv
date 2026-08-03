@@ -1,0 +1,21 @@
+Variable,Term,DF,F_statistic,p.value
+Chlorophyll a,Treatment,3,1.26,0.332
+Chlorophyll a,Time,3,13.7,0
+Chlorophyll a,Log10 Flow Rate,1,0.49,0.49
+Chlorophyll a,Treatment x Time,9,1.48,0.194
+Phosphate,Treatment,3,0.46,0.716
+Phosphate,Time,3,2.84,0.054
+Phosphate,Log10 Flow Rate,1,0,0.955
+Phosphate,Treatment x Time,9,0.76,0.653
+Silicate,Treatment,3,7.15,0.001
+Silicate,Time,3,36.3,0
+Silicate,Log10 Flow Rate,1,0.16,0.691
+Silicate,Treatment x Time,9,3.27,0.004
+Ammonia,Treatment,3,0.62,0.62
+Ammonia,Time,3,44.61,0
+Ammonia,Log10 Flow Rate,1,1.86,0.19
+Ammonia,Treatment x Time,9,1.37,0.242
+Nitrate,Treatment,3,4.03,0.034
+Nitrate,Time,3,11.56,0
+Nitrate,Log10 Flow Rate,1,1.11,0.304
+Nitrate,Treatment x Time,9,0.89,0.544

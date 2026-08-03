@@ -531,24 +531,12 @@ DNA_meta <- DNA %>% select(id_number, tank_number, treatment, time_fac, log_flow
 OTU_24h <- DNA %>%  
   filter(!family %in% unclassified_families) %>% 
   
-  # filtering out rare taxa
-  ## removing taxa that have a max abundance >0.5%
-  #group_by(OTU_tax) %>% 
-  #mutate(sum_abund = sum(abund)) %>% 
-  #mutate(max = max(sum_abund)) %>%
-  #ungroup() %>% 
-  #filter(max >0.005) %>% 
-  
   ## remove taxa that don't have an abundance >0.1% in at least 3 samples
   group_by(id_number, OTU_tax) %>% 
   mutate(sum_abund= sum(abund)) %>% 
   ungroup() %>% 
   select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
          sum_abund, OTU_tax, log_flow) %>% 
-  #group_by(OTU_tax) %>%
-  #mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
-  #filter(n_above_threshold >= 3) %>% 
-  #ungroup() %>% 
   
   # sqrt() transform
   mutate(conc_norm = sqrt(sum_abund)) %>% 
@@ -617,7 +605,10 @@ anova_sig <- anova_results %>%
   filter(term == "treatment", p.value <0.05) %>%  
   select(variable) %>%  distinct() %>% pull()
 
-anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 2))
 
 write_csv(anova_table, path = here("outputs","otu_sqrt_anova.csv"))
 
@@ -639,13 +630,6 @@ emmeans_results_dna %>% filter(adj.p.value < 0.05) %>%
   select(variable, contrast, estimate, adj.p.value)
 ```
 
-```{r}
-otu_contrast_tab <- emmeans_results_dna %>% 
-  filter(variable %in% anova_sig, adj.p.value < 0.05) %>% 
-  select(variable, contrast, estimate, adj.p.value) %>% 
-  gt()
-gtsave(otu_contrast_tab, "sqrt_otu_contrast_tab.png", path = here("outputs"))
-```
 
 ```{}
 
@@ -795,7 +779,10 @@ anova_sig <- anova_results %>%
 
 
 ```{r}
-anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 2))
 
 write_csv(anova_table, path = here("outputs","otu_delta_anova.csv"))
 ```
@@ -818,13 +805,6 @@ emmeans_results_dna %>% filter(adj.p.value < 0.05) %>%
   select(variable, contrast, estimate, adj.p.value)
 ```
 
-```{r}
-otu_contrast_tab <- emmeans_results_dna %>% 
-  filter(variable %in% anova_sig, adj.p.value < 0.05) %>% 
-  select(variable, contrast, estimate, adj.p.value) %>% 
-  gt()
-gtsave(otu_contrast_tab, "delta_otu_contrast_tab.png", path = here("outputs"))
-```
 
 ### OTU tiles 
 ```{r}
@@ -932,7 +912,10 @@ anova_sig <- anova_results %>%
   distinct() %>% 
   pull()
 
-anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 7))
 
 write_csv(anova_table, path = here("outputs","genus_sqrt_anova.csv"))
 ```
@@ -955,14 +938,6 @@ emmeans_results_dna %>%
   select(variable, contrast, estimate, adj.p.value)
 
 
-```
-
-```{r}
-otu_contrast_tab <- emmeans_results_dna %>%
-  filter(variable %in% anova_sig, adj.p.value < 0.05) %>% 
-  select(variable, contrast, estimate, adj.p.value) %>% 
-  gt()
-gtsave(otu_contrast_tab, "sqrt_genus_contrast_tab.png", path = here("outputs"))
 ```
 
 
@@ -1081,7 +1056,10 @@ anova_sig <- anova_results %>%
   filter(term == "treatment", p.value <0.05) %>%  
   select(variable) %>%  distinct() %>% pull()
 
-anova_table <- anova_results %>% select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value)
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 2))
 
 write_csv(anova_table, path = here("outputs","genus_delta_anova.csv"))
 ```
