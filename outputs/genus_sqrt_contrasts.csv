@@ -1,0 +1,16 @@
+variable,contrast,estimate,adj.p.value
+"Marine_Group_II_ge, Marine_Group_II_fa, Thermoplasmata",Control - Algae,0.068,0.015
+"Francisella, Francisellaceae, Gammaproteobacteria",Control - Algae,-0.018,0.023
+"Nitrincolaceae_unclassified, Nitrincolaceae, Gammaproteobacteria",Control - Algae,-0.135,0.028
+"uncultured, Oligoflexaceae, Deltaproteobacteria",Control - Algae,0.011,0.025
+"Prochlorococcus_MIT9313, Cyanobiaceae, Oxyphotobacteria",Control - Algae,0.034,0.042
+"SAR116_clade_unclassified, SAR116_clade, Alphaproteobacteria",Control - Algae,0.039,0.041
+"Rubripirellula, Pirellulaceae, Planctomycetacia",Control - Algae,0.012,0.036
+"Desulfuromonadaceae_unclassified, Desulfuromonadaceae, Deltaproteobacteria",Control - Algae,-0.019,0.042
+"OM182_clade_ge, OM182_clade_fa, Gammaproteobacteria",Control - Algae,0.016,0.033
+"Marinimicrobia_(SAR406_clade)_ge, Marinimicrobia_(SAR406_clade)_fa, Marinimicrobia_(SAR406_clade)_cl",Control - Algae,0.021,0.035
+"Hypnocyclicus, Leptotrichiaceae, Fusobacteriia",Control - Algae,-0.021,0.011
+"OM60(NOR5)_clade, Halieaceae, Gammaproteobacteria",Control - Algae,0.038,0.027
+"HIMB11, Rhodobacteraceae, Alphaproteobacteria",Control - Algae,-0.064,0.046
+"Pseudohongiella, Pseudohongiellaceae, Gammaproteobacteria",Control - Algae,0.013,0.039
+"Candidatus_Endobugula, Cellvibrionaceae, Gammaproteobacteria",Control - Algae,-0.036,0.032

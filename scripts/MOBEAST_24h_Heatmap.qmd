@@ -408,6 +408,20 @@ modules_24h <- modules %>%
          treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
 ```
 
+
+### Module averages and stuff 
+
+```{r}
+module_A_bact <- modules_24h %>%  
+  group_by(taxa, cluster) %>% 
+  reframe(avg = mean(abund)*100) %>%  
+  filter(cluster == "Module A") %>% 
+  arrange(desc(avg)) %>%  
+  pull(taxa)
+```
+
+
+
 ### Model of the modules
 
 ```{r}
@@ -935,11 +949,45 @@ emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
 emmeans_results_dna %>% 
   filter(adj.p.value < 0.05,
          variable %in% anova_sig) %>% 
-  select(variable, contrast, estimate, adj.p.value)
+  select(variable, contrast, estimate, adj.p.value) %>% 
+  filter(variable %in% module_A_bact)
 
 
+module_A_sig_emm <- emmeans_results_dna %>% 
+  filter(adj.p.value < 0.05,
+         variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value) %>% 
+  filter(variable %in% module_A_bact) %>% 
+  pull(variable)
+
+
+emmeans_table_genus_sqrt <- emmeans_results_dna %>% 
+  filter(adj.p.value < 0.05,
+         variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value) %>%
+  mutate(estimate = round(estimate, digits = 3),
+         adj.p.value = round(adj.p.value, digits = 3))
+
+write_csv(emmeans_table_genus_sqrt, path = here("outputs","genus_sqrt_contrasts.csv"))
 ```
 
+
+### Percent decrease ? 
+
+```{r}
+genus_24h %>%  filter(treatment == "Algae"|treatment == "Control", 
+                      genus_tax %in% module_A_sig_emm) %>% 
+  group_by(genus_tax, time_fac, treatment) %>% 
+  reframe(avg = mean(sum_abund)) %>% 
+  mutate(time_fac = as.character(time_fac)) %>% 
+  filter(#time_fac == "12:00:00" | 
+           time_fac== "06:00:00") %>% 
+  #mutate(time_fac = ifelse(time_fac == "12:00:00", "noon", "six")) %>% 
+  pivot_wider(names_from = treatment, values_from = avg) %>% 
+  mutate(diff = (Algae -Control)*100) %>% 
+  select(genus_tax, diff)
+    
+```
 
 ### Genus tiles
 
