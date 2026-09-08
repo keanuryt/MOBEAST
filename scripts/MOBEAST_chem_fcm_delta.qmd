@@ -240,7 +240,7 @@ meta_var <- tibble(variable = c("het_bact", "pico_euk", "syn", "pro", "tot_bact"
                             "Prochlorococcus", "Total Bacteria", "Cyanobacteria", 
                             "Chlorophyll a", 
                             "TN", "Coble A", "Coble B", "Coble C", "Coble M",
-                            "Coble T", "M:C", "BIX", "HIX", "Fpeak", "Fulvic Acid",
+                            "Coble T", "M:C", "BIX", "HIX", "Fpeak", "Fluorescence Index",
                             "Lignin", "N+N", "NO2", "PO4", "SiO2", "NH3", "NO3", 
                             "Dissolved Oxygen", "Total Alkalinity", "DIC", "pH", "DOC"))
 
@@ -547,7 +547,7 @@ for (var in graph_loop) {
     #geom_jitter(aes(color = outlier), alpha = 0.5)+
     geom_hline(yintercept=0, linetype='dashed')+
     stat_summary(color = "yellow", alpha =0.5)+
-    facet_wrap( .~ time_fac, ncol = 4 )+
+    #facet_wrap( .~ time_fac, ncol = 4 )+
     labs(
        #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
        x= "Treatment",
@@ -596,10 +596,20 @@ ggsave(filename = "24h_N+N.png", plot = last_plot(), path = here("outputs"))
 ```
 
 ```{r, fig.width=14, fig.height=12}
- plots_24h[["fi"]] / plots_24h[["coble_c"]] / plots_24h[["m_to_c"]] + plot_layout(axes = "collect")
+(plots_24h[["fi"]] + facet_wrap( .~ time_fac, ncol = 4 )) / (plots_24h[["m_to_c"]]+ facet_wrap( .~ time_fac, ncol = 4 )) + plot_layout(axes = "collect")
 
 ggsave(filename = "24h_ICRS_FDOM.png", plot = last_plot(), path = here("outputs"))
 ```
+
+
+```{r, fig.width=14, fig.height=6}
+plots_24h[["het_bact"]]+
+  labs(y = "Bacterial Abundance Difference (cell/µL)")#+
+  #facet_wrap( .~ time_fac, ncol = 4 )
+
+ggsave(filename = "24h_cobC.png", plot = last_plot(), path = here("outputs"))
+```
+
 
 
 ```{r, fig.width=14, fig.height=10}
