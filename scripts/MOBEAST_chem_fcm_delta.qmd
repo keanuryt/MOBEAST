@@ -45,6 +45,9 @@ library(corrr)
 library(ggcorrplot)
 library(FactoMineR)
 library(factoextra) 
+
+# to add significance brackets
+library(ggpubr)
 ```
 
 
@@ -54,12 +57,14 @@ library(factoextra)
 nunu_theme <- theme_bw()+ 
   theme(plot.title = element_text(size=24, face = "bold"), 
         plot.subtitle = element_text(size=20),
-        axis.title = element_text(size = 18, face = "bold"),
-        axis.text = element_text(size = 16),
-        strip.text.x = element_text(size = 16, face = "bold"),
-        legend.title=element_text(size=18, face = "bold"),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        strip.text.x = element_text(size = 14, face = "bold"),
+        legend.title=element_text(size= 18, face = "bold"),
         legend.text=element_text(size=16),
-        strip.background = element_rect(fill = "white"))
+        strip.background = element_rect(fill = "white"),
+        legend.position = "none"
+        )
 ```
 
 
@@ -489,41 +494,15 @@ tukey_FCM_results %>% filter(variable %in% fcm,
 ```
 
 
-    
-#### Contrast Effect Size 
 
-Adds biological interpretability to each contrast
-Tells you not just "these groups differ" but "by how much and in which direction"
-Essential for comparing across nutrients since your residuals are on different scales
+# Plotting
 
-
-```{}
-effect_size_results <- tibble()
-
-for (var in sig_eta) {
-  emm <- emmeans(models_24h[[var]], ~ treatment)
-  contrasts <- contrast(emm, method = "trt.vs.ctrl")
-
-## Effect size for each contrast
-  df <- tidy(eff_size(emm, sigma = sigma(models_24h[[var]]), 
-                edf = df.residual(models_24h[[var]])))
-  
-  df <- df %>% mutate(variable = var) %>% rename(effect.size = estimate) %>% 
-    relocate(variable)
-  
-  effect_size_results <- rbind(effect_size_results, df)
-  
-}
-
-effect_size_results %>% 
-  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") %>% filter(abs(effect.size) >=0.8)
-
-
-
+```{r}
+avg_inflow <- mobeast_delta %>% filter(treatment == "Inflow") %>% 
+  group_by(treatment, variable) %>% 
+  reframe(avg_inflow = mean(value, na.rm = TRUE))
 ```
 
-
-#### Violin plots
 
 ```{r, warning=FALSE}
 
@@ -535,17 +514,21 @@ plots_24h <- vector(mode = "list", length = length(graph_loop))
 
 for (var in graph_loop) {
   
-  unit_plot <- mobeast_24h %>% filter(variable == var) %>% select(units) %>% distinct()
+  data <- mobeast_24h %>% filter(variable == var)
   
-  variable_name <- mobeast_24h %>% filter(variable == var) %>% 
+  unit_plot <- data %>% select(units) %>% distinct()
+  
+  variable_name <- data %>% 
     select(variable_clean) %>% distinct()
   
-  plots_24h[[var]] <- mobeast_24h %>% 
-  filter(variable == var) %>% 
+  inflow_val <- avg_inflow %>% filter(variable == var) %>% pull(avg_inflow)
+  
+  plots_24h[[var]] <- data %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
-    geom_violin()+
-    #geom_jitter(aes(color = outlier), alpha = 0.5)+
+    geom_boxplot(outlier.shape = NA)+
+    geom_jitter(color = "black", alpha = 0.5, width = 0.25)+
     geom_hline(yintercept=0, linetype='dashed')+
+    geom_hline(yintercept=inflow_val,linetype = 'dotdash', color = "red")+
     stat_summary(color = "yellow", alpha =0.5)+
     #facet_wrap( .~ time_fac, ncol = 4 )+
     labs(
@@ -554,14 +537,98 @@ for (var in graph_loop) {
        y = paste0("Delta ", variable_name, " (",unit_plot, ")"))+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-  scale_color_manual(breaks = c("outlier", "not outlier"), 
-                       values=c("red", "black"))+
-    nunu_theme + 
-    theme(axis.text = element_text(size = 18),
-          legend.position = "none")
+    nunu_theme #+ 
+    #theme(axis.title = element_text(size = 15, face = "bold"),
+          #axis.text = element_text(size = 31),
+          #legend.position = "none")
 }
 
 ```
+
+```{r}
+
+
+
+
+# --- 1. Prep the contrasts dataframe ---------------------------------------
+# Assumes "contrast" looks like "p1-3K - wt" (emmeans default separator " - ")
+# Adjust the split pattern if yours differs (e.g. "p1-3K/wt" or "p1-3K vs wt")
+
+contrasts_clean <- emmeans_results %>%
+  mutate(
+    group1 = str_trim(str_split_fixed(contrast, " - ", 2)[, 2]),  # reference, e.g. "wt"
+    group2 = str_trim(str_split_fixed(contrast, " - ", 2)[, 1]),  # comparison, e.g. "p1-3K"
+    p.adj.signif = case_when(
+      adj.p.value <= 0.0001 ~ "****",
+      adj.p.value <= 0.001  ~ "***",
+      adj.p.value <= 0.01   ~ "**",
+      adj.p.value <= 0.05   ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>% 
+  filter(p.adj.signif != "ns")   # drop non-significant, matches the figure (only sig. shown)
+
+
+# --- 2. Loop over variables --------------------------------------------------
+
+graph_loop <- mobeast_24h %>% select(variable) %>% distinct() %>% pull()
+plots_24h <- vector(mode = "list", length = length(graph_loop))
+
+for (var in graph_loop) {
+  
+  df_var <- mobeast_24h %>% filter(variable == var)
+  
+  unit_plot <- df_var %>% select(units) %>% distinct()
+  
+  variable_name <- df_var %>% 
+    select(variable_clean) %>% distinct()
+  
+  inflow_val <- avg_inflow %>% filter(variable == var) %>% pull(avg_inflow)
+  
+  contrasts_var <- contrasts_clean %>%
+    filter(variable == var)
+  
+  # y.position for brackets, staggered above the max data point
+  if (nrow(contrasts_var) > 0) {
+    y_max <- max(df_var$conc_norm, na.rm = TRUE)
+    y_range <- diff(range(df_var$conc_norm, na.rm = TRUE))
+    
+    contrasts_var <- contrasts_var %>%
+      arrange(group2) %>%
+      mutate(y.position = y_max + y_range * 0.2 * row_number())  # a bit more spacing since "ns" adds rows
+  }
+  
+  p <- df_var %>%
+    ggplot(aes(x = treatment, y = conc_norm, fill = treatment)) +
+    geom_boxplot(width = 0.5, outlier.shape = NA) +
+    geom_jitter(color = "black", alpha = 0.5, width = 0.25) +
+    geom_hline(yintercept = 0, linetype = 'dashed') +
+    geom_hline(yintercept=inflow_val, linetype = 'dotdash', color = "red")+
+    stat_summary(color = "yellow", alpha = 0.5) +
+    labs(x= "Treatment",
+       y = paste0("Delta ", variable_name, " (",unit_plot, ")"))+
+    scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"),
+                       values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")) +
+    nunu_theme +
+    theme(legend.box = "vertical")
+  
+  if (nrow(contrasts_var) > 0) {
+    p <- p + stat_pvalue_manual(
+      contrasts_var,
+      label = "p.adj.signif",
+      xmin = "group1",
+      xmax = "group2",
+      y.position = "y.position",
+      tip.length = 0.01,
+      label.size = 5,      # size of the "*"/"ns" text — bump up from ggpubr's default of ~3.88
+      bracket.size = 0.6   # thickness of the bracket lines — default is 0.3
+    )
+  }
+  
+  plots_24h[[var]] <- p
+}
+```
+
 
 ```{r, fig.width=14, fig.height=14}
 # fDOM plots 
@@ -573,77 +640,46 @@ for (var in graph_loop) {
 
 ```{r, fig.width=14, fig.height=17}
 # FCM plots 
-(plots_24h[["het_bact"]]+ labs(title = "A")) /(plots_24h[["syn"]]+ labs(title = "B")) / (plots_24h[["pico_euk"]] + labs(title = "C")) / (plots_24h[["chla_conc"]] + labs(title = "D"))
+(plots_24h[["het_bact"]]+ labs(title = "A")) /
+  (plots_24h[["syn"]]+ labs(title = "B")) / 
+  (plots_24h[["pico_euk"]] + labs(title = "C")) / 
+  (plots_24h[["chla_conc"]] + labs(title = "D"))
 
 ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
 ```
 
 
-```{r, fig.width=14, fig.height=10}
-# Nutrients plots 
+### Figures for Publication 
+```{r, fig.width=10, fig.height=8}
+ 
+(plots_24h[["N_N"]] + labs(y = "Nitrate+Nitrite Difference (µM)")+ 
+   labs(title = "A")) / 
+  (plots_24h[["SiO2"]]+ labs(y = "Silicate Difference (µM)")
+   + labs(title = "B"))  + plot_layout(axes = "collect")
 
-(plots_24h[["N_N"]]+ labs(title = "A")) / (plots_24h[["SiO2"]]+ labs(title = "B"))
 
-
-ggsave(filename = "24h_nutrients.png", plot = last_plot(), path = here("outputs"))
+ggsave(filename = "stacked_sig_nutrients.png", plot = last_plot(), path = here("outputs"))
 ```
+```{r, fig.width=8, fig.height=10}
 
-```{r, fig.width=14, fig.height=6}
-plots_24h[["N_N"]]+
-  labs(y = "Nitrate+Nitrite Difference from Inflow (µM)")
+(plots_24h[["coble_c"]] + 
+   labs(y = "Coble C Difference (µM)") + labs(title = "C")) /
+  (plots_24h[["m_to_c"]] + 
+     labs(y = "M:C Difference (µM)") + labs(title = "D")) /
+  (plots_24h[["fi"]] + 
+     labs(y = "Fluorescence Index Difference (µM)") + labs(title = "E")) + plot_layout(axes = "collect")
 
-ggsave(filename = "24h_N+N.png", plot = last_plot(), path = here("outputs"))
-```
-
-```{r, fig.width=14, fig.height=12}
-(plots_24h[["fi"]] + facet_wrap( .~ time_fac, ncol = 4 )) / (plots_24h[["m_to_c"]]+ facet_wrap( .~ time_fac, ncol = 4 )) + plot_layout(axes = "collect")
-
-ggsave(filename = "24h_ICRS_FDOM.png", plot = last_plot(), path = here("outputs"))
-```
-
-
-```{r, fig.width=14, fig.height=6}
-plots_24h[["het_bact"]]+
-  labs(y = "Bacterial Abundance Difference (cell/µL)")#+
-  #facet_wrap( .~ time_fac, ncol = 4 )
-
-ggsave(filename = "24h_cobC.png", plot = last_plot(), path = here("outputs"))
+ggsave(filename = "stacked_sig_DOM.png", plot = last_plot(), path = here("outputs"))
 ```
 
 
-
-```{r, fig.width=14, fig.height=10}
- plots_24h[["syn"]] / plots_24h[["het_bact"]]+ plot_layout(axes = "collect")
-
-ggsave(filename = "24h_ICRS_FCM.png", plot = last_plot(), path = here("outputs"))
+```{r, fig.width=10, fig.height=6}
+(plots_24h[["het_bact"]]+
+   labs(y = "Heterotrophic Bacteria Abundance Difference (cells/µL)") + labs(title = "F")) 
+ggsave(filename = "stacked_sig_hetbact.png", plot = last_plot(), path = here("outputs"))
 ```
 
 
-```{r, fig.width=14, fig.height=10}
-# Carbonate plots 
-
-(plots_24h[["ph"]]+ labs(title = "A", 
-                         y = "Delta pH")) / 
-  (plots_24h[["ta"]]+ labs(title = "B",
-                           y = "Delta TA (μmol/kg)"))
-
-
-ggsave(filename = "24h_carbonate.png", plot = last_plot(), path = here("outputs"))
-```
-
-```{r, fig.width=14, fig.height=30}
-# Nutrients plots 
-
-(plots_24h[["coble_c"]]+ labs(title = "Fluorescent DOM", subtitle = "A - Coble C")) /
-  (plots_24h[["hix"]]+ labs(subtitle = "B - HIX")) / 
-  
-  #(plots_24h[["NO3"]]+ labs(title = "Nutrients",subtitle = "C - NO3"))/ 
-  
-  (plots_24h[["het_bact"]]+ labs(title = "Cell Count",subtitle = "D - Heterotrophic Bacteria"))/ 
-  (plots_24h[["syn"]]+ labs(subtitle = "E - Synechococcus"))
-
-#ggsave(filename = "24h_sig_var.png", plot = last_plot(), path = here("outputs"))
-```
 
 ##### Nutrients 
 
@@ -898,73 +934,3 @@ ph <- mobeast_24h %>%
 
 ta + ph
 ```
-
-
-
-## PCA 
-
-```{r}
-## used the areal flux to calculate the PCA here
-## normalization with scale(), but don't actually know what it noarmalizes to...
-pca_24h_df <- mobeast_24h %>% select(id_number, tank_number, treatment, inflow_table,
-                             date_string, time_string, variable, conc_norm) %>%
-  pivot_wider(names_from = variable, values_from = conc_norm) %>% 
-   na.omit()
-
-pca_matrix_24h_norm <- pca_24h_df %>% select(het_bact:npoc_u_m) %>% scale() 
-
-pca_matrix_24h_norm %>% cor() %>% 
-  ggcorrplot(
-           hc.order = TRUE,
-           #type = "lower",
-           lab = TRUE)
-```
-
-
-```{r}
-
-pca_matrix_24h_norm<- pca_matrix_24h_norm %>% as.data.frame() %>% 
-  select(het_bact, pico_euk, syn, pro, chla_conc, coble_b,SiO2,NH3,
-                                coble_t, bix, fpeak, fi, PO4, NO3, 
-                                het_bact, npoc_u_m, coble_a, 
-                                coble_c, coble_m, hix,npoc_u_m ) %>% as.matrix()
-```
-
-
-```{r}
-data.pca <- princomp(pca_matrix_24h_norm, cor = TRUE)
-summary(data.pca)
-
-data.pca$loadings[,1:4]
-
-loading_results <- as.data.frame(data.pca$loadings[,1:4])
-
-fviz_eig(data.pca, addlabels = TRUE)
-
-fviz_pca_var(data.pca, col.var = "black")
-
-fviz_pca_var(data.pca, col.var = "cos2",
-            gradient.cols = c("blue", "lightgrey", "red"),
-            repel = TRUE)
-```
-
-```{r}
-pca_scores <- as.data.frame(data.pca$scores)
-
-ggplot(pca_scores, aes(Comp.1,Comp.2))+
-  geom_point(aes(color = pca_24h_df$treatment, size= 3))+
-  geom_segment(data = loading_results, 
-               aes(x=0, y=0, xend = Comp.1, yend= Comp.2),
-               arrow = arrow(length = unit(0.5, "cm")),
-               alpha = 0.75, color = "black")+
-  geom_text(data = loading_results, 
-            aes(x = Comp.1, y = Comp.2, 
-                label = rownames(loading_results)),
-            vjust=1, hjust = 1)+
-  theme_bw() +
-      scale_color_manual(
-        breaks = c("Control", "Coral", "CCA", "Algae"),
-        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")
-      )  
-```
-
