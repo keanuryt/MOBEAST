@@ -54,14 +54,14 @@ library(ggpubr)
 ## Data visualization theme
 
 ```{r}
-nunu_theme <- theme_bw()+ 
-  theme(plot.title = element_text(size=24, face = "bold"), 
+nunu_theme <- theme_test()+ 
+  theme(plot.title = element_text(size=16, face = "bold"), 
         plot.subtitle = element_text(size=20),
-        axis.title = element_text(size = 12, face = "bold"),
-        axis.text = element_text(size = 12),
-        strip.text.x = element_text(size = 14, face = "bold"),
-        legend.title=element_text(size= 18, face = "bold"),
-        legend.text=element_text(size=16),
+        axis.title = element_text(size = 7.5, face = "bold"),
+        axis.text = element_text(size = 7.5),
+        strip.text.x = element_text(size = 10, face = "bold"),
+        legend.title=element_text(size= 9, face = "bold"),
+        legend.text=element_text(size=7.5),
         strip.background = element_rect(fill = "white"),
         legend.position = "none"
         )
@@ -500,55 +500,45 @@ tukey_FCM_results %>% filter(variable %in% fcm,
 ```{r}
 avg_inflow <- mobeast_delta %>% filter(treatment == "Inflow") %>% 
   group_by(treatment, variable) %>% 
-  reframe(avg_inflow = mean(value, na.rm = TRUE))
+  reframe(avg_value = mean(value, na.rm = TRUE))
+mobeast_inflow <- mobeast_delta %>% filter(treatment == "Inflow")
 ```
 
 
-```{r, warning=FALSE}
-
-graph_loop <- mobeast_24h %>% #filter(variable %in% sig_eta) %>% 
-  select(variable) %>% 
-  distinct() %>% pull()
-  
-plots_24h <- vector(mode = "list", length = length(graph_loop))
-
-for (var in graph_loop) {
-  
-  data <- mobeast_24h %>% filter(variable == var)
-  
-  unit_plot <- data %>% select(units) %>% distinct()
-  
-  variable_name <- data %>% 
-    select(variable_clean) %>% distinct()
-  
-  inflow_val <- avg_inflow %>% filter(variable == var) %>% pull(avg_inflow)
-  
-  plots_24h[[var]] <- data %>% 
+```{r}
+mobeast_24h %>% 
+  filter(variable == "coble_c") %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
     geom_boxplot(outlier.shape = NA)+
     geom_jitter(color = "black", alpha = 0.5, width = 0.25)+
     geom_hline(yintercept=0, linetype='dashed')+
-    geom_hline(yintercept=inflow_val,linetype = 'dotdash', color = "red")+
-    stat_summary(color = "yellow", alpha =0.5)+
-    #facet_wrap( .~ time_fac, ncol = 4 )+
-    labs(
-       #subtitle = "Norm DOC = Tank DOC - Inflow DOC",
-       x= "Treatment",
-       y = paste0("Delta ", variable_name, " (",unit_plot, ")"))+
+    geom_hline(yintercept= 0,linetype = 'dotdash', color = "red")+
+    labs(x= "Treatment",
+       y = paste0("Delta Coble C"))+
+  scale_y_continuous(
+    name = "Delta",
+    sec.axis = sec_axis(trans = ~ . +2, name = "Secondary Axis (Percentage)"))+
   scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
                        values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))+
-    nunu_theme #+ 
-    #theme(axis.title = element_text(size = 15, face = "bold"),
-          #axis.text = element_text(size = 31),
-          #legend.position = "none")
-}
+  
+    nunu_theme 
+
 
 ```
 
+
 ```{r}
+nunu_theme_pub <- theme_test()+ 
+  theme(plot.title = element_text(size=16, face = "bold"), 
+        axis.title = element_text(size = 10, face = "bold"),
+        axis.text = element_text(size = 9),
+        legend.text=element_text(size=9),
+        #strip.background = element_rect(fill = "white"),
+        legend.position = "none"
+        )
+```
 
-
-
+```{r}
 
 # --- 1. Prep the contrasts dataframe ---------------------------------------
 # Assumes "contrast" looks like "p1-3K - wt" (emmeans default separator " - ")
@@ -574,6 +564,7 @@ contrasts_clean <- emmeans_results %>%
 graph_loop <- mobeast_24h %>% select(variable) %>% distinct() %>% pull()
 plots_24h <- vector(mode = "list", length = length(graph_loop))
 
+
 for (var in graph_loop) {
   
   df_var <- mobeast_24h %>% filter(variable == var)
@@ -583,7 +574,16 @@ for (var in graph_loop) {
   variable_name <- df_var %>% 
     select(variable_clean) %>% distinct()
   
-  inflow_val <- avg_inflow %>% filter(variable == var) %>% pull(avg_inflow)
+  inflow_val <- avg_inflow %>% filter(variable == var) %>% pull(avg_value)
+  print(paste(var, ":", inflow_val))
+  
+  # capture inflow_val as DATA, not as a symbol to be looked up later
+  inflow_df <- data.frame(
+    yint = inflow_val,
+    lty  = "Averaged Inflow")
+  
+  # bake inflow_val into the formula as a literal number, not a lazy symbol
+  sec_axis_formula <- as.formula(paste0("~ . + ", inflow_val))
   
   contrasts_var <- contrasts_clean %>%
     filter(variable == var)
@@ -602,15 +602,24 @@ for (var in graph_loop) {
     ggplot(aes(x = treatment, y = conc_norm, fill = treatment)) +
     geom_boxplot(width = 0.5, outlier.shape = NA) +
     geom_jitter(color = "black", alpha = 0.5, width = 0.25) +
-    geom_hline(yintercept = 0, linetype = 'dashed') +
-    geom_hline(yintercept=inflow_val, linetype = 'dotdash', color = "red")+
+    geom_hline(aes(yintercept = 0, linetype = "Zero")) +
+    geom_hline(aes(yintercept = 0, linetype = "Averaged Inflow"), color = "red") +
+    #geom_hline(data = inflow_df, aes(yintercept = yint, linetype = lty), color = "red") +
+    stat_summary(color = "yellow", alpha = 0.5) +
     stat_summary(color = "yellow", alpha = 0.5) +
     labs(x= "Treatment",
        y = paste0("Delta ", variable_name, " (",unit_plot, ")"))+
     scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"),
                        values = c("grey", "#03A9F4", "#EF5350", "#4CAF50")) +
-    nunu_theme +
-    theme(legend.box = "vertical")
+    scale_y_continuous(
+      sec.axis = sec_axis(transform = sec_axis_formula, name = "Raw Values", guide = )
+    )+
+    scale_linetype_manual(
+    name = NULL,
+    values = c("Zero" = "dashed", "Averaged Inflow" = "dotdash"))+
+  guides(fill = "none")+
+    nunu_theme_pub #+
+    #theme(legend.position = "bottom")
   
   if (nrow(contrasts_var) > 0) {
     p <- p + stat_pvalue_manual(
@@ -623,6 +632,7 @@ for (var in graph_loop) {
       label.size = 5,      # size of the "*"/"ns" text — bump up from ggpubr's default of ~3.88
       bracket.size = 0.6   # thickness of the bracket lines — default is 0.3
     )
+
   }
   
   plots_24h[[var]] <- p
@@ -630,36 +640,48 @@ for (var in graph_loop) {
 ```
 
 
-```{r, fig.width=14, fig.height=14}
-# fDOM plots 
-(plots_24h[["coble_c"]]+ labs(title = "A")) / (plots_24h[["m_to_c"]]+ labs(title = "B"))/
-  (plots_24h[["hix"]]+ labs(title = "C")) / (plots_24h[["fi"]]+ labs(title = "D"))
-
-#ggsave(filename = "24h_fDOM.png", plot = last_plot(), path = here("outputs"))
-```
-
-```{r, fig.width=14, fig.height=17}
-# FCM plots 
-(plots_24h[["het_bact"]]+ labs(title = "A")) /
-  (plots_24h[["syn"]]+ labs(title = "B")) / 
-  (plots_24h[["pico_euk"]] + labs(title = "C")) / 
-  (plots_24h[["chla_conc"]] + labs(title = "D"))
-
-ggsave(filename = "24h_FCM.png", plot = last_plot(), path = here("outputs"))
-```
-
 
 ### Figures for Publication 
-```{r, fig.width=10, fig.height=8}
- 
-(plots_24h[["N_N"]] + labs(y = "Nitrate+Nitrite Difference (µM)")+ 
-   labs(title = "A")) / 
-  (plots_24h[["SiO2"]]+ labs(y = "Silicate Difference (µM)")
-   + labs(title = "B"))  + plot_layout(axes = "collect")
+```{r, fig.asp= 0.82}
 
 
-ggsave(filename = "stacked_sig_nutrients.png", plot = last_plot(), path = here("outputs"))
+bact <- plots_24h[["het_bact"]] + 
+           labs(y = ("Heterotrophic Bacteria \n (cells µL-1 difference from inlet mean)"))+ 
+           labs(title = "B") #+ 
+  #theme(axis.title.y = element_text(size = 10, margin = margin(r = 8)))
+
+cobC <- (plots_24h[["coble_c"]]+ 
+           labs(y = "Coble C (Raman units of water \n difference from inlet mean)") + 
+           labs(title = "D"))
+
+MC <- (plots_24h[["m_to_c"]] + 
+         labs(y = "M:C (unitless ratio \n difference from inlet mean)")+ 
+         labs(title = "C")) 
+
+FI <- (plots_24h[["fi"]] + 
+         labs(y = "Fluorescence Index  (unitless ratio \n difference from inlet mean)")+ 
+         labs(title = "E") +
+         theme(legend.position = "right")+
+         guides(fill = "none")
+       ) 
+
+NN <- (plots_24h[["N_N"]] + 
+         labs(y = "Nitrate+Nitrite \n (µM difference from inlet mean)")+ 
+         labs(title = "A"))
+
+
+
+
+
+(NN+bact)/(MC+cobC)/(FI + (ggplot()+geom_blank()+ theme_void())+plot_layout(widths = c(1.2, 1)))+
+  #plot_layout(guides = "collect")+
+  plot_layout(axis_titles = "collect") 
+
+
+ggsave(filename = "stacked_figure_pub.png", dpi = 300, height = 200 , width = 180, units = "mm",
+       plot = last_plot(), path = here("outputs"))
 ```
+
 ```{r, fig.width=8, fig.height=10}
 
 (plots_24h[["coble_c"]] + 
