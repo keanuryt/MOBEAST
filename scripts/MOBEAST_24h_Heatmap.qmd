@@ -319,7 +319,7 @@ col_ha <- HeatmapAnnotation(
 ```{r, fig.height = 16, fig.width = 24}
 # Version 2
 #png(width=3000, height=2200, file= here("outputs", "zscore_24hdata.png"))
-#png(width=2000, height=1200, file= here("outputs", "zscore_24hdata.png"))
+png(width=2000, height=1200, file= here("outputs", "zscore_24hdata.png"))
 
 ht = Heatmap(mat_ordered, 
              name = "Z-scored Abundance", 
@@ -359,11 +359,11 @@ ht_drawn <- draw(ht, heatmap_legend_side = "right",
                  annotation_legend_side = "right", 
   merge_legends = TRUE)
 
-#dev.off()
+dev.off()
 
 ```
 
-```{r, fig.height = 16, fig.width = 30}
+```{, fig.height = 16, fig.width = 30}
 # --- Step 1: draw once as before to get the k-means groupings ---
 set.seed(1999)
 ht_initial <- Heatmap(mat_ordered, 
@@ -483,8 +483,8 @@ modules <- modules %>% left_join(flow_meta)
 ```{r}
 modules <- modules %>%  
   mutate(cluster2 = cluster, 
-         cluster = ifelse(cluster2 == "Cluster 1", "Module B",
-                          ifelse(cluster2 == "Cluster 3", "Module A", "Module C")),
+         cluster = ifelse(cluster2 == "Cluster 1", "Module A",
+                          ifelse(cluster2 == "Cluster 3", "Module B", "Module C")),
          cluster = factor(cluster, levels = c("Module A", "Module B", "Module C")))
 ```
 
@@ -571,19 +571,20 @@ emmeans_results_dna %>% filter(adj.p.value < 0.05) %>%
 
 
 ### Plot of the clusters/module
-```{r Family clustering, fig.width= 16, fig.height= 6}
+```{r Family clustering, fig.width= 16, fig.height= 7}
 modules_df %>% drop_na(cluster) %>%
   group_by(treatment, time_fac, cluster) %>%
   reframe(mean_abund = mean(conc_norm),
           sd_abund   = sd(conc_norm),
           conc_norm) %>%
   ungroup() %>% 
-  ggplot(aes(x = time_fac, y = mean_abund, group = treatment, color = treatment)) +
+  rename(Treatments = treatment) %>% 
+  ggplot(aes(x = time_fac, y = mean_abund, group = Treatments, color = Treatments)) +
   geom_line(linewidth = 1) +
-  geom_point( size = 2)+
+  geom_point(size = 2)+
   geom_ribbon(aes(ymin = mean_abund - sd_abund,
                   ymax = mean_abund + sd_abund,
-                  fill = treatment),
+                  fill = Treatments),
                   alpha = 0.15, color = NA) +
   geom_point(aes(x = time_fac, y = conc_norm), shape = 1, alpha = 0.7,
              size = 2.5) +
@@ -593,11 +594,12 @@ modules_df %>% drop_na(cluster) %>%
   scale_color_manual(values = treatment_colors) +
   scale_fill_manual(values  = treatment_colors) +
   facet_grid(. ~ cluster)+
-  nunu_theme
+  nunu_theme+
+  theme(legend.position = "bottom")
 
 
 
-#ggsave(filename = "modules_ICRS.png", plot = last_plot(), path = here("outputs"))
+ggsave(filename = "modules_ICRS.png", plot = last_plot(), path = here("outputs"))
 ```
 
 
