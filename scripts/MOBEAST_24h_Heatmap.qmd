@@ -182,9 +182,8 @@ taxa_filtered <- OTU_htm_24h %>%
 taxa_filtered
   
 taxa_filtered %>% select(taxa) %>% distinct()
+
 ```
-
-
 
 
 ### SQRT-transformed Z-score 
@@ -507,6 +506,26 @@ module_A_bact <- modules_24h %>%
   pull(taxa)
 ```
 
+
+```{r}
+modules_24h %>% 
+  group_by(taxa, treatment, cluster) %>% 
+  summarise(sum = sum(abund)) %>% 
+  ungroup() %>% 
+  group_by(taxa, cluster) %>% 
+  summarise(mean = mean(sum)) 
+
+```
+
+
+```{r}
+modules_24h %>% 
+  group_by(taxa, cluster) %>% 
+  summarise(mean = mean(abund)) %>% 
+  ungroup() %>% 
+  filter(cluster == "Module B") %>% 
+  arrange(desc(mean) )
+```
 
 
 ### Model of the modules
