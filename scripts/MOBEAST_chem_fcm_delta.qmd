@@ -343,7 +343,8 @@ anova_results <- imap_dfr(models_24h, ~ {
 
 # all the variables that have significant treatment effects
 sig_anova <- anova_results %>% 
-  filter( p.value <0.05) %>%  filter(term == "treatment") %>%  
+  #filter( p.value <0.05) %>%  
+  filter(term == "treatment") %>%  
   select(variable) %>% pull()
 
 anova_results %>% 
@@ -370,9 +371,8 @@ fdom<- mobeast_delta %>%  filter(variable_cat == "fDOM" | variable== "npoc_u_m")
   select("variable") %>%  distinct() %>% pull()
 
 anova_results %>% 
-  filter( p.value <0.05,
-    #term == "treatment"
-    ) %>%  
+  #filter( p.value <0.05,
+    #term == "treatment") %>%  
   #filter(term == "time_fac") %>% 
   filter(variable %in% fdom)
 
@@ -439,7 +439,8 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   relocate(variable) %>% 
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
-emmeans_results %>% filter(variable %in% sig_anova) %>%
+emmeans_results %>% 
+  filter(variable %in% sig_anova) #%>%
   filter(adj.p.value <0.05) 
 ```
 
@@ -469,7 +470,10 @@ emmeans_time_results <- imap_dfr(models_24h, ~ {
 }) %>% 
   relocate(variable)
 
-emmeans_time_results %>%  filter(adj.p.value<0.05)
+emmeans_time_results %>%  
+  #filter(adj.p.value<0.05) %>% 
+  filter(variable == "SiO2")
+
 ```
 
 ##### FCM Time Contrasts
@@ -507,12 +511,13 @@ mobeast_inflow <- mobeast_delta %>% filter(treatment == "Inflow")
 
 ```{r}
 mobeast_24h %>% 
-  filter(variable == "syn") %>% 
+  filter(variable == "SiO2") %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
     geom_boxplot(outlier.shape = NA)+
     geom_jitter(color = "black", alpha = 0.5, width = 0.25)+
     geom_hline(yintercept=0, linetype='dashed')+
     geom_hline(yintercept= 0,linetype = 'dotdash', color = "red")+
+  facet_wrap(.~ time_fac)+
     labs(x= "Treatment",
        y = paste0("Delta Coble C"))+
   scale_y_continuous(

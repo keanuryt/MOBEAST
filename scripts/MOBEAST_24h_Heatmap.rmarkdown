@@ -1,0 +1,1792 @@
+---
+title: "MOBEAST - 24h Heatmap"
+format: html
+editor: source
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+
+
+## Load Libraries
+
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(janitor)
+library(ggrepel)
+library(ghibli)
+library(gt)
+library(patchwork)
+library(RColorBrewer)
+
+library(ComplexHeatmap)
+library(data.table)
+library(dendextend)
+library(grid)
+
+# Rayna library
+library(dendsort)
+library(ggsci)
+library(randomForest)
+library(vegan)
+library(ape)
+library(devtools)
+library(ggpubr)
+library(viridis)
+library(colorspace)
+library(readr)
+library(circlize)
+
+
+library(cowplot)
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(emmeans)
+library(performance)
+library(multcompView)
+library(broom.mixed)
+library(effectsize)
+
+```
+
+
+
+Heatmap info and tutorial: https://jokergoo.github.io/ComplexHeatmap-reference/book/a-single-heatmap.html
+
+## Functions
+
+
+
+```{r}
+source(here("scripts", "reference_scripts", "heatmap_zscore_function.R"))
+```
+
+
+
+## Data visualization theme
+
+
+
+```{r}
+
+nunu_theme <- theme_bw()+ 
+  theme(plot.title = element_text(size=24, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 16),
+        strip.text.x = element_text(size = 16, face = "bold"),
+        legend.title=element_text(size=18, face = "bold"),
+        legend.text=element_text(size=16),
+        axis.text.x = element_text(angle= 45, hjust= 1),
+        strip.background = element_rect(fill = "white"))
+```
+
+
+
+### Color palette
+
+
+
+```{r}
+treatment_colors = c(
+  #Treatments
+  "Control" = "grey",
+  "Coral" = "#03A9F4",
+  "CCA" = "#EF5350",
+  "Algae" = "#4CAF50"
+)
+
+```
+
+
+
+## Load Data
+
+
+
+```{r}
+meta <- read_csv(here("data", "MOBEAST_metadata_V2.csv"))
+OTU_long <- read_csv(here("data","MOBEAST_DNA_long.csv"))
+mobeast <- read_csv(here("data", "MOBEAST_full_merged_data_long.csv"))
+
+```
+
+```{r}
+flow_meta <- mobeast %>%  
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>% 
+  select(id_number, flowrate) %>% 
+  distinct() %>% 
+  filter(!is.na(id_number))
+```
+
+
+
+
+## Data Clean Up
+
+
+
+```{r}
+OTU_long <- OTU_long %>% clean_names() %>% select(-long_name, -tank_number, -treatment, -date,-time) %>%  rename(id_number= sample_id)
+
+DNA <- meta %>% left_join(OTU_long)
+```
+
+
+
+### Preparing the OTU matrix for heatmap
+
+
+
+```{r}
+exclude_family <- DNA %>% group_by(family) %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>%
+  reframe(sum = sum(abund)) %>% 
+  filter(sum ==0) %>% 
+  select(family) %>% 
+  pull()
+
+unclassified_families <- c("Alteromonadales_unclassified", "Alphaproteobacteria_unclassified", "Gammaproteobacteria_unclassified", "Campylobacteria_unclassified", "Bacteroidia_unclassified", "Bacteria_unclassified", 
+                           "Proteobacteria_unclassified ")
+```
+
+```{r}
+OTU_htm <- DNA %>% 
+  filter(date == ymd("2024-06-02")| date == ymd("2024-06-03")) %>%
+  filter(!family %in% exclude_family) %>% 
+  mutate(family_tax = paste(family, "X", order, "X", class, "X", phylum),
+         genus_tax = paste(genus, "X", family, "X", order, "X", class, "X", phylum))
+```
+
+```{r}
+OTU_htm_24h <- OTU_htm %>% filter(treatment != "Inflow")
+  
+```
+
+
+
+
+
+## Data with only the most abundant taxa 
+
+
+
+
+```{r}
+# genus
+## per sample, min abundance 0.5% and more than 3x occurence. 
+
+taxa_filtered <- OTU_htm_24h %>%
+  
+  mutate(genus_tax = paste0(genus, ", ", family, ", ", class)) %>% 
+  filter(!family %in% unclassified_families) %>%
+  
+  #group_by(genus_tax) %>% 
+  #mutate(sum_abund= sum(abund)) %>% 
+  #mutate(max = max(sum_abund)) %>%
+  #filter(max >0.005) %>%
+  #ungroup() %>%
+
+  ## remove taxa that don't have an abundance >0.5% in at least 3 samples
+  group_by(id_number, genus_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  group_by(genus_tax) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.005)) %>%
+  filter(n_above_threshold >= 3) %>% 
+  ungroup() %>% 
+  mutate(taxa = genus_tax) %>% 
+  select(-long_name, -kingdom, -family_tax, #-max, 
+         -n_above_threshold) %>% distinct()
+
+taxa_filtered
+  
+taxa_filtered %>% select(taxa) %>% distinct()
+```
+
+
+
+
+
+
+### SQRT-transformed Z-score 
+
+
+
+```{r, echo=TRUE, collapse=TRUE}
+#Make a heatmap of z-scored relative abundance data after it was summed by family
+#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
+
+# some the abundance of bacteria by family
+family.culled.long.table <- taxa_filtered %>%
+  group_by(id_number, taxa) %>%
+  summarize(abund = sum(abund, na.rm = TRUE)) %>% 
+  ungroup()
+
+# Make wide format table to make a matrix later
+family.culled.abund <- pivot_wider(family.culled.long.table, names_from = taxa, values_from = abund)
+
+# Remove ID number from the data frame
+## Z-score function only works on df that has a matrix format
+culled.abund.OTU <- family.culled.abund %>% tibble() %>%  select(-id_number)
+
+```
+
+```{r}
+sqrt.matrix <- apply(culled.abund.OTU, 2, FUN=sqrt)
+sqrt.zscore <- as.data.frame(apply(sqrt.matrix, 2, FUN = zscore.calculation))
+```
+
+```{r}
+# bring back the sample ID number in the df 
+sqrt.zscore$id_number = family.culled.abund$id_number
+
+
+# Set the ID numbers as the rownames (to make a matrix)
+rownames(sqrt.zscore) = sqrt.zscore$id_number
+
+# Remove the ID number column, convert the df to a matrix and transpose to make the final matrix.
+sqrt.zscore.matrix <- sqrt.zscore %>% select(-id_number) %>% 
+  as.matrix() %>% t()
+
+
+```
+
+
+
+### Heatmap
+
+#### Annotation
+
+
+
+```{r}
+## Create a vector that will have information of a variable and its associate sample 
+treatment <- meta[match(colnames(sqrt.zscore.matrix),
+                           meta$id_number), 
+                 "treatment"]
+
+date_time <- meta[match(colnames(sqrt.zscore.matrix),
+                           meta$id_number),
+                  "date_time_string"]
+
+time <- meta[match(colnames(sqrt.zscore.matrix),
+                           meta$id_number),
+                  "time_string"]
+
+```
+
+
+
+
+#### Organize the samples (ChatGPT)
+
+
+```{r}
+
+## organize the treatment in order they will be display on the heatmap
+treatment2 <- factor(treatment$treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))
+
+## organize the time in order they will be display on the heatmap
+time2 <- factor(time$time_string, levels = c("12:00:00", "18:00:00", "00:00:00", "06:00:00"))
+
+#store that info in a df
+col_info <- data.frame(
+  Treatment = treatment2,
+  Time = time2) %>% drop_na()
+
+# create the order in which the samples with be organize in the heatmap
+sample_order <- order(col_info$Treatment,col_info$Time)
+
+# tell the matrix with my z-scores how the samples should be arranged
+mat_ordered <- sqrt.zscore.matrix[, sample_order]
+
+# have vectors specifying the order of the treatment for the heatmap
+treatment_ordered <- col_info$Treatment[sample_order]
+time_ordered <- col_info$Time[sample_order]
+
+
+```
+
+```{r}
+col_ha <- HeatmapAnnotation(
+  Treatment = anno_block(
+    gp = gpar(fill = c("grey", "#03A9F4", "#EF5350", "#4CAF50")),
+    labels = c("Control", "Coral", "CCA", "Algae"), 
+    labels_gp = gpar(col = "white", fontsize = 14, fontface = "bold")),
+  
+  Time = time_ordered, 
+  
+  col = list(Treatment = c("Control" = "grey", 
+                           "Coral"   = "#03A9F4", 
+                           "CCA"     = "#EF5350",
+                           "Algae"   = "#4CAF50"),
+             Time = c("12:00:00" = "black",
+                      "18:00:00" = "green", 
+                      "00:00:00" = "blue",
+                      "06:00:00" = "grey")),
+  
+   # Controls the "Time" label on the left side of the ribbon *
+   annotation_name_gp = gpar(fontsize = 16, fontface = "bold"), 
+  
+   # Controls the height of the Time ribbon bar itself 
+   simple_anno_size = unit(6, "mm"), 
+  
+  annotation_legend_param = list(
+    
+     Time = list( 
+       title_gp    = gpar(fontsize = 16, fontface = "bold"), 
+       labels_gp   = gpar(fontsize = 16)
+    )
+  )
+)
+```
+
+
+
+
+
+
+#### Printing heatmap
+
+
+
+```{r, fig.height = 16, fig.width = 24}
+# Version 2
+#png(width=3000, height=2200, file= here("outputs", "zscore_24hdata.png"))
+png(width=2000, height=1200, file= here("outputs", "zscore_24hdata.png"))
+
+ht = Heatmap(mat_ordered, 
+             name = "Z-scored Abundance", 
+             heatmap_legend_param = list(#legend_direction = "horizontal",
+                                          title_gp= gpar(fontsize = 16, 
+                                                          fontface = "bold"), 
+                labels_gp       = gpar(fontsize = 16), 
+                grid_height     = unit(6, "mm"), 
+                grid_width      = unit(6, "mm"), 
+                legend_width    = unit(8, "cm")),   # controls horizontal legend length),
+             show_row_names = TRUE,
+        row_names_max_width = unit(22, "cm"),
+        clustering_method_rows = "complete",
+        clustering_distance_rows = "euclidean",
+             #rect_gp = gpar(col = "white", lwd = 0.1),
+        
+        column_title = "Bacterial Community Shift Over 24h", 
+        column_title_gp = gpar(fontsize = 25, fontface = "bold"),
+        #column_title_side = "bottom",
+        cluster_rows = TRUE,
+        cluster_columns =  FALSE,
+        row_title = c("A", "B", "C") ,
+        row_title_rot = 0,
+        row_title_gp = gpar(fontsize = 30, fontface = "bold"),
+        row_names_gp = gpar(fontsize = 16),
+        row_dend_width = unit(2, "cm"),
+        #column_names_gp = gpar(fontsize = 10),
+        show_column_names = FALSE,
+        row_km = 3, # 5? number of forced segregation in rows 
+        #column_km = 4,#number of forced segregation in columns 
+        top_annotation = col_ha,
+        #bottom_annotation = col_ha,
+        column_split = treatment_ordered
+        )
+set.seed(1999)
+ht_drawn <- draw(ht, heatmap_legend_side = "right",
+                 annotation_legend_side = "right", 
+  merge_legends = TRUE)
+
+dev.off()
+
+```
+
+
+
+```{, fig.height = 16, fig.width = 30}
+# --- Step 1: draw once as before to get the k-means groupings ---
+set.seed(1999)
+ht_initial <- Heatmap(mat_ordered, 
+             name = "Z-scored Abundance", 
+             heatmap_legend_param = list(
+                title_gp     = gpar(fontsize = 16, fontface = "bold"), 
+                labels_gp    = gpar(fontsize = 16), 
+                grid_height  = unit(6, "mm"), 
+                grid_width   = unit(6, "mm"), 
+                legend_width = unit(8, "cm")),
+             show_row_names = TRUE,
+             row_names_max_width = unit(22, "cm"),
+             clustering_method_rows = "complete",
+             clustering_distance_rows = "euclidean",
+             column_title = "Bacterial Community Shift Over 24h", 
+             column_title_gp = gpar(fontsize = 25, fontface = "bold"),
+             cluster_rows = TRUE,
+             cluster_columns = FALSE,
+             row_title = c("A", "B", "C"),
+             row_title_rot = 0,
+             row_title_gp = gpar(fontsize = 30, fontface = "bold"),
+             row_names_gp = gpar(fontsize = 16),
+             row_dend_width = unit(2, "cm"),
+             show_column_names = FALSE,
+             row_km = 3,
+             top_annotation = col_ha,
+             column_split = treatment_ordered
+             )
+
+ht_drawn_initial <- draw(ht_initial, heatmap_legend_side = "right",
+                          annotation_legend_side = "right", 
+                          merge_legends = TRUE)
+
+# --- Step 2: extract which rows belong to which displayed slice (1 = A, 2 = B, 3 = C) ---
+row_order_list <- row_order(ht_drawn_initial)
+
+split_vec <- integer(nrow(mat_ordered))
+for (i in seq_along(row_order_list)) {
+  split_vec[row_order_list[[i]]] <- i
+}
+
+# --- Step 3: build a factor that swaps A and B while keeping C in place ---
+# original position 1 = "A", 2 = "B", 3 = "C"
+# levels = c(2,1,3) means: whatever was position 2 now displays first, position 1 displays second
+row_split_swapped <- factor(split_vec, levels = c(2, 1, 3), labels = c("A", "B", "C"))
+
+# --- Step 4: redraw the heatmap using the manual split, order fixed (no re-clustering of slices) ---
+ht = Heatmap(mat_ordered, 
+             name = "Z-scored Abundance", 
+             show_heatmap_legend = FALSE,
+             #show_annotation_legend = FALSE,
+             heatmap_legend_param = list(
+                title_gp     = gpar(fontsize = 16, fontface = "bold"), 
+                labels_gp    = gpar(fontsize = 16), 
+                grid_height  = unit(6, "mm"), 
+                grid_width   = unit(6, "mm"), 
+                legend_width = unit(8, "cm")),
+             show_row_names = TRUE,
+             row_names_max_width = max_text_width(rownames(mat_ordered), 
+                                                  gp = gpar(fontsize = 22)),
+             #row_names_max_width = unit(22, "cm"),
+             clustering_method_rows = "complete",
+             clustering_distance_rows = "euclidean",
+             column_title = "Bacterial Community Shift Over 24h", 
+             column_title_gp = gpar(fontsize = 25, fontface = "bold"),
+             cluster_rows = TRUE,
+             cluster_columns = FALSE,
+             row_split = row_split_swapped,
+             cluster_row_slices = FALSE,   # <- keeps our custom order instead of auto-reordering
+             row_title = c("A", "B", "C"),
+             row_title_rot = 0,
+             row_title_gp = gpar(fontsize = 30, fontface = "bold"),
+             row_names_gp = gpar(fontsize = 16),
+             row_dend_width = unit(2, "cm"),
+             show_column_names = FALSE,
+             top_annotation = col_ha,
+             column_split = treatment_ordered
+             )
+
+set.seed(1999)
+ht_drawn_vis <- draw(ht, heatmap_legend_side = "right",
+                 annotation_legend_side = "right",
+                 merge_legends = TRUE)
+```
+
+# Modules
+## Data clean up 
+
+
+
+```{r}
+
+# 4. Extract row positions grouped by cluster slice
+cluster_list <- row_order(ht_drawn)
+
+# 5. Convert the list into a clean, unified data frame matching gene names to cluster IDs
+cluster_membership <- do.call(rbind, lapply(names(cluster_list), function(cl_name) {
+  row_indices <- cluster_list[[cl_name]]
+  data.frame(
+    taxa = rownames(mat_ordered)[row_indices],
+    cluster = paste("Cluster", cl_name)
+  )
+}))
+
+cluster_membership
+```
+
+```{r}
+modules <- taxa_filtered %>%  select(id_number, tank_number,treatment,date, time, date_time,
+                                     inflow_table,taxa, abund) %>% 
+  left_join(cluster_membership) 
+
+modules <- modules %>% left_join(flow_meta)
+
+
+```
+
+```{r}
+modules <- modules %>%  
+  mutate(cluster2 = cluster, 
+         cluster = ifelse(cluster2 == "Cluster 1", "Module A",
+                          ifelse(cluster2 == "Cluster 3", "Module B", "Module C")),
+         cluster = factor(cluster, levels = c("Module A", "Module B", "Module C")))
+```
+
+```{r}
+modules_24h <- modules %>% 
+  mutate(time_fac = factor(time, levels = c("12:00:00", "18:00:00", "00:00:00", "06:00:00")),
+         treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+```
+
+
+
+
+### Module averages and stuff 
+
+
+
+```{r}
+module_A_bact <- modules_24h %>%  
+  group_by(taxa, cluster) %>% 
+  reframe(avg = mean(abund)*100) %>%  
+  filter(cluster == "Module A") %>% 
+  arrange(desc(avg)) %>%  
+  pull(taxa)
+```
+
+
+
+
+
+### Model of the modules
+
+
+
+```{r}
+modules_df <- modules_24h %>% 
+  group_by(id_number, cluster) %>% 
+  mutate(conc_norm = sum(abund)#,
+         #conc_norm = sqrt(sum_ra_module)
+         ) %>% 
+  ungroup() %>% 
+  mutate(log_flow = log10(flowrate)) %>%
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         conc_norm, cluster, log_flow) %>% distinct()
+
+mobeast_loop <- modules_df %>% 
+  select(cluster) %>% distinct() %>% pull()
+
+models_modules <- vector(mode = "list", length = length(mobeast_loop))
+names(models_modules) <- mobeast_loop
+
+
+for (var in mobeast_loop) {
+  df <- modules_df %>% filter(cluster == var)
+  models_modules[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
+                                  log_flow + (1|tank_number), data = df)
+  
+}
+
+```
+
+
+
+
+### Module ANOVA
+
+
+
+```{r, warning= FALSE}
+
+anova_results <- imap_dfr(models_modules, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+anova_results %>% filter(p.value <0.05) %>% 
+  select(variable, term, statistic, p.value)
+
+```
+
+
+
+### Module Emmeans 
+
+
+
+```{r, message= FALSE}
+
+emmeans_results_dna <- imap_dfr(models_modules, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
+
+emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
+  select(variable, term, estimate, contrast, adj.p.value)
+```
+
+
+
+
+### Plot of the clusters/module
+
+
+```{r Family clustering, fig.width= 16, fig.height= 7}
+modules_df %>% drop_na(cluster) %>%
+  group_by(treatment, time_fac, cluster) %>%
+  reframe(mean_abund = mean(conc_norm),
+          sd_abund   = sd(conc_norm),
+          conc_norm) %>%
+  ungroup() %>% 
+  rename(Treatments = treatment) %>% 
+  ggplot(aes(x = time_fac, y = mean_abund, group = Treatments, color = Treatments)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2)+
+  geom_ribbon(aes(ymin = mean_abund - sd_abund,
+                  ymax = mean_abund + sd_abund,
+                  fill = Treatments),
+                  alpha = 0.15, color = NA) +
+  geom_point(aes(x = time_fac, y = conc_norm), shape = 1, alpha = 0.7,
+             size = 2.5) +
+  labs(#title = "Modules from Genus Clustering", 
+       x= "Time", 
+       y= "Relative Abundance")+
+  scale_color_manual(values = treatment_colors) +
+  scale_fill_manual(values  = treatment_colors) +
+  facet_grid(. ~ cluster)+
+  nunu_theme+
+  theme(legend.position = "bottom")
+
+
+
+ggsave(filename = "modules_ICRS.png", plot = last_plot(), path = here("outputs"))
+```
+
+
+
+
+
+
+
+# Taxa models OTU and Genus
+
+## Data clean up 
+
+
+
+
+
+```{r}
+DNA <- OTU_htm %>% 
+  left_join(flow_meta) %>% 
+  mutate(date_string = as.character(date_string),
+         time_string = as.character(time_string), 
+         date_time_string = as.character(date_time_string)) %>% 
+  mutate(OTU_tax = paste0(otu_number, ", ", family, ", ", order,", ", class),
+         log_flow = log10(flowrate),
+         time_fac = factor(time_string, 
+                           levels = c("12:00:00", "18:00:00", "00:00:00","06:00:00"))) %>% 
+  select(-long_name)
+
+DNA_meta <- DNA %>% select(id_number, tank_number, treatment, time_fac, log_flow ) %>% distinct()
+```
+
+
+
+
+## Sqrt OTU Models : sqrt(RA)
+
+
+
+```{r}
+# Sqrt transform 
+OTU_24h <- DNA %>%  
+  filter(!family %in% unclassified_families) %>% 
+  
+  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  group_by(id_number, OTU_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, OTU_tax, log_flow) %>% 
+  
+  # sqrt() transform
+  mutate(conc_norm = sqrt(sum_abund)) %>% 
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+  
+  
+```
+
+```{r}
+exclude_tax <- OTU_24h %>% 
+  group_by(time, OTU_tax) %>% 
+  reframe(avg = mean(conc_norm)) %>% 
+  filter(avg == 0) 
+exclude_tax
+```
+
+```{r}
+mobeast_loop <- OTU_24h %>% 
+  filter(!OTU_tax %in% exclude_tax$OTU_tax & !OTU_tax %in% exclude_tax$time) %>%
+  select(OTU_tax) %>% distinct() %>% pull()
+
+models_DNA_24h <- vector(mode = "list", length = length(mobeast_loop))
+names(models_DNA_24h) <- mobeast_loop
+
+
+for (var in mobeast_loop) {
+  df <- OTU_24h %>% filter(OTU_tax == var)
+  models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
+                                  log_flow + (1|tank_number), data = df)
+
+}
+```
+
+
+
+
+```{}
+resid_panel(models_DNA_24h[["Otu0024 X Rhodobacteraceae X Rhodobacterales X Alphaproteobacteria"]], plots = c("qq"))
+```
+
+
+
+
+
+```{r}
+results_DNA <- imap_dfr(models_DNA_24h, ~ tidy(.x) %>%
+                     dplyr::mutate(variable = .y)) %>% 
+  relocate(variable, .before = "effect")
+
+results_DNA %>%  filter(p.value <0.05)
+```
+
+
+
+### OTU ANOVA
+
+
+
+```{r, warning= FALSE}
+
+anova_results <- imap_dfr(models_DNA_24h, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+anova_results %>% filter(term == "treatment", p.value <0.05) %>% 
+  select(variable, term, statistic, p.value )
+
+anova_sig <- anova_results %>% 
+  filter(term == "treatment", p.value <0.05) %>%  
+  select(variable) %>%  distinct() %>% pull()
+
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 2))
+
+write_csv(anova_table, path = here("outputs","otu_sqrt_anova.csv"))
+
+```
+
+
+
+### OTU Emmeans 
+
+
+
+```{r, message= FALSE}
+
+emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
+
+emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
+  filter(variable %in% anova_sig, adj.p.value < 0.05) %>%
+  select(variable, contrast, estimate, adj.p.value)
+```
+
+
+
+
+```{}
+
+# Get a sorted, unique list of taxa
+taxa_list <- OTU_24h %>% distinct(OTU_tax) %>% pull(OTU_tax) %>% sort()
+
+# Function to build one QQ plot for a given taxon
+make_qq <- function(taxon) {
+  df <- OTU_24h %>% filter(OTU_tax == taxon)
+  
+  ggplot(df, aes(sample = conc_norm )) +
+    stat_qq() +
+    stat_qq_line(color = "red") +
+    labs(title = taxon) +
+    theme_minimal(base_size = 8) +
+    theme(
+      plot.title = element_text(size = 7, hjust = 0.5),
+      axis.title = element_blank(),
+      axis.text = element_text(size = 5)
+    )
+}
+
+# Build the list of plots
+qq_plots <- map(taxa_list, make_qq)
+
+# Split into chunks of 16 and assemble each chunk into a 4x4 grid
+chunks <- split(qq_plots, ceiling(seq_along(qq_plots) / 16))
+
+grid_figures <- map(chunks, ~ wrap_plots(.x, ncol = 4, nrow = 4))
+
+# Save all grids to the outputs folder, one file per page
+walk2(grid_figures, seq_along(grid_figures), function(fig, i) {
+  ggsave(
+    filename = here("outputs", paste0("qq_grid_", i, ".png")),
+    plot = fig,
+    width = 14, height = 14, dpi = 300
+  )
+})
+```
+
+
+### OTU Tiles enrichment 
+
+
+```{r}
+sig_taxa <- emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% select(variable) %>%
+  distinct() %>% pull()
+
+emmeans_results_dna %>% filter(variable %in% sig_taxa) %>% 
+  mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>% 
+  mutate(sig = ifelse(estimate <0 & adj.p.value < 0.05, "Enrichment", 
+                      ifelse(estimate > 0 & adj.p.value < 0.05, 
+                             "Depletion", "No change"))) %>% 
+  ggplot(aes(x= contrast, y = variable, fill = sig)) + 
+  geom_tile(color = "black") +
+  scale_fill_manual(breaks = c("Enrichment", "Depletion", "No change"),
+                    values = c("lightgreen", "#EF5350", "#03A9F4")) +
+  theme(legend.position = "bottom")+
+  theme_bw()
+```
+
+
+
+
+
+
+## Delta OTU models
+
+
+
+```{r}
+# Delta no transformation, no z-scoring 
+OTU_24h <- DNA %>%  
+  filter(!family %in% unclassified_families) %>% 
+  
+  group_by(id_number, OTU_tax) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T)) %>% 
+  ungroup() %>% 
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, OTU_tax, log_flow) %>%
+  
+  # calculating delta values
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", sum_abund, NA)) %>% 
+  group_by(time, OTU_tax) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>%
+  mutate(conc_norm  = sum_abund - inflow ) %>% 
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+   
+```
+
+```{r}
+exclude_tax <- OTU_24h %>% 
+  group_by(time, OTU_tax) %>% 
+  reframe(avg = mean(conc_norm)) %>% 
+  filter(avg == 0) 
+exclude_tax
+```
+
+
+
+### OTU models
+
+
+```{r}
+mobeast_loop <- OTU_24h %>% 
+  filter(!OTU_tax %in% exclude_tax$OTU_tax & !OTU_tax %in% exclude_tax$time) %>%
+  select(OTU_tax) %>% distinct() %>% pull()
+
+models_DNA_24h <- vector(mode = "list", length = length(mobeast_loop))
+names(models_DNA_24h) <- mobeast_loop
+
+
+for (var in mobeast_loop) {
+  df <- OTU_24h %>% filter(OTU_tax == var)
+  models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
+                                  log_flow + (1|tank_number), data = df)
+
+}
+```
+
+
+
+
+```{}
+resid_panel(models_DNA_24h[["Otu0024 X Rhodobacteraceae X Rhodobacterales X Alphaproteobacteria"]], plots = c("qq"))
+```
+
+
+
+
+
+```{r}
+results_DNA <- imap_dfr(models_DNA_24h, ~ tidy(.x) %>%
+                     dplyr::mutate(variable = .y)) %>% 
+  relocate(variable, .before = "effect")
+
+results_DNA %>%  filter(p.value <0.05)
+```
+
+
+
+### OTU ANOVA
+
+
+
+```{r, warning= FALSE}
+
+anova_results <- imap_dfr(models_DNA_24h, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+anova_results %>% filter(term == "treatment", p.value <0.05) %>%  select(variable, term, statistic, p.value)
+
+
+anova_sig <- anova_results %>% 
+  filter(term == "treatment", p.value <0.05) %>%  
+  select(variable) %>%  distinct() %>% pull()
+```
+
+```{r}
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 2))
+
+write_csv(anova_table, path = here("outputs","otu_delta_anova.csv"))
+```
+
+
+
+
+
+### OTU Emmeans 
+
+
+
+```{r, message= FALSE}
+
+emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
+
+emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
+  filter(variable %in% anova_sig, adj.p.value < 0.05) %>%
+  select(variable, contrast, estimate, adj.p.value)
+```
+
+
+
+
+### OTU tiles 
+
+
+```{r}
+sig_taxa <- emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% select(variable) %>%
+  distinct() %>% pull()
+
+emmeans_results_dna %>% filter(variable %in% sig_taxa) %>% 
+  mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>% 
+  mutate(sig = ifelse(estimate <0 & adj.p.value < 0.05, "Enrichment", 
+                      ifelse(estimate > 0 & adj.p.value < 0.05, 
+                             "Depletion", "No change"))) %>% 
+  ggplot(aes(x= contrast, y = variable, fill = sig)) + 
+  geom_tile(color = "black") +
+  scale_fill_manual(breaks = c("Enrichment", "Depletion", "No change"),
+                    values = c("lightgreen", "#EF5350", "#03A9F4")) +
+  theme(legend.position = "bottom")+
+  theme_bw()
+```
+
+
+
+
+
+
+
+# Genus models
+
+## Sqrt Genus Models
+
+
+
+```{r}
+genus_24h <- DNA %>%
+  
+  filter(!family %in% unclassified_families)  %>% 
+  
+  mutate(genus_tax = paste0(genus, ", ", family,", ", class),
+         time_fac = factor(time, 
+                           levels = c("12:00:00", "18:00:00", "00:00:00", "06:00:00")),
+         log_flow = log10(flowrate)) %>% 
+
+  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  group_by(id_number, genus_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, genus_tax, log_flow) %>% 
+  
+  # outlier detection
+  mutate(conc_norm = sqrt(sum_abund)) %>% 
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) 
+
+  
+```
+
+```{r}
+exclude_tax <- genus_24h %>% 
+  group_by(time, genus_tax) %>% 
+  reframe(avg = mean(conc_norm)) %>% 
+  filter(avg == 0) 
+exclude_tax
+```
+
+
+
+### Genus models
+
+
+```{r}
+mobeast_loop <- genus_24h %>% 
+  filter(!genus_tax %in% exclude_tax$genus_tax & !genus_tax %in% exclude_tax$time) %>%
+  select(genus_tax) %>% distinct() %>% pull()
+
+models_DNA_24h <- vector(mode = "list", length = length(mobeast_loop))
+names(models_DNA_24h) <- mobeast_loop
+
+
+for (var in mobeast_loop) {
+  df <- genus_24h %>% filter(genus_tax == var)
+  models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
+                                  log_flow + (1|tank_number), data = df)
+
+}
+```
+
+
+
+
+```{}
+resid_panel(models_DNA_24h[["Vibrio X Vibrionaceae X Vibrionales X Gammaproteobacteria X Proteobacteria"]], plots = c("qq"))
+```
+
+
+### Genus ANOVA
+
+
+
+```{r, warning= FALSE}  
+
+anova_results <- imap_dfr(models_DNA_24h, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+
+anova_results %>% filter(term == "treatment", p.value <0.05) %>% 
+  select(variable, term, p.value) 
+
+anova_sig <- anova_results %>% 
+  filter(term == "treatment", p.value <0.05) %>% 
+  select(variable, term, p.value) %>% 
+  select(variable) %>% 
+  distinct() %>% 
+  pull()
+
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 7))
+
+write_csv(anova_table, path = here("outputs","genus_sqrt_anova.csv"))
+```
+
+
+
+### Genus Emmeans 
+
+
+
+```{r, message= FALSE}
+
+emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
+
+
+emmeans_results_dna %>% 
+  filter(adj.p.value < 0.05,
+         variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value) %>% 
+  filter(variable %in% module_A_bact)
+
+
+module_A_sig_emm <- emmeans_results_dna %>% 
+  filter(adj.p.value < 0.05,
+         variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value) %>% 
+  filter(variable %in% module_A_bact) %>% 
+  pull(variable)
+
+
+emmeans_table_genus_sqrt <- emmeans_results_dna %>% 
+  filter(adj.p.value < 0.05,
+         variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value) %>%
+  mutate(estimate = round(estimate, digits = 3),
+         adj.p.value = round(adj.p.value, digits = 3))
+
+write_csv(emmeans_table_genus_sqrt, path = here("outputs","genus_sqrt_contrasts.csv"))
+```
+
+
+
+
+### Percent decrease ? 
+
+
+
+```{r}
+genus_24h %>%  filter(treatment == "Algae"|treatment == "Control", 
+                      genus_tax %in% module_A_sig_emm) %>% 
+  group_by(genus_tax, time_fac, treatment) %>% 
+  reframe(avg = mean(sum_abund)) %>% 
+  mutate(time_fac = as.character(time_fac)) %>% 
+  filter(#time_fac == "12:00:00" | 
+           time_fac== "06:00:00") %>% 
+  #mutate(time_fac = ifelse(time_fac == "12:00:00", "noon", "six")) %>% 
+  pivot_wider(names_from = treatment, values_from = avg) %>% 
+  mutate(diff = (Algae -Control)*100) %>% 
+  select(genus_tax, diff)
+    
+```
+
+
+
+### Genus tiles
+
+
+
+```{r, fig.width= 15, fig.height= 12}
+sig_taxa <- emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% select(variable) %>%
+  distinct() %>% pull()
+
+emmeans_results_dna %>% 
+  filter(variable %in% anova_sig,
+         variable %in% sig_taxa) %>% 
+  mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>% 
+  mutate(sig = ifelse(estimate <0 & adj.p.value < 0.05, "Enrichment", 
+                      ifelse(estimate > 0 & adj.p.value < 0.05, 
+                             "Depletion", "No change"))) %>% 
+  ggplot(aes(x= contrast, y = variable, fill = sig)) + 
+  geom_tile(color = "black") +
+  labs(x= "Contrast", y = "Bacterial Taxa",
+       fill = "Significance")+
+  scale_fill_manual(breaks = c("Enrichment", "Depletion", "No change"),
+                    values = c("#4CAF50", "#EF5350", "#90CAF9")) +
+  theme(legend.position = "bottom")+
+  theme_bw()+
+  nunu_theme
+
+ggsave(filename = "genus_enrichment.png", plot = last_plot(), path = here("outputs"))
+```
+
+
+
+
+## Delta Genus models
+
+
+
+```{r}
+# Delta no transformation, no z-scoring 
+genus_24h <- DNA %>%  
+  
+  filter(!family %in% unclassified_families) %>%
+  
+  mutate(genus_tax = paste0(genus, ", ", family,", ", class)) %>% 
+  
+  group_by(id_number, genus_tax) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T)) %>% 
+  ungroup() %>% 
+  select(id_number, tank_number, treatment, date, time, date_time, time_fac, inflow_table, 
+         sum_abund, genus_tax, log_flow) %>%
+  
+  # calculating delta values
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", sum_abund, NA)) %>% 
+  group_by(time, genus_tax) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>%
+  
+  mutate(conc_norm  = sum_abund - inflow ) %>% 
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) 
+   
+```
+
+```{r}
+exclude_tax <- genus_24h %>% 
+  group_by(time, genus_tax) %>% 
+  reframe(avg = mean(conc_norm)) %>% 
+  filter(avg == 0) 
+exclude_tax
+```
+
+
+
+### Genus Models
+
+
+```{r}
+mobeast_loop <- genus_24h %>% 
+  filter(!genus_tax %in% exclude_tax$genus_tax & !genus_tax %in% exclude_tax$time) %>%
+  select(genus_tax) %>% distinct() %>% pull()
+
+models_DNA_24h <- vector(mode = "list", length = length(mobeast_loop))
+names(models_DNA_24h) <- mobeast_loop
+
+
+for (var in mobeast_loop) {
+  df <- genus_24h %>% filter(genus_tax == var)
+  models_DNA_24h[[var]] <- lmer(conc_norm ~ treatment*time_fac + 
+                                  log_flow + (1|tank_number), data = df)
+
+}
+```
+
+
+
+
+```{}
+resid_panel(models_DNA_24h[["Otu0024 X Rhodobacteraceae X Rhodobacterales X Alphaproteobacteria"]], plots = c("qq"))
+```
+
+
+
+
+
+```{r}
+results_DNA <- imap_dfr(models_DNA_24h, ~ tidy(.x) %>%
+                     dplyr::mutate(variable = .y)) %>% 
+  relocate(variable, .before = "effect")
+
+results_DNA %>%  filter(p.value <0.05)
+```
+
+
+
+### Genus ANOVA
+
+
+
+```{r, warning= FALSE}
+
+anova_results <- imap_dfr(models_DNA_24h, ~ {
+  stats::anova(.x, type = 2) %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>%
+  relocate(variable) 
+
+anova_results %>% filter(term == "treatment", p.value <0.05) %>% 
+  select(variable, term, statistic, p.value)
+
+anova_sig <- anova_results %>% 
+  filter(term == "treatment", p.value <0.05) %>%  
+  select(variable) %>%  distinct() %>% pull()
+
+anova_table <- anova_results %>% 
+  select(OTU = variable, term, DF = NumDF, F_value = statistic, p.value) %>% 
+  mutate(F_value = round(F_value, digits = 2),
+         p.value = round(p.value, digits = 2))
+
+write_csv(anova_table, path = here("outputs","genus_delta_anova.csv"))
+```
+
+
+
+### Genus Emmeans 
+
+
+
+```{r, message= FALSE}
+
+emmeans_results_dna <- imap_dfr(models_DNA_24h, ~ {
+  emmeans(.x, pairwise ~ treatment)$contrasts %>%
+    broom::tidy() %>%
+    mutate(variable = .y)}) %>% 
+  relocate(variable) %>% 
+  filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae")
+
+emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% 
+  filter(variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value)
+```
+
+```{r}
+otu_contrast_tab <- emmeans_results_dna %>% 
+  filter(variable %in% anova_sig, adj.p.value < 0.05) %>% 
+  select(variable, contrast, estimate, adj.p.value) %>% 
+  gt()
+gtsave(otu_contrast_tab, "delta_genus_contrast_tab.png", path = here("outputs"))
+```
+
+
+
+### Genus tiles 
+
+
+
+```{r}
+sig_taxa <- emmeans_results_dna %>% filter(adj.p.value < 0.05) %>% select(variable) %>%
+  distinct() %>% pull()
+
+emmeans_results_dna %>% filter(variable %in% sig_taxa) %>% 
+  mutate(contrast = factor(contrast, levels = c("Control - Coral", "Control - CCA", "Control - Algae"))) %>% 
+  mutate(sig = ifelse(estimate <0 & adj.p.value < 0.05, "Enrichment", 
+                      ifelse(estimate > 0 & adj.p.value < 0.05, 
+                             "Depletion", "No change"))) %>% 
+  ggplot(aes(x= contrast, y = variable, fill = sig)) + 
+  geom_tile(color = "black") +
+  scale_fill_manual(breaks = c("Enrichment", "Depletion", "No change"),
+                    values = c("lightgreen", "#EF5350", "#03A9F4")) +
+  theme(legend.position = "bottom")+
+  theme_bw()
+```
+
+
+
+
+## Z-score Delta Heatmap - Do not use, it does clsuter well with kmeans
+
+```{}
+# OTU 
+
+# Delta no transformation, no z-scoring but **summed otu** used to make the heatmap
+OTU_24h <- DNA %>%  
+  
+  filter(!family %in% unclassified_families) %>%
+  
+  # filtering out rare taxa
+  ## removing taxa that have a max abundance >0.5%
+  group_by(OTU_tax) %>% 
+  mutate(max = max(abund)) %>%
+  ungroup() %>% 
+  filter(max >0.005) %>% 
+  
+  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  group_by(id_number, OTU_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  group_by(OTU_tax) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  filter(n_above_threshold >= 3) %>% 
+  ungroup() %>% 
+  
+  
+  # outlier detection
+  group_by(OTU_tax,treatment) %>%
+  mutate(mean = mean(abund),
+         sd = sd(abund),
+         outlier = ifelse(abund > mean + 2*sd | abund < mean - 2*sd, "outlier", "not outlier")) %>%
+  ungroup() %>% 
+  filter(outlier != "outlier") %>%
+  select(-mean, -sd) %>% 
+  
+  # calculating delta values
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
+  group_by(time, OTU_tax) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>%
+  mutate(conc_norm  = abund - inflow ) %>% 
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate( z_score_conc = zscore.calculation(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+```
+
+
+```{}
+# Family 
+
+# Delta no transformation, no z-scoring but **summed otu** used to make the heatmap
+OTU_24h_filtered <- DNA %>%  
+  
+  # filtering out rare taxa
+  ## removing taxa that have a max abundance >0.5%
+  group_by(family_tax) %>% 
+  mutate(max = max(abund)) %>%
+  ungroup() %>% 
+  filter(max >0.005) %>% 
+  
+  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  group_by(id_number, family_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  group_by(family_tax) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  filter(n_above_threshold >= 3) %>% 
+  ungroup() %>% 
+  
+  
+  # outlier detection
+  group_by(family_tax,treatment) %>%
+  mutate(mean = mean(abund),
+         sd = sd(abund),
+         outlier = ifelse(abund > mean + 2*sd | abund < mean - 2*sd, "outlier", "not outlier")) %>%
+  ungroup() %>% 
+  filter(outlier != "outlier") %>%
+  select(-mean, -sd) 
+
+
+  # calculating delta values
+OTU_24h <- OTU_24h_filtered %>% 
+  
+  filter(!family %in% unclassified_families) %>% 
+  
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
+  group_by(time, family_tax) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>%
+  
+   group_by(id_number, treatment, time, family_tax) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T),
+    conc_norm  = sum_abund - inflow ) %>% 
+    ungroup() %>% 
+  
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  mutate(z_score_conc = zscore.calculation(conc_norm)) %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  select(id_number, tank_number, treatment, date,time,time_fac,date_time, inflow_table,
+         z_score_conc,family_tax) %>% distinct()
+```
+
+
+
+```{r}
+# Genus 
+
+# Delta no transformation, no z-scoring but **summed otu** used to make the heatmap
+OTU_24h_filtered <- DNA %>%  
+  
+  # filtering out rare taxa
+  ## removing taxa that have a max abundance >0.5%
+  group_by(genus_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>%
+  mutate(max = max(sum_abund)) %>%
+  ungroup() %>% 
+  filter(max >0.005) %>% 
+  
+  ## remove taxa that don't have an abundance >0.1% in at least 3 samples
+  group_by(id_number, genus_tax) %>% 
+  mutate(sum_abund= sum(abund)) %>% 
+  ungroup() %>% 
+  group_by(genus_tax) %>%
+  mutate(n_above_threshold = sum(sum_abund >= 0.001)) %>%
+  filter(n_above_threshold >= 3) %>% 
+  ungroup() 
+
+
+  # calculating delta values
+OTU_24h <- OTU_24h_filtered %>% 
+  
+  filter(!family %in% unclassified_families) %>% 
+  mutate(genus_tax = paste0(genus, ", ", family, ", ", class)) %>% 
+  
+  mutate(inflow_isolated = ifelse(treatment == "Inflow", abund, NA)) %>% 
+  group_by(time, genus_tax) %>% 
+  mutate(inflow = mean(inflow_isolated, na.rm = T )) %>% 
+  ungroup() %>%
+  
+   group_by(id_number, genus_tax, time_fac) %>% 
+  mutate(sum_abund = sum(abund, na.rm = T)) %>% 
+         ungroup() %>% 
+  mutate(conc_norm  = sum_abund - inflow ) %>% 
+  
+  filter(treatment != "Inflow") %>% 
+  filter(!is.na(conc_norm)) %>% 
+  group_by(genus_tax) %>% 
+  mutate(z_score_conc = zscore.calculation(conc_norm)) %>% 
+  ungroup() %>% 
+  mutate(treatment= factor(treatment, levels = c("Control", "Coral", "CCA", "Algae"))) %>% 
+  select(id_number, tank_number, treatment, date,time,time_fac,date_time, inflow_table,
+         z_score_conc,genus_tax) %>% distinct()
+```
+
+
+
+```{}
+OTU_24h %>% filter(genus_tax == "Vibrio X Vibrionaceae X Vibrionales X Gammaproteobacteria X Proteobacteria")
+```
+
+
+
+```{r, echo=TRUE, collapse=TRUE}
+#Make a heatmap of z-scored relative abundance data after it was summed by family
+#https://jokergoo.github.io/ComplexHeatmap-reference/book/heatmap-annotations.html
+
+# some the abundance of bacteria by family
+family.culled.long.table <- OTU_24h %>%
+  group_by(id_number, genus_tax) %>%
+  summarize(z_score_conc) %>% 
+  ungroup()
+
+# Make wide format table to make a matrix later
+family.culled.abund <- pivot_wider(family.culled.long.table, names_from = genus_tax, values_from = z_score_conc)
+
+# Remove ID number from the data frame
+## Z-score function only works on df that has a matrix format
+culled.abund.OTU <- family.culled.abund %>% as.data.frame() 
+
+```
+
+
+
+
+```{}
+sqrt.matrix <- apply(culled.abund.OTU, 2, FUN=sqrt)
+sqrt.zscore <- as.data.frame(apply(sqrt.matrix, 2, FUN = zscore.calculation))
+```
+
+
+
+```{r}
+# Set the ID numbers as the rownames (to make a matrix)
+rownames(culled.abund.OTU) = culled.abund.OTU$id_number
+
+# Remove the ID number column, convert the df to a matrix and transpose to make the final matrix.
+delta.matrix <- culled.abund.OTU %>% select(-id_number) %>% 
+  as.matrix() %>% t()
+
+
+```
+
+
+
+### Heatmap
+
+#### Annotation
+
+
+
+```{r}
+## Create a vector that will have information of a variable and its associate sample 
+treatment <- meta[match(colnames(delta.matrix),
+                           meta$id_number), 
+                 "treatment"]
+
+date_time <- meta[match(colnames(delta.matrix),
+                           meta$id_number),
+                  "date_time_string"]
+
+time <- meta[match(colnames(delta.matrix),
+                           meta$id_number),
+                  "time_string"]
+
+```
+
+
+
+
+#### Organize the samples (ChatGPT)
+
+
+```{r}
+
+## organize the treatment in order they will be display on the heatmap
+treatment2 <- factor(treatment$treatment, levels = c("Control", "Coral", "CCA", "Algae", "Inflow"))
+
+## organize the time in order they will be display on the heatmap
+time2 <- factor(time$time_string, levels = c("12:00:00", "18:00:00", "00:00:00", "06:00:00"))
+
+#store that info in a df
+col_info <- data.frame(
+  Treatment = treatment2,
+  Time = time2) %>% drop_na()
+
+# create the order in which the samples with be organize in the heatmap
+sample_order <- order(col_info$Treatment,col_info$Time)
+
+# tell the matrix with my z-scores how the samples should be arranged
+mat_ordered <- delta.matrix[, sample_order]
+
+# have vectors specifying the order of the treatment for the heatmap
+treatment_ordered <- col_info$Treatment[sample_order]
+time_ordered <- col_info$Time[sample_order]
+
+
+```
+
+```{r}
+col_ha <- HeatmapAnnotation(
+  Treatment = anno_block(
+    gp = gpar(fill = c("grey", "#03A9F4", "#EF5350", "#4CAF50")),
+    labels = c("Control", "Coral", "CCA", "Algae"), 
+    labels_gp = gpar(col = "white", fontsize = 14, fontface = "bold")),
+  
+  Time = time_ordered, 
+  
+  col = list(Treatment = c("Control" = "grey", 
+                           "Coral"   = "#03A9F4", 
+                           "CCA"     = "#EF5350",
+                           "Algae"   = "#4CAF50"),
+             Time = c("12:00:00" = "black",
+                      "18:00:00" = "green", 
+                      "00:00:00" = "blue",
+                      "06:00:00" = "grey")),
+  
+   # Controls the "Time" label on the left side of the ribbon *
+   annotation_name_gp = gpar(fontsize = 16, fontface = "bold"), 
+  
+   # Controls the height of the Time ribbon bar itself 
+   simple_anno_size = unit(6, "mm"), 
+  
+  annotation_legend_param = list(
+    
+     Time = list( 
+       title_gp    = gpar(fontsize = 16, fontface = "bold"), 
+       labels_gp   = gpar(fontsize = 16)
+    )
+  )
+)
+
+```
+
+
+
+
+#### Printing heatmap
+
+
+
+```{r, fig.height = 16, fig.width = 24}
+# Version 2
+#png(width=3000, height=1200, file= here("outputs", "zscore_24hdata.png"))
+#png(width=1800, height=1000, file= here("outputs", "zscore_delta_genus.png"))
+
+ht = Heatmap(mat_ordered, 
+             name = "Z-scored Abundance", 
+             heatmap_legend_param = list(#legend_direction = "horizontal",
+                                          title_gp= gpar(fontsize = 16, 
+                                                          fontface = "bold"), 
+                labels_gp       = gpar(fontsize = 16), 
+                grid_height     = unit(6, "mm"), 
+                grid_width      = unit(6, "mm"), 
+                legend_width    = unit(8, "cm")),   # controls horizontal legend length),
+             show_row_names = TRUE,
+        row_names_max_width = unit(25, "cm"),
+        clustering_method_rows = "complete",
+        clustering_distance_rows = "euclidean",
+             #rect_gp = gpar(col = "white", lwd = 0.1),
+        
+        column_title = "Bacterial Community Shift Over 24h", 
+        column_title_gp = gpar(fontsize = 25, fontface = "bold"),
+        #column_title_side = "bottom",
+        cluster_rows = TRUE,
+        cluster_columns =  FALSE,
+        row_title = "Bacterial Taxa",
+        row_title_gp = gpar(fontsize = 18, fontface = "bold"),
+        row_names_gp = gpar(fontsize = 16),
+        row_dend_width = unit(1.5, "cm"),
+        #column_names_gp = gpar(fontsize = 10),
+        show_column_names = FALSE,
+        row_km = 3, # 5? number of forced segregation in rows 
+        #column_km = 4,#number of forced segregation in columns 
+        top_annotation = col_ha,
+        #bottom_annotation = col_ha,
+        column_split = treatment_ordered
+        )
+set.seed(1999)
+ht_drawn <- draw(ht, heatmap_legend_side = "right",
+                 annotation_legend_side = "right", 
+  merge_legends = TRUE)
+
+#dev.off()
+
+```
+
+
+
+
+
+
+
+```{, fig.height= 16, fig.width=12}
+library(RColorBrewer)
+
+OTU_24h %>% 
+  ggplot(aes(x = time_fac, y = OTU_tax, fill = conc_norm)) + 
+  geom_tile(color = "black") +
+  facet_grid(. ~ treatment, scales = "free_x", space = "free_x") +
+  scale_fill_distiller(palette = "RdBu") +
+  labs(x = "Time point", y = NULL, fill = "Concentration") +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold"),
+    panel.spacing = unit(0.3, "lines")
+  )
+```
+
+
+
+
+
+```{r}
+DNA %>% 
+  filter(!family %in% unclassified_families) %>%  select(genus, family, order, class) %>%  distinct()
+```
+
