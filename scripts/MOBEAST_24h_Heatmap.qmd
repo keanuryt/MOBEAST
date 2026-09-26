@@ -504,6 +504,13 @@ module_A_bact <- modules_24h %>%
   filter(cluster == "Module A") %>% 
   arrange(desc(avg)) %>%  
   pull(taxa)
+
+module_B_bact <- modules_24h %>%  
+  group_by(taxa, cluster) %>% 
+  reframe(avg = mean(abund)*100) %>%  
+  filter(cluster == "Module B") %>% 
+  arrange(desc(avg)) %>%  
+  pull(taxa)
 ```
 
 
@@ -1080,10 +1087,22 @@ emmeans_table_genus_sqrt <- emmeans_results_dna %>%
 write_csv(emmeans_table_genus_sqrt, path = here("outputs","genus_sqrt_contrasts.csv"))
 ```
 
+```{r}
+## Significant taxa in Module B 
+
+module_B_sig_emm <- emmeans_results_dna %>% 
+  filter(adj.p.value < 0.05,
+         variable %in% anova_sig) %>% 
+  select(variable, contrast, estimate, adj.p.value) %>% 
+  filter(variable %in% module_B_bact) %>% 
+  pull(variable)
+```
+
 
 ### Percent decrease ? 
 
 ```{r}
+#Module A percent difference 
 genus_24h %>%  filter(treatment == "Algae"|treatment == "Control", 
                       genus_tax %in% module_A_sig_emm) %>% 
   group_by(genus_tax, time_fac, treatment) %>% 
@@ -1093,7 +1112,21 @@ genus_24h %>%  filter(treatment == "Algae"|treatment == "Control",
            time_fac== "06:00:00") %>% 
   #mutate(time_fac = ifelse(time_fac == "12:00:00", "noon", "six")) %>% 
   pivot_wider(names_from = treatment, values_from = avg) %>% 
-  mutate(diff = (Algae -Control)*100) %>% 
+  mutate(diff = (Algae - Control)*100) %>% 
+  select(genus_tax, diff)
+
+
+## Module B percent difference
+genus_24h %>%  filter(treatment == "Algae"|treatment == "Control", 
+                      genus_tax %in% module_B_bact) %>% 
+  group_by(genus_tax, time_fac, treatment) %>% 
+  reframe(avg = mean(sum_abund)) %>% 
+  mutate(time_fac = as.character(time_fac)) %>% 
+  filter(#time_fac == "12:00:00" | 
+           time_fac== "06:00:00") %>% 
+  #mutate(time_fac = ifelse(time_fac == "12:00:00", "noon", "six")) %>% 
+  pivot_wider(names_from = treatment, values_from = avg) %>% 
+  mutate(diff = (Algae - Control)*100) %>% 
   select(genus_tax, diff)
     
 ```

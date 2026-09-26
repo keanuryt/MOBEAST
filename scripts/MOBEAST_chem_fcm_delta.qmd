@@ -381,9 +381,8 @@ fcm<- mobeast_delta %>%  filter(variable_cat == "FCM" | variable_cat== "chla") %
   select("variable") %>%  distinct() %>% pull()
 
 anova_results %>% 
-  filter( p.value <0.05,
-    term == "time_fac"
-    ) %>%  
+  #filter(p.value <0.05,
+    #term == "treatment") %>%  
   #filter(term == "time_fac") %>% 
   filter(variable %in% fcm)
 ```
@@ -440,7 +439,7 @@ emmeans_results <- imap_dfr(models_24h, ~ {
   filter(contrast == "Control - Coral"| contrast == "Control - CCA"|contrast == "Control - Algae") 
 
 emmeans_results %>% 
-  filter(variable %in% sig_anova) #%>%
+  filter(variable %in% sig_anova) %>%
   filter(adj.p.value <0.05) 
 ```
 
@@ -486,7 +485,7 @@ tukey_FCM_results <- imap_dfr(models_24h, ~ {
 }) %>% 
   relocate(variable)
 
-tukey_FCM_results %>% filter(variable %in% fcm, 
+tukey_FCM_results %>% filter(variable %in% fcm , 
                              adj.p.value <0.05) %>%
   mutate(abs_stat = abs(statistic)) %>% 
   group_by(variable) %>% 
@@ -517,7 +516,7 @@ mobeast_24h %>%
     geom_jitter(color = "black", alpha = 0.5, width = 0.25)+
     geom_hline(yintercept=0, linetype='dashed')+
     geom_hline(yintercept= 0,linetype = 'dotdash', color = "red")+
-  facet_wrap(.~ time_fac)+
+  #facet_wrap(.~ time_fac)+
     labs(x= "Treatment",
        y = paste0("Delta Coble C"))+
   scale_y_continuous(
