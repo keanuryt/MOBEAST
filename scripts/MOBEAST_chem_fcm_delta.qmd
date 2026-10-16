@@ -960,3 +960,36 @@ ph <- mobeast_24h %>%
 
 ta + ph
 ```
+
+
+
+```{r}
+## the residence time is in hours
+
+mobeast%>% select(id_number, date_string, time_string, residence_time, flowrate) %>% 
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  distinct() %>% 
+  pivot_longer(cols = c(residence_time, flowrate), names_to = "variable", values_to = "value") %>% 
+  group_by(variable) %>% 
+  reframe(avg = mean(value, na.rm = TRUE),
+          SD = sd(value, na.rm = TRUE),
+          median= median(value, na.rm = TRUE),
+          max = max(value, na.rm = TRUE),
+          min= min(value, na.rm = TRUE)
+          ) %>% 
+  mutate(avg_time = 10/(avg*3600/1000))
+```
+
+```{r}
+mobeast%>% select(id_number, date_string, time_string, residence_time, flowrate) %>% 
+  filter(date_string == "2024-06-02"|date_string == "2024-06-03") %>% 
+  distinct() %>% 
+  mutate(res_time = 10/(flowrate*3600/1000))
+```
+
+
+
+
+
+
+
