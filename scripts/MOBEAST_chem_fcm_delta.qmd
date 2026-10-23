@@ -163,9 +163,22 @@ mobeast_flagged <- mobeast_DOC %>%
   ungroup()
   
 
-mobeast_flagged %>%  filter(variable == "NO3")
 ```
 
+```{r}
+mobeast_flagged %>%  
+  filter(treatment != "Inflow", !is.na(outlier)) %>% 
+  #filter(outlier == "outlier") %>% 
+  group_by(variable, outlier) %>% 
+  reframe(n= n()) %>% 
+  pivot_wider(names_from = "outlier",
+              values_from = "n") %>% 
+  mutate(percent_outlier = outlier/64*100) %>% 
+  reframe(min= min(percent_outlier, na.rm = T),
+          max = max(percent_outlier, na.rm = T),
+          avg = mean(percent_outlier, na.rm = T))
+
+```
 
 
 ### Biogeochemistry 
@@ -470,8 +483,9 @@ emmeans_time_results <- imap_dfr(models_24h, ~ {
   relocate(variable)
 
 emmeans_time_results %>%  
-  #filter(adj.p.value<0.05) %>% 
-  filter(variable == "SiO2")
+  filter(adj.p.value<0.05) %>% 
+  filter(variable == "chla_conc") 
+  
 
 ```
 
@@ -510,13 +524,13 @@ mobeast_inflow <- mobeast_delta %>% filter(treatment == "Inflow")
 
 ```{r}
 mobeast_24h %>% 
-  filter(variable == "SiO2") %>% 
+  filter(variable == "pro") %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
     geom_boxplot(outlier.shape = NA)+
     geom_jitter(color = "black", alpha = 0.5, width = 0.25)+
     geom_hline(yintercept=0, linetype='dashed')+
     geom_hline(yintercept= 0,linetype = 'dotdash', color = "red")+
-  #facet_wrap(.~ time_fac)+
+  facet_wrap(.~ time_fac)+
     labs(x= "Treatment",
        y = paste0("Delta Coble C"))+
   scale_y_continuous(
@@ -751,62 +765,66 @@ mobeast_delta %>% filter(variable %in% sig_anova) %>%
           sd = sd(conc_norm, na.rm = TRUE))
 ```
 
-## DOM x Het Bact
 ```{r}
-mobeast_wide <- mobeast_24h %>% select(tank_number, treatment, inflow_table, 
-                       time_fac,variable, conc_norm, log_flow) %>% 
-  pivot_wider(names_from = variable, values_from = conc_norm)
+mobeast_24h %>%  filter(variable == "pro") %>% 
+  select(treatment, time_string, conc_norm) %>% 
+  mutate(time = ifelse(time_string == "00:00:00", "AM_12", 
+                   ifelse(time_string == "06:00:00", "AM_6", 
+                        ifelse(time_string == "18:00:00", "PM_6", "PM_12" )))) %>% 
+  select(-time_string) %>% 
+  group_by(time) %>% 
+  reframe(avg = mean(conc_norm, rm.na = T)) %>% 
+  pivot_wider(names_from = time,
+              values_from = avg) %>% 
+  mutate(delta = PM_12+ abs(AM_12))
+
+
+
+mobeast_24h %>%  filter(variable == "pro") %>% 
+  select(treatment, time_string, conc_norm) %>% 
+  mutate(time = ifelse(time_string == "00:00:00", "AM_12", 
+                   ifelse(time_string == "06:00:00", "AM_6", 
+                        ifelse(time_string == "18:00:00", "PM_6", "PM_12" )))) %>% 
+  select(-time_string, -treatment) %>% 
+  pivot_wider(names_from = time,
+              values_from = conc_norm)
+  group_by(time) %>% 
+  reframe(avg = mean(conc_norm, rm.na = T)) %>% 
+  mutate(delta = PM_12+ abs(AM_12))
 ```
 
+# Exploration of FCM X chla
 
-### HIX 
 ```{r}
-mod_hix <- lm(het_bact ~ hix + treatment + log_flow , 
-                  data= mobeast_wide)
-anova(mod_hix)
-contrast(emmeans(mod_hix, ~treatment), methods= "trt.vs.ctrl")
-
-ggplot(mobeast_wide, aes(hix, het_bact, color = treatment,group= treatment))+
+mobeast_24h %>% 
+  select(id_number, time_string, treatment, variable, conc_norm) %>%
+  pivot_wider(names_from = variable, 
+              values_from = conc_norm) %>% 
+  mutate(time_string = factor(time_string, 
+                                 levels = c("12:00:00",
+                                            "18:00:00",
+                                            "00:00:00",
+                                            "06:00:00"))) %>% 
+  ggplot(aes(x= syn, y = chla_conc, color = treatment ))+
   geom_point()+
-  geom_smooth(method = "lm",se = F)+
-  facet_wrap(.~treatment)+
-  scale_color_manual(values = treatment_colors)+
-  nunu_theme
+  geom_smooth(method = "lm")+
+  facet_grid(treatment ~ time_string)+
+  #facet_wrap(. ~ treatment)+
+  scale_color_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))
 
-ggplot(mobeast_wide, aes(hix, het_bact, fill = treatment,group= treatment))+
-  geom_violin()+
-  facet_wrap(.~treatment, nrow=1)+
-  stat_summary(alpha = 0.5)+
-  scale_fill_manual(values = treatment_colors)+
-  nunu_theme
-```
+mobeast_24h
 
-### Coble C
-
-```{r}
-mod_cobC <- lm(het_bact ~ coble_c + treatment + log_flow , 
-                  data= mobeast_wide)
-anova(mod_cobC)
-contrast(emmeans(mod_cobC, ~treatment), methods= "trt.vs.ctrl")
-
-ggplot(mobeast_wide, aes(coble_c, het_bact, color = treatment,group= treatment))+
-  geom_point()+
-  geom_smooth(method = "lm",se = F)+
-  facet_wrap(.~treatment, nrow=1)+
-  scale_color_manual(values = treatment_colors)+
-  nunu_theme
-
-ggplot(mobeast_wide, aes(coble_c, het_bact, fill = treatment,group= treatment))+
-  geom_violin()+
-  facet_wrap(.~treatment, nrow=1)+
-  stat_summary(alpha = 0.5)+
-  scale_fill_manual(values = treatment_colors)+
-  nunu_theme
+write_csv(mobeast_24h, here("data", "mobeast_24h.csv"))
+  
 ```
 
 
+## Models 
 
-### Plots 
+
+
+### Carbonate Plots 
 
 
 ```{r}
@@ -891,78 +909,9 @@ ta + ph
 ```
 
 
-```{r}
-
-# Define shading dataframe matching your exact factor levels
-# Adjust period assignments to match your actual day/night schedule
-shading <- data.frame(
-  time_fac = levels(mobeast_24h$time_fac),
-  period   = c("day", "night", "night", "day")  # adjust to your time points
-)
-
-ta <- mobeast_24h %>% 
-  filter(variable == "ta") %>% 
-  ggplot(aes(x = time_fac, y = conc_norm, fill = treatment)) +
-  # Day/night shading - added before geom_point and geom_line
-  #geom_point() +
-  geom_tile(
-    data = shading,
-    aes(x = time_fac, y = 0, fill = period),
-    height = Inf, alpha = 0.3,
-    inherit.aes = FALSE
-  ) +
-  geom_violin() +
-  stat_summary(color = "yellow", alpha =0.5)+
-  geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_grid(treatment ~ .) +
-  labs(title = "Total Alkalinity ",
-    x = "Time Point",
-    y = paste0("Delta TA (µmol/kg)")
-  ) +
-  scale_fill_manual(
-    breaks = c("Control", "Coral", "CCA", "Algae", "day", "night"),
-    values = c("grey", "#03A9F4", "#EF5350", "#4CAF50", "lightyellow", "lightblue")
-  ) +
-  nunu_theme +
-  theme(
-    axis.text       = element_text(size = 18),
-    legend.position = "none"
-  )
-
-ph <- mobeast_24h %>% 
-  filter(variable == "ph") %>% 
-  ggplot(aes(x = time_fac, y = conc_norm, fill = treatment)) +
-  # Day/night shading - added before geom_point and geom_line
-  #geom_point() +
-  geom_tile(
-    data = shading,
-    aes(x = time_fac, y = 0, fill = period),
-    height = Inf, alpha = 0.3,
-    inherit.aes = FALSE
-  ) +
-  geom_violin() +
-  stat_summary(color = "yellow", alpha =0.5)+
-  geom_hline(yintercept = 0, linetype = 'dashed') +
-  facet_grid(treatment ~ .) +
-  labs(title = "pH",
-    x = "Time Point",
-    y = paste0("Delta pH")
-  ) +
-  scale_fill_manual(
-    breaks = c("Control", "Coral", "CCA", "Algae", "day", "night"),
-    values = c("grey", "#03A9F4", "#EF5350", "#4CAF50", "lightyellow", "lightblue")
-  ) +
-  nunu_theme +
-  theme(
-    axis.text       = element_text(size = 18),
-    legend.position = "none"
-  )
-
-ta + ph
-```
 
 
-
+# Checking residence time 
 ```{r}
 ## the residence time is in hours
 

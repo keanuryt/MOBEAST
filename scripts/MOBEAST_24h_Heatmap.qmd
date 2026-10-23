@@ -149,7 +149,7 @@ OTU_htm_24h <- OTU_htm %>% filter(treatment != "Inflow")
 
 
 
-## Data with only the most abundant taxa 
+## Abundance Filter : Data with only the most abundant taxa 
 
 
 ```{r}
@@ -184,6 +184,8 @@ taxa_filtered
 taxa_filtered %>% select(taxa) %>% distinct()
 
 ```
+
+
 
 
 ### SQRT-transformed Z-score 
@@ -629,6 +631,29 @@ ggsave(filename = "modules_ICRS.png", plot = last_plot(), path = here("outputs")
 ```
 
 
+```{r}
+modules_24h %>% 
+  group_by(cluster, taxa) %>%
+  reframe(avg = mean(abund)) %>% 
+  ggplot(aes(x=cluster, y= avg, fill = taxa)) + 
+  geom_col(color = "black")+
+  geom_text(aes(label = round(avg*100, 3)),        # round to 3 decimal places
+            position = position_stack(vjust = 0.5),  # centers text in each block
+            size     = 3,
+            color    = "white")+
+  labs(x= "Module", y= "averaged relative abundance")+
+  theme_bw()+
+  theme(legend.position = "none")
+
+  
+```
+```{r}
+modules_24h %>% 
+  group_by(cluster, taxa) %>%
+  reframe(avg = mean(abund)) %>% 
+  filter(cluster == "Module A") %>% 
+  arrange(desc(avg))
+```
 
 
 
@@ -1187,6 +1212,16 @@ genus_24h <- DNA %>%
    
 ```
 
+
+```{r}
+genus_24h_alt <- genus_24h %>% 
+  select(id_number, tank_number, treatment, inflow_table, 
+         date, time,  date_time,
+         sum_abund, genus_tax, conc_norm, log_flow) %>% distinct()
+  
+  
+write_csv(genus_24h_alt, here("data", "mobeast_DNA_24h.csv"))
+```
 
 ```{r}
 exclude_tax <- genus_24h %>% 

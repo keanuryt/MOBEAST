@@ -150,7 +150,7 @@ nmds_merged %>%
   rename(Treatments = treatment) %>% 
   ggplot(aes(x= NMDS1, y = NMDS2, colour = Treatments, fill= Treatments))+
   stat_ellipse(#aes(colour = cluster, fill = cluster),
-               alpha = 0.2, geom= "polygon", level = 0.8, show.legend = FALSE)+
+               alpha = 0.2, geom= "polygon", level = 0.95, show.legend = FALSE)+
   
   geom_point(size = 4) +
   geom_point(shape = 1, color = "black",size = 4) +
@@ -162,13 +162,17 @@ nmds_merged %>%
   scale_fill_manual(values= treatment_colors) +
   nunu_theme+
   theme(legend.position = "bottom")
+
 ggsave("bacterial_community_ordination.png", width = 16, height = 6, path = here("outputs"))
 
 ```
 ## PERMANOVA 
 
 ```{r}
-nmds_merged<- nmds_merged %>% mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00","00:00:00","06:00:00")))
+nmds_merged<- nmds_merged %>% 
+  mutate(time_fac = factor(time_string, levels = c("12:00:00", "18:00:00","00:00:00","06:00:00"))) %>% 
+  mutate(tank_number = as.factor(tank_number))
+  
 ```
 
 

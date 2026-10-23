@@ -1,0 +1,250 @@
+---
+title: "FCM x DNA"
+created: 22 Oct 2026
+edited: 22 Oct 2026
+format: html
+editor: source
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(here)
+
+library(ggrepel)
+library(patchwork)
+library(RColorBrewer)
+library(measurements)
+library(gt)
+library(webshot2)
+
+library(car) # ANOVA package
+library(ggeffects)
+library(effects) #dependency for ggeffects
+library(ggResidpanel) #residual panel
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+library(emmeans)
+library(performance)
+library(multcompView)
+library(broom.mixed)
+library(effectsize)
+
+
+# PCA packages
+library(corrr)
+library(ggcorrplot)
+library(FactoMineR)
+library(factoextra) 
+
+# to add significance brackets
+library(ggpubr)
+
+```
+
+## Data visualization theme
+
+```{r}
+nunu_theme <- theme_test()+ 
+  theme(plot.title = element_text(size=16, face = "bold"), 
+        plot.subtitle = element_text(size=20),
+        axis.title = element_text(size = 7.5, face = "bold"),
+        axis.text = element_text(size = 7.5),
+        strip.text.x = element_text(size = 10, face = "bold"),
+        legend.title=element_text(size= 9, face = "bold"),
+        legend.text=element_text(size=7.5),
+        strip.background = element_rect(fill = "white"),
+        legend.position = "none"
+        )
+```
+
+
+```{r}
+treatment_colors = c("Inflow"="#00838F",
+                     "Control"="grey", 
+                     "Coral"="#03A9F4", 
+                     "CCA"="#EF5350", 
+                     "Algae"="#4CAF50",
+                     "Endmember" = "black", 
+                     "Rain"= "yellow")
+```
+
+## Load Data
+
+```{r}
+mobeast <- read_csv(here("data", "MOBEAST_24h.csv"))
+mobeast_DNA <- read_csv(here("data", "MOBEAST_DNA_24h.csv"))
+```
+
+```{r}
+meta <- mobeast %>% select(id_number, tank_number, treatment,
+                           inflow_table, date_time, date, time, 
+                           flowrate, log_flow) %>% distinct()
+mobeast <- mobeast %>% filter(variable_cat == "FCM" | variable_cat == "chla" ) %>% select(id_number, variable, conc_norm)
+
+
+mobeast_DNA <- mobeast_DNA %>% filter(str_detect(genus_tax, "Syn")|
+                         str_detect(genus_tax, "Prochl")) %>% 
+  mutate(variable = ifelse(str_detect(genus_tax, "Syn"),
+                           "syn_dna", "pro_dna")) %>% 
+  select(id_number, variable, conc_norm) %>% distinct()
+
+microbe <- rbind(mobeast, mobeast_DNA)
+
+mobeast_micro <- left_join(meta, microbe) %>% 
+  select(id_number, treatment, tank_number, tank_number, time, flowrate, variable, conc_norm) %>% 
+  pivot_wider(names_from = variable, values_from = conc_norm) %>% 
+  mutate(treatment = factor(treatment, levels = c("Control", "Coral", "CCA", "Algae")))
+  
+```
+
+
+## Plots 
+```{r}
+mobeast_micro %>%  
+  mutate(time_fac = factor(time, 
+                                 levels = c("12:00:00",
+                                            "18:00:00",
+                                            "00:00:00",
+                                            "06:00:00"))) %>% 
+  ggplot(aes(x= syn, y= syn_dna, color = treatment))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  #facet_grid(treatment ~ time_fac)+
+  facet_wrap(. ~ treatment)+
+  theme_classic()+
+  scale_color_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))
+```
+
+
+## Models 
+
+```{r}
+# DNA vs FCM
+
+mod_syn <- lmer(syn_dna ~ syn*treatment + (1|tank_number), data = mobeast_micro)
+anova(mod_syn, type= 2) # signficant 
+
+MuMIn::r.squaredGLMM(mod_syn)
+
+
+mod_pro <- lmer(pro_dna ~ pro*treatment+ (1|tank_number), data = mobeast_micro)
+anova(mod_pro, type= 2 ) # significant!
+
+MuMIn::r.squaredGLMM(mod_pro)
+
+# FCM vs chla
+mod_syn_chla <- lmer(chla_conc ~ syn*treatment + (1|tank_number), data = mobeast_micro)
+anova(mod_syn_chla, type= 2) # not signficant 
+
+mod_pro_chla <- lmer(chla_conc ~ pro*treatment+ (1|tank_number), data = mobeast_micro)
+anova(mod_pro_chla) # not signficant 
+
+# DNA vs chla
+mod_syn_dna_chla <- lmer(chla_conc ~ syn_dna*treatment+ (1|tank_number), 
+                       data = mobeast_micro)
+anova(mod_syn_dna_chla, type= 2) # significant 
+
+mod_pro_dna_chla <- lmer(chla_conc ~ pro_dna*treatment+ (1|tank_number), 
+                       data = mobeast_micro)
+anova(mod_pro_dna_chla, type= 2) # not significant 
+
+
+```
+
+
+
+```{r}
+pro_pro_dna_emmeans <- tidy(emmeans(mod_pro, pairwise ~ treatment)$contrasts) %>% 
+  mutate(model = "pro vs pro DNA") %>% 
+  select(-null.value, -std.error, -df, -term) %>% 
+  relocate(model)
+
+
+syn_syn_dna_emmeans <- tidy(emmeans(mod_syn, pairwise ~ treatment)$contrasts) %>% 
+  mutate(model = "syn vs syn DNA") %>% 
+  select(-null.value, -std.error, -df, -term) %>% 
+  relocate(model)
+
+
+syn_dna_chla_emmeans <- tidy(emmeans(mod_syn_dna_chla, pairwise ~ treatment)$contrasts) %>% 
+  mutate(model = "syn DNA vs chla") %>% 
+  select(-null.value, -std.error, -df, -term) %>% 
+  relocate(model)
+
+emmeans_results <- rbind(pro_pro_dna_emmeans,syn_syn_dna_emmeans,syn_dna_chla_emmeans)
+
+emmeans_results %>% filter(adj.p.value <0.05)
+```
+
+```{r}
+cor.test(mobeast_micro$syn, 
+         mobeast_micro$syn_dna, 
+         method = "pearson")
+
+cor.test(mobeast_micro$pro_dna, 
+         mobeast_micro$pro, 
+         method = "pearson")
+
+cor.test(mobeast_micro$syn_dna, 
+         mobeast_micro$chla_conc, 
+         method = "pearson")
+```
+
+
+
+```{r}
+set.seed(120)
+mobeast_micro %>%  
+  mutate(treatment = factor(treatment, levels = c(
+    "Control", "Coral", "CCA", "Algae"))) %>% 
+ggplot( aes(x= treatment, y = pro_dna, fill = treatment))+
+  geom_boxplot()+
+  geom_jitter(alpha = 0.5)+
+  scale_fill_manual(breaks = c("Control", "Coral", "CCA", "Algae"), 
+                       values=c("grey", "#03A9F4", "#EF5350", "#4CAF50"))
+```
+
+```{r}
+mobeast_micro %>%
+  ggplot(aes(x = pro,
+             y = pro_dna,
+             color = treatment,
+             group = tank_number)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE,
+              aes(group = 1),  # single regression line across all
+              color = "black", linetype = "dashed") +
+  facet_wrap(~ treatment)
+```
+
+```{r}
+mobeast_micro %>%
+  ggplot(aes(x = syn_dna,
+             y = chla_conc,
+             color = treatment,
+             group = tank_number)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE,
+              aes(group = 1),  # single regression line across all
+              color = "black", linetype = "dashed") +
+  facet_wrap(~ treatment)
+```
+
+
+# Thoughts 
+
+Prochlorococcus absolute and relative abundance are linearly correlated. So that translate to an actual increase/decrease in pro in the DNA as opposed a simple change in taxa abundance. But the control vs Algae contrast is not signficant !!! X( 
+
+There is indeed a treatment effect on pro_dna which was already identified in the DNA models. 
+
+

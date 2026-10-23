@@ -138,6 +138,8 @@ mobeast_DNA_24h %>%
   mutate(sum = sum(value, na.rm = T)) %>% 
   filter(sum > 0.005) %>% 
   ungroup()
+
+
 ```
 
 
