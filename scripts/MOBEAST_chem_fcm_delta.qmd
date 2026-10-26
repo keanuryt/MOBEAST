@@ -476,7 +476,7 @@ emmean_sig <- emmeans_results_sig %>% select(variable) %>% distinct() %>%  pull(
 
 ```{r}
 emmeans_time_results <- imap_dfr(models_24h, ~ {
-  emmeans(.x, pairwise ~ time_fac | treatment)$contrasts %>%
+  emmeans(.x, pairwise ~ time_fac|treatment)$contrasts %>%
     broom::tidy() %>%
     mutate(variable = .y)
 }) %>% 
@@ -484,7 +484,7 @@ emmeans_time_results <- imap_dfr(models_24h, ~ {
 
 emmeans_time_results %>%  
   filter(adj.p.value<0.05) %>% 
-  filter(variable == "chla_conc") 
+  filter(variable == "N_N") %>% filter(treatment == "Algae")
   
 
 ```
@@ -524,7 +524,7 @@ mobeast_inflow <- mobeast_delta %>% filter(treatment == "Inflow")
 
 ```{r}
 mobeast_24h %>% 
-  filter(variable == "pro") %>% 
+  filter(variable == "N_N") %>% 
   ggplot(aes(x= treatment, y= conc_norm, fill = treatment))+
     geom_boxplot(outlier.shape = NA)+
     geom_jitter(color = "black", alpha = 0.5, width = 0.25)+
